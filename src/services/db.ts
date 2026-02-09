@@ -1,0 +1,1122 @@
+import Database from 'better-sqlite3';
+import { app } from 'electron';
+import { join } from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import type { PomodoroSession, Setting, TaskPreference, Milestone, Goal, DailyIntentions, ShutdownRitual } from '../types';
+
+let db: Database.Database | null = null;
+
+export function initDB(): Database.Database {
+  if (db) return db;
+
+  const userDataPath = app.getPath('userData');
+  const dbPath = join(userDataPath, 'productivity.db');
+
+  db = new Database(dbPath);
+  db.pragma('journal_mode = WAL');
+
+  // Execute schema inline instead of reading from file
+  const schema = `
+    CREATE TABLE IF NOT EXISTS task_cache (
+      task_id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      project_id INTEGER NOT NULL,
+      project_name TEXT,
+      last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+      id TEXT PRIMARY KEY,
+      start_at DATETIME NOT NULL,
+      end_at DATETIME,
+      duration_minutes INTEGER NOT NULL DEFAULT 25,
+      task_id TEXT,
+      source TEXT CHECK(source IN ('pomodoro', 'manual', 'calendar')) DEFAULT 'pomodoro',
+      comment TEXT,
+      logged INTEGER DEFAULT 0,
+      log_sent_at DATETIME,
+      server_entry_id INTEGER,
+      billable INTEGER DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS adhoc_entries (
+      id TEXT PRIMARY KEY,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      date TEXT NOT NULL,
+      duration_minutes INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      task_id TEXT,
+      is_todo INTEGER DEFAULT 0,
+      due_date TEXT,
+      completed INTEGER DEFAULT 0,
+      marked_to_log INTEGER DEFAULT 0,
+      logged INTEGER DEFAULT 0,
+      comment TEXT,
+      billable INTEGER DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS calendar_proposals (
+      id TEXT PRIMARY KEY,
+      event_uid TEXT NOT NULL,
+      title TEXT NOT NULL,
+      start_at DATETIME NOT NULL,
+      end_at DATETIME NOT NULL,
+      duration_minutes INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      accepted INTEGER DEFAULT 0,
+      dismissed INTEGER DEFAULT 0,
+      task_id TEXT,
+      comment TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS daily_summaries (
+      date TEXT PRIMARY KEY,
+      payload JSON NOT NULL,
+      saved_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS log_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      task_id TEXT NOT NULL,
+      default_duration INTEGER,
+      billable INTEGER DEFAULT 1,
+      comment TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS task_preferences (
+      task_id TEXT PRIMARY KEY,
+      tracked INTEGER DEFAULT 0,
+      pinned INTEGER DEFAULT 0,
+      milestone_ids TEXT DEFAULT '[]',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS milestones (
+      id TEXT PRIMARY KEY,
+      parent_type TEXT CHECK(parent_type IN ('task', 'goal')) NOT NULL,
+      parent_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      completed INTEGER DEFAULT 0,
+      order_num INTEGER DEFAULT 0,
+      weight REAL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS goals (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      identity_reinforcement TEXT,
+      milestone_ids TEXT DEFAULT '[]',
+      active INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS daily_intentions (
+      date TEXT PRIMARY KEY,
+      intentions TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS shutdown_rituals (
+      date TEXT PRIMARY KEY,
+      total_minutes INTEGER NOT NULL,
+      deep_work_minutes INTEGER NOT NULL,
+      tasks_worked TEXT NOT NULL,
+      reflection TEXT,
+      notes TEXT,
+      tomorrow_intentions TEXT,
+      locked INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sessions_date ON pomodoro_sessions(date(start_at));
+    CREATE INDEX IF NOT EXISTS idx_sessions_logged ON pomodoro_sessions(logged);
+    CREATE INDEX IF NOT EXISTS idx_adhoc_date ON adhoc_entries(date);
+    CREATE INDEX IF NOT EXISTS idx_calendar_date ON calendar_proposals(date);
+    CREATE INDEX IF NOT EXISTS idx_milestones_parent ON milestones(parent_type, parent_id);
+    CREATE INDEX IF NOT EXISTS idx_milestones_completed ON milestones(completed);
+    CREATE INDEX IF NOT EXISTS idx_task_prefs_tracked ON task_preferences(tracked);
+    CREATE INDEX IF NOT EXISTS idx_goals_active ON goals(active);
+  `;
+
+  // Execute schema statements
+  db.exec(schema);
+
+  // Run migrations for existing databases
+  runMigrations(db);
+
+  // Initialize default settings if not present
+  initializeDefaultSettings(db);
+
+  // Initialize default templates if not present
+  initializeDefaultTemplates(db);
+
+  return db;
+}
+
+function runMigrations(database: Database.Database) {
+  // Migration: Add comment column to calendar_proposals if it doesn't exist
+  try {
+    const tableInfo = database.pragma('table_info(calendar_proposals)');
+    const hasCommentColumn = tableInfo.some((col: any) => col.name === 'comment');
+
+    if (!hasCommentColumn) {
+      console.log('Running migration: Adding comment column to calendar_proposals');
+      database.exec('ALTER TABLE calendar_proposals ADD COLUMN comment TEXT');
+      console.log('Migration complete');
+    }
+  } catch (error) {
+    console.error('Migration error:', error);
+  }
+
+  // Migration: Add billable column to pomodoro_sessions
+  try {
+    const sessionsInfo = database.pragma('table_info(pomodoro_sessions)');
+    const sessionHasBillable = sessionsInfo.some((col: any) => col.name === 'billable');
+
+    if (!sessionHasBillable) {
+      console.log('Running migration: Adding billable column to pomodoro_sessions');
+      database.exec('ALTER TABLE pomodoro_sessions ADD COLUMN billable INTEGER DEFAULT 1');
+      console.log('Migration complete: pomodoro_sessions.billable');
+    }
+  } catch (error) {
+    console.error('Migration error (pomodoro_sessions billable):', error);
+  }
+
+  // Migration: Add billable column to adhoc_entries
+  try {
+    const adhocInfo = database.pragma('table_info(adhoc_entries)');
+    const adhocHasBillable = adhocInfo.some((col: any) => col.name === 'billable');
+
+    if (!adhocHasBillable) {
+      console.log('Running migration: Adding billable column to adhoc_entries');
+      database.exec('ALTER TABLE adhoc_entries ADD COLUMN billable INTEGER DEFAULT 1');
+      console.log('Migration complete: adhoc_entries.billable');
+    }
+  } catch (error) {
+    console.error('Migration error (adhoc_entries billable):', error);
+  }
+
+  // Migration: Add comment column to log_templates
+  try {
+    const templatesInfo = database.pragma('table_info(log_templates)');
+    const hasCommentColumn = templatesInfo.some((col: any) => col.name === 'comment');
+
+    if (!hasCommentColumn) {
+      console.log('Running migration: Adding comment column to log_templates');
+      database.exec('ALTER TABLE log_templates ADD COLUMN comment TEXT');
+      console.log('Migration complete: log_templates.comment');
+    }
+  } catch (error) {
+    console.error('Migration error (log_templates comment):', error);
+  }
+
+  // Migration: Create shutdown_rituals table if it doesn't exist
+  try {
+    const tables = database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='shutdown_rituals'").all();
+
+    if (tables.length === 0) {
+      console.log('Running migration: Creating shutdown_rituals table');
+      database.exec(`
+        CREATE TABLE shutdown_rituals (
+          date TEXT PRIMARY KEY,
+          total_minutes INTEGER NOT NULL,
+          deep_work_minutes INTEGER NOT NULL,
+          tasks_worked TEXT NOT NULL,
+          reflection TEXT,
+          notes TEXT,
+          tomorrow_intentions TEXT,
+          locked INTEGER DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      console.log('Migration complete: shutdown_rituals table created');
+    }
+  } catch (error) {
+    console.error('Migration error (shutdown_rituals table):', error);
+  }
+}
+
+function initializeDefaultSettings(database: Database.Database) {
+  const defaultSettings = [
+    { key: 'apiBaseUrl', value: 'https://es.easyproject.com' },
+    { key: 'pomodoroFocus', value: '25' },
+    { key: 'pomodoroShortBreak', value: '5' },
+    { key: 'pomodoroLongBreak', value: '10' },
+    { key: 'sessionsUntilLongBreak', value: '3' },
+    { key: 'defaultBillable', value: 'true' },
+    { key: 'roundingMode', value: 'none' }
+  ];
+
+  const insertStmt = database.prepare(
+    'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)'
+  );
+
+  for (const setting of defaultSettings) {
+    insertStmt.run(setting.key, setting.value);
+  }
+}
+
+function initializeDefaultTemplates(database: Database.Database) {
+  const defaultTemplates = [
+    { id: 'tpl-admin', name: 'Admin', task_id: '229602', default_duration: 15, billable: 0 },
+    { id: 'tpl-meeting', name: 'Meeting', task_id: '138850', default_duration: 30, billable: 1 }
+  ];
+
+  const insertStmt = database.prepare(
+    'INSERT OR IGNORE INTO log_templates (id, name, task_id, default_duration, billable) VALUES (?, ?, ?, ?, ?)'
+  );
+
+  for (const template of defaultTemplates) {
+    insertStmt.run(template.id, template.name, template.task_id, template.default_duration, template.billable);
+  }
+}
+
+export function getDB(): Database.Database {
+  if (!db) {
+    // Auto-initialize if not already initialized
+    return initDB();
+  }
+  return db;
+}
+
+export function closeDB() {
+  if (db) {
+    db.close();
+    db = null;
+  }
+}
+
+// Session operations
+export function saveSession(
+  session: Omit<PomodoroSession, 'id'>
+): string {
+  const database = getDB();
+  const id = uuidv4();
+
+  const stmt = database.prepare(`
+    INSERT INTO pomodoro_sessions
+    (id, start_at, end_at, duration_minutes, task_id, source, comment, logged, billable)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  stmt.run(
+    id,
+    session.start_at,
+    session.end_at,
+    session.duration_minutes,
+    session.task_id,
+    session.source,
+    session.comment,
+    session.logged,
+    session.billable !== undefined ? (session.billable ? 1 : 0) : 1 // Default to billable=true
+  );
+
+  // Update task cache last_seen_at if task_id is provided
+  if (session.task_id) {
+    try {
+      const updateStmt = database.prepare(`
+        UPDATE task_cache
+        SET last_seen_at = datetime('now')
+        WHERE task_id = ?
+      `);
+      updateStmt.run(session.task_id);
+    } catch (error) {
+      console.error('Failed to update task cache timestamp:', error);
+      // Don't fail the session save if cache update fails
+    }
+  }
+
+  return id;
+}
+
+export function getSessions(date: string): PomodoroSession[] {
+  const database = getDB();
+
+  const stmt = database.prepare(`
+    SELECT * FROM pomodoro_sessions
+    WHERE date(start_at) = date(?)
+    ORDER BY start_at DESC
+  `);
+
+  return stmt.all(date) as PomodoroSession[];
+}
+
+export function getLastSessionWithTask(date: string): PomodoroSession | null {
+  const database = getDB();
+
+  const stmt = database.prepare(`
+    SELECT * FROM pomodoro_sessions
+    WHERE date(start_at) = date(?)
+      AND (task_id IS NOT NULL OR comment IS NOT NULL)
+    ORDER BY start_at DESC
+    LIMIT 1
+  `);
+
+  return (stmt.get(date) as PomodoroSession) || null;
+}
+
+export function getAllSessionsForToday(): PomodoroSession[] {
+  const database = getDB();
+  const today = new Date().toISOString().split('T')[0];
+
+  return getSessions(today);
+}
+
+// Get sessions within a date range (for dashboard)
+export function getSessionsInRange(startDate: string, endDate: string): PomodoroSession[] {
+  const database = getDB();
+
+  const stmt = database.prepare(`
+    SELECT * FROM pomodoro_sessions
+    WHERE date(start_at) BETWEEN date(?) AND date(?)
+    ORDER BY start_at ASC
+  `);
+
+  return stmt.all(startDate, endDate) as PomodoroSession[];
+}
+
+export function updateSession(
+  id: string,
+  updates: Partial<PomodoroSession>
+): void {
+  const database = getDB();
+
+  const fields = Object.keys(updates)
+    .map(key => `${key} = ?`)
+    .join(', ');
+
+  const values = Object.values(updates);
+  values.push(id);
+
+  const stmt = database.prepare(`
+    UPDATE pomodoro_sessions
+    SET ${fields}
+    WHERE id = ?
+  `);
+
+  stmt.run(...values);
+}
+
+export function deleteSession(id: string): void {
+  const database = getDB();
+
+  const stmt = database.prepare(`
+    DELETE FROM pomodoro_sessions
+    WHERE id = ?
+  `);
+
+  stmt.run(id);
+}
+
+// Settings operations
+export function getSetting(key: string): string | null {
+  const database = getDB();
+
+  const stmt = database.prepare(
+    'SELECT value FROM settings WHERE key = ?'
+  );
+
+  const result = stmt.get(key) as Setting | undefined;
+  return result?.value ?? null;
+}
+
+export function saveSetting(key: string, value: string): void {
+  const database = getDB();
+
+  const stmt = database.prepare(`
+    INSERT OR REPLACE INTO settings (key, value)
+    VALUES (?, ?)
+  `);
+
+  stmt.run(key, value);
+}
+
+export function getAllSettings(): Record<string, string> {
+  const database = getDB();
+
+  const stmt = database.prepare('SELECT key, value FROM settings');
+  const rows = stmt.all() as Setting[];
+
+  return rows.reduce((acc, row) => {
+    acc[row.key] = row.value;
+    return acc;
+  }, {} as Record<string, string>);
+}
+
+// Task cache operations
+export function cacheTask(
+  taskId: string,
+  title: string,
+  projectId: number,
+  projectName: string
+): void {
+  const database = getDB();
+
+  const stmt = database.prepare(`
+    INSERT OR REPLACE INTO task_cache
+    (task_id, title, project_id, project_name, last_seen_at)
+    VALUES (?, ?, ?, ?, datetime('now'))
+  `);
+
+  stmt.run(taskId, title, projectId, projectName);
+}
+
+export function getCachedTask(taskId: string) {
+  const database = getDB();
+
+  const stmt = database.prepare(
+    'SELECT * FROM task_cache WHERE task_id = ?'
+  );
+
+  return stmt.get(taskId);
+}
+
+export function getAllCachedTasks() {
+  const database = getDB();
+
+  const stmt = database.prepare(`
+    SELECT * FROM task_cache
+    ORDER BY last_seen_at DESC
+    LIMIT 50
+  `);
+
+  return stmt.all();
+}
+
+export function getRecentTasks() {
+  const database = getDB();
+
+  const stmt = database.prepare(`
+    SELECT task_id, title FROM task_cache
+    ORDER BY last_seen_at DESC
+    LIMIT 10
+  `);
+
+  return stmt.all();
+}
+
+// Adhoc entry operations
+export function addAdhocEntry(
+  entry: Omit<import('../types').AdhocEntry, 'id' | 'created_at'>
+): string {
+  const database = getDB();
+  const id = uuidv4();
+
+  const stmt = database.prepare(`
+    INSERT INTO adhoc_entries
+    (id, date, duration_minutes, title, task_id, is_todo, due_date, completed, marked_to_log, logged, comment, billable)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  stmt.run(
+    id,
+    entry.date,
+    entry.duration_minutes,
+    entry.title,
+    entry.task_id,
+    entry.is_todo || 0,
+    entry.due_date || null,
+    entry.completed || 0,
+    entry.marked_to_log || 1,
+    entry.logged || 0,
+    entry.comment,
+    entry.billable !== undefined ? (entry.billable ? 1 : 0) : 1 // Default to billable=true
+  );
+
+  return id;
+}
+
+export function getAdhocEntries(date: string) {
+  const database = getDB();
+
+  const stmt = database.prepare(`
+    SELECT * FROM adhoc_entries
+    WHERE date = ?
+    ORDER BY created_at DESC
+  `);
+
+  return stmt.all(date);
+}
+
+// Get adhoc entries within a date range (for dashboard)
+export function getAdhocEntriesInRange(startDate: string, endDate: string) {
+  const database = getDB();
+
+  const stmt = database.prepare(`
+    SELECT * FROM adhoc_entries
+    WHERE date BETWEEN ? AND ?
+    ORDER BY date ASC, created_at ASC
+  `);
+
+  return stmt.all(startDate, endDate);
+}
+
+export function updateAdhocEntry(
+  id: string,
+  updates: Partial<import('../types').AdhocEntry>
+): void {
+  const database = getDB();
+
+  const fields = Object.keys(updates)
+    .filter(key => key !== 'id' && key !== 'created_at')
+    .map(key => `${key} = ?`)
+    .join(', ');
+
+  if (!fields) return;
+
+  const values = Object.keys(updates)
+    .filter(key => key !== 'id' && key !== 'created_at')
+    .map(key => updates[key as keyof typeof updates]);
+  values.push(id);
+
+  const stmt = database.prepare(`
+    UPDATE adhoc_entries
+    SET ${fields}
+    WHERE id = ?
+  `);
+
+  stmt.run(...values);
+}
+
+export function deleteAdhocEntry(id: string): void {
+  const database = getDB();
+
+  const stmt = database.prepare(`
+    DELETE FROM adhoc_entries
+    WHERE id = ?
+  `);
+
+  stmt.run(id);
+}
+
+// Calendar proposal operations
+export function getCalendarProposals(date: string, includeAll: boolean = false) {
+  const database = getDB();
+
+  const whereClause = includeAll
+    ? 'WHERE date = ?'
+    : 'WHERE date = ? AND dismissed = 0';
+
+  const stmt = database.prepare(`
+    SELECT * FROM calendar_proposals
+    ${whereClause}
+    ORDER BY start_at ASC
+  `);
+
+  return stmt.all(date);
+}
+
+export function addCalendarProposal(proposal: any): string {
+  const database = getDB();
+  const id = uuidv4();
+
+  const stmt = database.prepare(`
+    INSERT INTO calendar_proposals
+    (id, event_uid, title, start_at, end_at, duration_minutes, date, accepted, dismissed, task_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  stmt.run(
+    id,
+    proposal.event_uid,
+    proposal.title,
+    proposal.start_at,
+    proposal.end_at,
+    proposal.duration_minutes,
+    proposal.date,
+    proposal.accepted || 0,
+    proposal.dismissed || 0,
+    proposal.task_id || null
+  );
+
+  return id;
+}
+
+export function updateCalendarProposal(id: string, updates: any): void {
+  const database = getDB();
+
+  const fields: string[] = [];
+  const values: any[] = [];
+
+  if (updates.title !== undefined) {
+    fields.push('title = ?');
+    values.push(updates.title);
+  }
+  if (updates.start_at !== undefined) {
+    fields.push('start_at = ?');
+    values.push(updates.start_at);
+  }
+  if (updates.end_at !== undefined) {
+    fields.push('end_at = ?');
+    values.push(updates.end_at);
+  }
+  if (updates.duration_minutes !== undefined) {
+    fields.push('duration_minutes = ?');
+    values.push(updates.duration_minutes);
+  }
+  if (updates.accepted !== undefined) {
+    fields.push('accepted = ?');
+    values.push(updates.accepted);
+  }
+  if (updates.dismissed !== undefined) {
+    fields.push('dismissed = ?');
+    values.push(updates.dismissed);
+  }
+  if (updates.task_id !== undefined) {
+    fields.push('task_id = ?');
+    values.push(updates.task_id);
+  }
+  if (updates.comment !== undefined) {
+    fields.push('comment = ?');
+    values.push(updates.comment);
+  }
+
+  if (fields.length === 0) return;
+
+  values.push(id);
+
+  const stmt = database.prepare(`
+    UPDATE calendar_proposals
+    SET ${fields.join(', ')}
+    WHERE id = ?
+  `);
+
+  stmt.run(...values);
+}
+
+export function acceptCalendarProposal(id: string, taskId?: string): void {
+  updateCalendarProposal(id, {
+    accepted: 1,
+    task_id: taskId || null
+  });
+}
+
+export function dismissCalendarProposal(id: string): void {
+  updateCalendarProposal(id, { dismissed: 1 });
+}
+
+// Template operations
+export function getTemplates() {
+  const database = getDB();
+
+  const stmt = database.prepare(`
+    SELECT * FROM log_templates
+    ORDER BY created_at ASC
+  `);
+
+  return stmt.all();
+}
+
+export function addTemplate(
+  template: { name: string; task_id: string; default_duration?: number; billable?: boolean; comment?: string }
+): string {
+  const database = getDB();
+  const id = `tpl-${Date.now()}`;
+
+  const stmt = database.prepare(`
+    INSERT INTO log_templates (id, name, task_id, default_duration, billable, comment)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
+  stmt.run(
+    id,
+    template.name,
+    template.task_id,
+    template.default_duration || null,
+    template.billable !== undefined ? (template.billable ? 1 : 0) : 1,
+    template.comment || null
+  );
+
+  return id;
+}
+
+export function updateTemplate(
+  id: string,
+  template: { name: string; task_id: string; default_duration?: number; billable?: boolean; comment?: string }
+): void {
+  const database = getDB();
+
+  const stmt = database.prepare(`
+    UPDATE log_templates
+    SET name = ?, task_id = ?, default_duration = ?, billable = ?, comment = ?
+    WHERE id = ?
+  `);
+
+  stmt.run(
+    template.name,
+    template.task_id,
+    template.default_duration || null,
+    template.billable !== undefined ? (template.billable ? 1 : 0) : 1,
+    template.comment || null,
+    id
+  );
+}
+
+export function deleteTemplate(id: string): void {
+  const database = getDB();
+
+  const stmt = database.prepare(`
+    DELETE FROM log_templates
+    WHERE id = ?
+  `);
+
+  stmt.run(id);
+}
+
+// Get days since last logged entry
+export function getDaysSinceLastLog(): number | null {
+  const database = getDB();
+
+  // Find most recent logged entry from both pomodoro_sessions and adhoc_entries
+  const lastPomodoroStmt = database.prepare(`
+    SELECT date(start_at) as last_date
+    FROM pomodoro_sessions
+    WHERE logged = 1
+    ORDER BY start_at DESC
+    LIMIT 1
+  `);
+
+  const lastAdhocStmt = database.prepare(`
+    SELECT date
+    FROM adhoc_entries
+    WHERE logged = 1
+    ORDER BY date DESC
+    LIMIT 1
+  `);
+
+  const lastPomodoro = lastPomodoroStmt.get() as { last_date?: string } | undefined;
+  const lastAdhoc = lastAdhocStmt.get() as { date?: string } | undefined;
+
+  // Get the most recent date between the two
+  let lastLoggedDate: string | null = null;
+
+  if (lastPomodoro?.last_date && lastAdhoc?.date) {
+    lastLoggedDate = lastPomodoro.last_date > lastAdhoc.date ? lastPomodoro.last_date : lastAdhoc.date;
+  } else if (lastPomodoro?.last_date) {
+    lastLoggedDate = lastPomodoro.last_date;
+  } else if (lastAdhoc?.date) {
+    lastLoggedDate = lastAdhoc.date;
+  }
+
+  if (!lastLoggedDate) {
+    return null; // No logged entries found
+  }
+
+  // Calculate days between last logged date and today
+  const lastDate = new Date(lastLoggedDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Reset to start of day
+  lastDate.setHours(0, 0, 0, 0);
+
+  const diffMs = today.getTime() - lastDate.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  return diffDays;
+}
+
+// ==================== TASK PREFERENCES ====================
+
+export function getTaskPreference(taskId: string): TaskPreference | null {
+  const database = getDB();
+  const row = database.prepare('SELECT * FROM task_preferences WHERE task_id = ?').get(taskId) as any;
+  if (!row) return null;
+
+  return {
+    taskId: row.task_id,
+    tracked: Boolean(row.tracked),
+    pinned: Boolean(row.pinned),
+    milestoneIds: JSON.parse(row.milestone_ids)
+  };
+}
+
+export function getAllTaskPreferences(): TaskPreference[] {
+  const database = getDB();
+  const rows = database.prepare('SELECT * FROM task_preferences').all() as any[];
+  return rows.map(row => ({
+    taskId: row.task_id,
+    tracked: Boolean(row.tracked),
+    pinned: Boolean(row.pinned),
+    milestoneIds: JSON.parse(row.milestone_ids)
+  }));
+}
+
+export function setTaskPreference(taskId: string, pref: Partial<TaskPreference>): void {
+  const database = getDB();
+  database.prepare(`
+    INSERT INTO task_preferences (task_id, tracked, pinned, milestone_ids)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(task_id) DO UPDATE SET
+      tracked = excluded.tracked,
+      pinned = excluded.pinned,
+      milestone_ids = excluded.milestone_ids,
+      updated_at = CURRENT_TIMESTAMP
+  `).run(
+    taskId,
+    pref.tracked ? 1 : 0,
+    pref.pinned ? 1 : 0,
+    JSON.stringify(pref.milestoneIds || [])
+  );
+}
+
+// ==================== MILESTONES ====================
+
+export function getMilestone(id: string): Milestone | null {
+  const database = getDB();
+  const row = database.prepare('SELECT * FROM milestones WHERE id = ?').get(id) as any;
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    parentType: row.parent_type,
+    parentId: row.parent_id,
+    title: row.title,
+    description: row.description,
+    completed: Boolean(row.completed),
+    order: row.order_num,
+    weight: row.weight
+  };
+}
+
+export function getMilestonesByParent(parentType: string, parentId: string): Milestone[] {
+  const database = getDB();
+  const rows = database.prepare(
+    'SELECT * FROM milestones WHERE parent_type = ? AND parent_id = ? ORDER BY order_num'
+  ).all(parentType, parentId) as any[];
+
+  return rows.map(row => ({
+    id: row.id,
+    parentType: row.parent_type,
+    parentId: row.parent_id,
+    title: row.title,
+    description: row.description,
+    completed: Boolean(row.completed),
+    order: row.order_num,
+    weight: row.weight
+  }));
+}
+
+export function createMilestone(milestone: Milestone): void {
+  const database = getDB();
+  database.prepare(`
+    INSERT INTO milestones (id, parent_type, parent_id, title, description, completed, order_num, weight)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    milestone.id,
+    milestone.parentType,
+    milestone.parentId,
+    milestone.title,
+    milestone.description || null,
+    milestone.completed ? 1 : 0,
+    milestone.order,
+    milestone.weight || null
+  );
+}
+
+export function updateMilestone(id: string, patch: Partial<Milestone>): void {
+  const database = getDB();
+  const fields: string[] = [];
+  const values: any[] = [];
+
+  if (patch.title !== undefined) { fields.push('title = ?'); values.push(patch.title); }
+  if (patch.description !== undefined) { fields.push('description = ?'); values.push(patch.description); }
+  if (patch.completed !== undefined) { fields.push('completed = ?'); values.push(patch.completed ? 1 : 0); }
+  if (patch.order !== undefined) { fields.push('order_num = ?'); values.push(patch.order); }
+  if (patch.weight !== undefined) { fields.push('weight = ?'); values.push(patch.weight); }
+
+  fields.push('updated_at = CURRENT_TIMESTAMP');
+  values.push(id);
+
+  database.prepare(`UPDATE milestones SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+}
+
+export function deleteMilestone(id: string): void {
+  const database = getDB();
+  database.prepare('DELETE FROM milestones WHERE id = ?').run(id);
+}
+
+// ==================== GOALS ====================
+
+export function getGoal(id: string): Goal | null {
+  const database = getDB();
+  const row = database.prepare('SELECT * FROM goals WHERE id = ?').get(id) as any;
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    identityReinforcement: row.identity_reinforcement,
+    milestoneIds: JSON.parse(row.milestone_ids),
+    active: Boolean(row.active)
+  };
+}
+
+export function getAllGoals(): Goal[] {
+  const database = getDB();
+  const rows = database.prepare('SELECT * FROM goals ORDER BY active DESC, created_at DESC').all() as any[];
+  return rows.map(row => ({
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    identityReinforcement: row.identity_reinforcement,
+    milestoneIds: JSON.parse(row.milestone_ids),
+    active: Boolean(row.active)
+  }));
+}
+
+export function getActiveGoal(): Goal | null {
+  const database = getDB();
+  const row = database.prepare('SELECT * FROM goals WHERE active = 1').get() as any;
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    identityReinforcement: row.identity_reinforcement,
+    milestoneIds: JSON.parse(row.milestone_ids),
+    active: true
+  };
+}
+
+export function createGoal(goal: Goal): void {
+  const database = getDB();
+  database.prepare(`
+    INSERT INTO goals (id, title, description, identity_reinforcement, milestone_ids, active)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    goal.id,
+    goal.title,
+    goal.description,
+    goal.identityReinforcement || null,
+    JSON.stringify(goal.milestoneIds),
+    goal.active ? 1 : 0
+  );
+}
+
+export function updateGoal(id: string, patch: Partial<Goal>): void {
+  const database = getDB();
+  const fields: string[] = [];
+  const values: any[] = [];
+
+  if (patch.title !== undefined) { fields.push('title = ?'); values.push(patch.title); }
+  if (patch.description !== undefined) { fields.push('description = ?'); values.push(patch.description); }
+  if (patch.identityReinforcement !== undefined) { fields.push('identity_reinforcement = ?'); values.push(patch.identityReinforcement); }
+  if (patch.milestoneIds !== undefined) { fields.push('milestone_ids = ?'); values.push(JSON.stringify(patch.milestoneIds)); }
+  if (patch.active !== undefined) { fields.push('active = ?'); values.push(patch.active ? 1 : 0); }
+
+  fields.push('updated_at = CURRENT_TIMESTAMP');
+  values.push(id);
+
+  database.prepare(`UPDATE goals SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+}
+
+export function setActiveGoal(id: string): void {
+  const database = getDB();
+  database.prepare('UPDATE goals SET active = 0').run();
+  database.prepare('UPDATE goals SET active = 1 WHERE id = ?').run(id);
+}
+
+// ==================== DAILY INTENTIONS ====================
+
+export function getDailyIntentions(date: string): DailyIntentions | null {
+  const database = getDB();
+  const row = database.prepare('SELECT * FROM daily_intentions WHERE date = ?').get(date) as any;
+  if (!row) return null;
+
+  return {
+    date: row.date,
+    intentions: JSON.parse(row.intentions)
+  };
+}
+
+export function setDailyIntentions(date: string, intentions: string[]): void {
+  const database = getDB();
+  database.prepare(`
+    INSERT INTO daily_intentions (date, intentions)
+    VALUES (?, ?)
+    ON CONFLICT(date) DO UPDATE SET
+      intentions = excluded.intentions,
+      updated_at = CURRENT_TIMESTAMP
+  `).run(date, JSON.stringify(intentions));
+}
+
+// ==================== SHUTDOWN RITUALS ====================
+
+export function getShutdownRitual(date: string): ShutdownRitual | null {
+  const database = getDB();
+  const row = database.prepare('SELECT * FROM shutdown_rituals WHERE date = ?').get(date) as any;
+  if (!row) return null;
+
+  return {
+    date: row.date,
+    totalMinutes: row.total_minutes,
+    deepWorkMinutes: row.deep_work_minutes,
+    tasksWorked: JSON.parse(row.tasks_worked),
+    reflection: row.reflection,
+    notes: row.notes,
+    tomorrowIntentions: row.tomorrow_intentions ? JSON.parse(row.tomorrow_intentions) : null,
+    locked: row.locked === 1,
+    createdAt: row.created_at
+  };
+}
+
+export function saveShutdownRitual(
+  date: string,
+  totalMinutes: number,
+  deepWorkMinutes: number,
+  tasksWorked: string[],
+  reflection: string | null,
+  notes: string | null,
+  tomorrowIntentions: string[] | null
+): void {
+  const database = getDB();
+  database.prepare(`
+    INSERT INTO shutdown_rituals (
+      date, total_minutes, deep_work_minutes, tasks_worked,
+      reflection, notes, tomorrow_intentions, locked
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+    ON CONFLICT(date) DO UPDATE SET
+      total_minutes = excluded.total_minutes,
+      deep_work_minutes = excluded.deep_work_minutes,
+      tasks_worked = excluded.tasks_worked,
+      reflection = excluded.reflection,
+      notes = excluded.notes,
+      tomorrow_intentions = excluded.tomorrow_intentions,
+      locked = 1
+  `).run(
+    date,
+    totalMinutes,
+    deepWorkMinutes,
+    JSON.stringify(tasksWorked),
+    reflection,
+    notes,
+    tomorrowIntentions ? JSON.stringify(tomorrowIntentions) : null
+  );
+}
+
+export function unlockDay(date: string): void {
+  const database = getDB();
+  database.prepare('UPDATE shutdown_rituals SET locked = 0 WHERE date = ?').run(date);
+}
+
+export function isDayLocked(date: string): boolean {
+  const database = getDB();
+  const row = database.prepare('SELECT locked FROM shutdown_rituals WHERE date = ?').get(date) as any;
+  return row ? row.locked === 1 : false;
+}

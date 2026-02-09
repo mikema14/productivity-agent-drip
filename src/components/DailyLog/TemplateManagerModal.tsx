@@ -1,0 +1,350 @@
+import { useState, useEffect } from 'react';
+import type { LogTemplate } from '../../types';
+import AddTemplateModal from './AddTemplateModal';
+
+interface TemplateManagerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onTemplatesChanged: () => void;
+}
+
+export default function TemplateManagerModal({ isOpen, onClose, onTemplatesChanged }: TemplateManagerModalProps) {
+  const [templates, setTemplates] = useState<LogTemplate[]>([]);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<LogTemplate | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadTemplates();
+    }
+  }, [isOpen]);
+
+  const loadTemplates = async () => {
+    try {
+      const data = await window.logAPI.getTemplates();
+      setTemplates(data);
+    } catch (error) {
+      console.error('Failed to load templates:', error);
+    }
+  };
+
+  const handleSaveTemplate = async (template: {
+    name: string;
+    task_id: string;
+    default_duration: number | null;
+    billable: boolean;
+    comment?: string;
+  }) => {
+    try {
+      if (editingTemplate) {
+        // Update existing template
+        await window.logAPI.updateTemplate(editingTemplate.id, template);
+      } else {
+        // Add new template
+        await window.logAPI.addTemplate(template);
+      }
+      await loadTemplates();
+      onTemplatesChanged();
+      setIsAddModalOpen(false);
+      setEditingTemplate(null);
+    } catch (error) {
+      console.error('Failed to save template:', error);
+      throw error;
+    }
+  };
+
+  const handleEdit = (template: LogTemplate) => {
+    setEditingTemplate(template);
+    setIsAddModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this template?')) {
+      return;
+    }
+
+    try {
+      await window.logAPI.deleteTemplate(id);
+      await loadTemplates();
+      onTemplatesChanged();
+    } catch (error) {
+      console.error('Failed to delete template:', error);
+      alert('Failed to delete template');
+    }
+  };
+
+  const handleAddNew = () => {
+    setEditingTemplate(null);
+    setIsAddModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setIsAddModalOpen(false);
+    setEditingTemplate(null);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Manage Templates
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="mb-4">
+            <button
+              onClick={handleAddNew}
+              className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+            >
+              + Add Template
+            </button>
+          </div>
+
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {templates.length === 0 ? (
+              <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+                No templates yet. Click "Add Template" to create one.
+              </p>
+            ) : (
+              templates.map((template) => (
+                <div
+                  key={template.id}
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600"
+                >
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      {template.name}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Task {template.task_id} · {template.default_duration || 15}m ·{' '}
+                      {template.billable ? 'Billable' : 'Non-billable'}
+                      {template.comment && (
+                        <span className="block mt-0.5 italic">"{template.comment}"</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEdit(template)}
+                      className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(template.id)}
+                      className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 rounded"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="mt-6">
+            <button
+              onClick={onClose}
+              className="w-full px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <EditTemplateModal
+        isOpen={isAddModalOpen}
+        onClose={handleModalClose}
+        onSave={handleSaveTemplate}
+        template={editingTemplate}
+      />
+    </>
+  );
+}
+
+// Extended version of AddTemplateModal that supports editing
+interface EditTemplateModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (template: {
+    name: string;
+    task_id: string;
+    default_duration: number | null;
+    billable: boolean;
+    comment?: string;
+  }) => Promise<void>;
+  template: LogTemplate | null;
+}
+
+function EditTemplateModal({ isOpen, onClose, onSave, template }: EditTemplateModalProps) {
+  const [name, setName] = useState('');
+  const [taskId, setTaskId] = useState('');
+  const [duration, setDuration] = useState('15');
+  const [billable, setBillable] = useState(true);
+  const [comment, setComment] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Update form when template changes
+  useEffect(() => {
+    if (template) {
+      setName(template.name);
+      setTaskId(template.task_id);
+      setDuration(template.default_duration?.toString() || '15');
+      setBillable(!!template.billable);
+      setComment(template.comment || '');
+    } else {
+      setName('');
+      setTaskId('');
+      setDuration('15');
+      setBillable(true);
+      setComment('');
+    }
+  }, [template]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!name.trim() || !taskId.trim()) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await onSave({
+        name: name.trim(),
+        task_id: taskId.trim(),
+        default_duration: duration ? parseInt(duration) : null,
+        billable,
+        comment: comment.trim() || undefined
+      });
+
+      // Reset form only if adding (not editing)
+      if (!template) {
+        setName('');
+        setTaskId('');
+        setDuration('15');
+        setBillable(true);
+        setComment('');
+      }
+      onClose();
+    } catch (error) {
+      console.error('Failed to save template:', error);
+      alert('Failed to save template');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+          {template ? 'Edit Template' : 'Add Quick Log Template'}
+        </h2>
+
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Template Name
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g., Admin, Meeting"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Task ID
+              </label>
+              <input
+                type="text"
+                value={taskId}
+                onChange={(e) => setTaskId(e.target.value)}
+                placeholder="e.g., 229602"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Default Duration (minutes)
+              </label>
+              <input
+                type="number"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder="15"
+                min="1"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Default Comment (optional)
+              </label>
+              <input
+                type="text"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="e.g., Team meeting, Admin work"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="billable"
+                checked={billable}
+                onChange={(e) => setBillable(e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="billable" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Billable
+              </label>
+            </div>
+          </div>
+
+          <div className="mt-6 flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSaving}
+              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="flex-1 px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+            >
+              {isSaving ? 'Saving...' : template ? 'Update Template' : 'Save Template'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
