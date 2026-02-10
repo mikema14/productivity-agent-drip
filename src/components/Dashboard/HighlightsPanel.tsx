@@ -100,22 +100,22 @@ export default function HighlightsPanel() {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg border border-gray-200">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">Highlights</h2>
+    <div className="glass-surface p-6">
+      <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Highlights</h2>
 
       {highlights.length === 0 ? (
-        <p className="text-gray-400 text-sm">No highlights yet. Start tracking time!</p>
+        <p className="text-txt-muted text-sm">No highlights yet. Start tracking time!</p>
       ) : (
         <div className="grid grid-cols-1 gap-3">
           {highlights.map((highlight, index) => (
             <div
               key={index}
-              className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100"
+              className="flex items-center gap-3 p-3 bg-glass-bg rounded-xl border border-glass-border"
             >
-              <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-white rounded-full text-xl">
+              <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-drip-surface rounded-full text-xl">
                 {getIcon(highlight.icon, highlight.text)}
               </div>
-              <span className="text-gray-900 text-sm font-medium">{highlight.text}</span>
+              <span className="text-txt-primary text-sm font-medium">{highlight.text}</span>
             </div>
           ))}
         </div>

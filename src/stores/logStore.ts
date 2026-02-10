@@ -8,6 +8,7 @@ import { syncCalendarProposals } from '../services/calendar';
 export interface LogEntry {
   id: string;
   type: 'pomodoro' | 'adhoc' | 'calendar';
+  source?: 'pomodoro' | 'manual' | 'calendar' | 'break';
   date: string;
   startTime: string | null;
   durationMinutes: number;
@@ -85,14 +86,15 @@ export const useLogStore = create<LogState>()(
       const pomodoroEntries: LogEntry[] = sessions.map(s => ({
         id: s.id,
         type: 'pomodoro' as const,
+        source: (s.source as LogEntry['source']) || 'pomodoro',
         date: s.start_at.split('T')[0],
         startTime: s.start_at,
         durationMinutes: s.duration_minutes,
         taskId: s.task_id,
-        title: s.comment || 'Pomodoro session',
+        title: s.source === 'break' ? 'Break' : (s.comment || 'Pomodoro session'),
         comment: s.comment,
         logged: s.logged === 1,
-        markedToLog: s.logged === 0,
+        markedToLog: s.source === 'break' ? false : (s.logged === 0),
         billable: s.billable !== 0, // Convert 1/0 to boolean
       }));
 
@@ -313,7 +315,7 @@ export const useLogStore = create<LogState>()(
 
   logSelected: async () => {
     const { entries, selectedDate } = get();
-    const toLog = entries.filter(e => e.markedToLog && !e.logged);
+    const toLog = entries.filter(e => e.markedToLog && !e.logged && e.source !== 'break');
 
     console.log('Logging these entries:', toLog);
 

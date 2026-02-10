@@ -12,40 +12,42 @@ export default function BoundaryConfirmDialog({
   onOpenSettings
 }: BoundaryConfirmDialogProps) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="glass-surface-elevated max-w-md w-full mx-4 animate-scale-in">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">Starting Work Late?</h2>
+        <div className="px-6 py-4 border-b border-glass-border">
+          <h2 className="text-xl font-display font-semibold text-txt-primary">Starting Work Late?</h2>
         </div>
 
         {/* Content */}
         <div className="px-6 py-6">
-          <p className="text-gray-700 mb-2">
+          <p className="text-txt-secondary mb-2">
             You're starting a focus session after your preferred workday end time ({workdayEndTime}).
           </p>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-txt-muted">
             This is just a gentle reminder - you can always continue if needed.
           </p>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-glass-border flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded"
+            className="glass-button text-txt-muted text-sm font-medium"
           >
             Cancel
           </button>
           <button
             onClick={onOpenSettings}
-            className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded"
+            className="px-4 py-2 text-sm font-medium bg-focus-muted text-focus rounded-xl
+                     hover:bg-focus/20 transition-colors"
           >
             Change Settings
           </button>
           <button
             onClick={onContinue}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded"
+            className="px-4 py-2 text-sm font-medium bg-focus text-drip-bg rounded-xl
+                     hover:bg-focus-light transition-colors"
           >
             Yes, Continue
           </button>

@@ -5,23 +5,23 @@ interface ViewToggleProps {
 
 export default function ViewToggle({ viewMode, onViewChange }: ViewToggleProps) {
   return (
-    <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+    <div className="inline-flex rounded-xl border border-glass-border bg-glass-bg/30 backdrop-blur-sm p-1">
       <button
         onClick={() => onViewChange('list')}
-        className={`px-3 py-1.5 text-sm font-medium rounded transition-all ${
+        className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
           viewMode === 'list'
-            ? 'bg-white text-gray-900 shadow-sm'
-            : 'text-gray-600 hover:text-gray-900'
+            ? 'bg-drip-elevated text-txt-primary shadow-glass-sm border border-glass-border'
+            : 'text-txt-muted hover:text-txt-primary hover:bg-glass-hover'
         }`}
       >
         List
       </button>
       <button
         onClick={() => onViewChange('timeline')}
-        className={`px-3 py-1.5 text-sm font-medium rounded transition-all ${
+        className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
           viewMode === 'timeline'
-            ? 'bg-white text-gray-900 shadow-sm'
-            : 'text-gray-600 hover:text-gray-900'
+            ? 'bg-drip-elevated text-txt-primary shadow-glass-sm border border-glass-border'
+            : 'text-txt-muted hover:text-txt-primary hover:bg-glass-hover'
         }`}
       >
         Timeline

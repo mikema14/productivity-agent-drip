@@ -42,38 +42,38 @@ export default function Heatmap90Days() {
 
   const getIntensityColor = (intensity: number): string => {
     switch (intensity) {
-      case 0: return 'bg-gray-100';   // 0h: none
-      case 1: return 'bg-blue-200';   // <1h: light blue
-      case 2: return 'bg-blue-400';   // 1-4h: medium blue
-      case 3: return 'bg-blue-600';   // 4-8h: strong blue
-      case 4: return 'bg-blue-800';   // 8h+: saturated blue
-      default: return 'bg-gray-100';
+      case 0: return 'bg-glass-bg';
+      case 1: return 'bg-focus/20';
+      case 2: return 'bg-focus/40';
+      case 3: return 'bg-focus/60';
+      case 4: return 'bg-focus/80';
+      default: return 'bg-glass-bg';
     }
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg border border-gray-200">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">90-Day Consistency</h2>
+    <div className="glass-surface p-6">
+      <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">90-Day Consistency</h2>
 
       <div className="grid grid-cols-15 gap-1">
         {heatmapData.map(({ date, minutes, intensity }) => (
           <div
             key={date}
-            className={`w-3 h-3 rounded-sm ${getIntensityColor(intensity)} hover:ring-2 hover:ring-blue-500 cursor-pointer transition-all`}
+            className={`w-3 h-3 rounded-sm ${getIntensityColor(intensity)} hover:ring-2 hover:ring-focus cursor-pointer transition-all`}
             title={`${date}: ${minutes} min`}
           />
         ))}
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-2 mt-4 text-xs text-gray-600">
+      <div className="flex items-center gap-2 mt-4 text-xs text-txt-muted">
         <span>Less</span>
         <div className="flex gap-1">
-          <div className="w-3 h-3 bg-gray-100 rounded-sm" />
-          <div className="w-3 h-3 bg-blue-200 rounded-sm" />
-          <div className="w-3 h-3 bg-blue-400 rounded-sm" />
-          <div className="w-3 h-3 bg-blue-600 rounded-sm" />
-          <div className="w-3 h-3 bg-blue-800 rounded-sm" />
+          <div className="w-3 h-3 bg-glass-bg rounded-sm" />
+          <div className="w-3 h-3 bg-focus/20 rounded-sm" />
+          <div className="w-3 h-3 bg-focus/40 rounded-sm" />
+          <div className="w-3 h-3 bg-focus/60 rounded-sm" />
+          <div className="w-3 h-3 bg-focus/80 rounded-sm" />
         </div>
         <span>More</span>
       </div>

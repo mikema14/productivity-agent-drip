@@ -27,7 +27,7 @@ interface ControlBarProps {
 
 export default function ControlBar(props: ControlBarProps) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 shadow-sm">
+    <div className="glass-surface p-3 mb-4">
       {/* Row 1: View Toggle + Primary Action */}
       <div className="flex items-center justify-between mb-3">
         {/* Left: View Toggle */}
@@ -38,7 +38,7 @@ export default function ControlBar(props: ControlBarProps) {
           <button
             onClick={props.onLogSelected}
             disabled={props.isLogging}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-emerald-500/80 hover:bg-emerald-500 text-white rounded-xl font-display font-medium backdrop-blur-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {props.isLogging ? 'Logging...' : `Log ${props.markedCount} ${props.markedCount === 1 ? 'Item' : 'Items'}`}
             <span>→</span>
@@ -47,11 +47,11 @@ export default function ControlBar(props: ControlBarProps) {
       </div>
 
       {/* Row 2: Secondary Actions */}
-      <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
+      <div className="flex items-center gap-2 border-t border-glass-border pt-3">
         {/* Add Entry */}
         <button
           onClick={props.onAddEntry}
-          className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors flex items-center gap-1.5"
+          className="glass-button text-txt-secondary text-sm px-3 py-1.5 flex items-center gap-1.5"
         >
           <span>+</span>
           <span>Add</span>
@@ -60,7 +60,7 @@ export default function ControlBar(props: ControlBarProps) {
         {/* Templates */}
         <button
           onClick={props.onManageTemplates}
-          className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors flex items-center gap-1.5"
+          className="glass-button text-txt-secondary text-sm px-3 py-1.5 flex items-center gap-1.5"
         >
           <span>📋</span>
           <span>Templates</span>
@@ -70,7 +70,7 @@ export default function ControlBar(props: ControlBarProps) {
         {props.toggleableCount > 0 && (
           <button
             onClick={props.onSelectToggle}
-            className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors flex items-center gap-1.5"
+            className="glass-button text-txt-secondary text-sm px-3 py-1.5 flex items-center gap-1.5"
           >
             <span>⋮</span>
             <span>{props.allSelected ? 'Unselect' : 'Select'} All</span>
@@ -84,7 +84,7 @@ export default function ControlBar(props: ControlBarProps) {
         {!props.isDayLocked && (
           <button
             onClick={props.onEndDay}
-            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg shadow-sm transition-all flex items-center gap-2"
+            className="px-4 py-2 text-sm font-medium bg-purple-500/15 border border-purple-500/30 text-purple-400 hover:bg-purple-500/25 rounded-xl transition-all flex items-center gap-2"
           >
             <span>🌙</span>
             <span>End Day</span>
@@ -95,7 +95,7 @@ export default function ControlBar(props: ControlBarProps) {
         {props.showGroupToggle && (
           <button
             onClick={props.onGroupByTaskToggle}
-            className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 rounded transition-colors"
+            className="px-2 py-1 text-xs text-txt-muted hover:bg-glass-hover rounded transition-colors"
           >
             {props.groupByTask ? '⊟ Show Flat' : '⊞ Group by Task'}
           </button>

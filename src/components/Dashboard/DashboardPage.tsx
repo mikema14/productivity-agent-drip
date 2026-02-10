@@ -28,19 +28,21 @@ export default function DashboardPage({ onNavigateToTask }: DashboardPageProps) 
   }, []);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      {/* Left Column (8 columns) */}
-      <div className="lg:col-span-8 flex flex-col gap-6">
-        <IdentityHeader />
-        <TodayIntentionsPanel />
-        <TrackedTasksPanel onNavigateToTask={onNavigateToTask} />
-      </div>
+    <div className="max-w-7xl mx-auto p-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column (8 columns) */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
+          <IdentityHeader />
+          <TodayIntentionsPanel />
+          <TrackedTasksPanel onNavigateToTask={onNavigateToTask} />
+        </div>
 
-      {/* Right Column (4 columns) */}
-      <div className="lg:col-span-4 flex flex-col gap-6">
-        <HighlightsPanel />
-        <WeeklyChart />
-        <Heatmap90Days />
+        {/* Right Column (4 columns) */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          <HighlightsPanel />
+          <WeeklyChart />
+          <Heatmap90Days />
+        </div>
       </div>
     </div>
   );

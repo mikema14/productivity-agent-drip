@@ -133,42 +133,43 @@ export default function Settings() {
   };
 
   return (
+    <div className="max-w-4xl mx-auto px-8 py-6 h-full">
     <div className="flex flex-col h-full">
-      <div className="flex-none px-6 py-4 border-b border-gray-200 bg-white">
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+      <div className="flex-none px-6 py-4 border-b border-glass-border">
+        <h1 className="text-2xl font-display font-semibold text-txt-primary">Settings</h1>
       </div>
 
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-2xl space-y-8">
           {/* API Settings */}
           <section>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Easy Project API</h2>
-            <div className="space-y-4 bg-white p-6 rounded-lg border border-gray-200">
+            <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Easy Project API</h2>
+            <div className="space-y-4 glass-surface p-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
                   API Base URL
                 </label>
                 <input
                   type="text"
                   value={settings.apiBaseUrl}
                   onChange={(e) => setSettings({ ...settings, apiBaseUrl: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   placeholder="https://es.easyproject.com"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
                   API Key
                 </label>
                 <input
                   type="password"
                   value={settings.apiKey}
                   onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   placeholder="Your Easy Project API key"
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-txt-dim">
                   Find your API key in Easy Project under My Account → API access key
                 </p>
               </div>
@@ -176,7 +177,7 @@ export default function Settings() {
               <button
                 onClick={handleTestApi}
                 disabled={isTestingApi || !settings.apiKey}
-                className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-medium bg-focus/10 border border-focus/20 text-focus hover:bg-focus/20 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isTestingApi ? 'Testing...' : 'Test Connection'}
               </button>
@@ -185,20 +186,20 @@ export default function Settings() {
 
           {/* Calendar Settings */}
           <section>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Calendar Integration</h2>
-            <div className="space-y-4 bg-white p-6 rounded-lg border border-gray-200">
+            <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Calendar Integration</h2>
+            <div className="space-y-4 glass-surface p-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
                   Outlook Calendar ICS URL
                 </label>
                 <input
                   type="text"
                   value={settings.calendarUrl}
                   onChange={(e) => setSettings({ ...settings, calendarUrl: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   placeholder="https://outlook.office365.com/owa/calendar/..."
                 />
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-txt-dim">
                   Get this URL from Outlook Calendar → Share → Publish Calendar
                 </p>
               </div>
@@ -207,11 +208,11 @@ export default function Settings() {
 
           {/* Pomodoro Settings */}
           <section>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Pomodoro Timer</h2>
-            <div className="space-y-4 bg-white p-6 rounded-lg border border-gray-200">
+            <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Pomodoro Timer</h2>
+            <div className="space-y-4 glass-surface p-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
                     Focus Duration (minutes)
                   </label>
                   <input
@@ -220,12 +221,12 @@ export default function Settings() {
                     onChange={(e) => setSettings({ ...settings, pomodoroFocus: parseInt(e.target.value) || 25 })}
                     min="1"
                     max="60"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
                     Short Break (minutes)
                   </label>
                   <input
@@ -234,12 +235,12 @@ export default function Settings() {
                     onChange={(e) => setSettings({ ...settings, pomodoroShortBreak: parseInt(e.target.value) || 5 })}
                     min="1"
                     max="30"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
                     Long Break (minutes)
                   </label>
                   <input
@@ -248,12 +249,12 @@ export default function Settings() {
                     onChange={(e) => setSettings({ ...settings, pomodoroLongBreak: parseInt(e.target.value) || 10 })}
                     min="1"
                     max="60"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
                     Sessions until Long Break
                   </label>
                   <input
@@ -262,7 +263,7 @@ export default function Settings() {
                     onChange={(e) => setSettings({ ...settings, sessionsUntilLongBreak: parseInt(e.target.value) || 3 })}
                     min="1"
                     max="10"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   />
                 </div>
               </div>
@@ -271,29 +272,29 @@ export default function Settings() {
 
           {/* Time Logging Settings */}
           <section>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Time Logging</h2>
-            <div className="space-y-4 bg-white p-6 rounded-lg border border-gray-200">
+            <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Time Logging</h2>
+            <div className="space-y-4 glass-surface p-6">
               <div className="flex items-center">
                 <input
                   type="checkbox"
                   id="defaultBillable"
                   checked={settings.defaultBillable}
                   onChange={(e) => setSettings({ ...settings, defaultBillable: e.target.checked })}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-focus border-glass-border bg-glass-bg rounded focus:ring-focus/30"
                 />
-                <label htmlFor="defaultBillable" className="ml-2 text-sm font-medium text-gray-700">
+                <label htmlFor="defaultBillable" className="ml-2 text-sm font-medium text-txt-secondary">
                   Mark entries as billable by default
                 </label>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
                   Time Rounding
                 </label>
                 <select
                   value={settings.roundingMode}
                   onChange={(e) => setSettings({ ...settings, roundingMode: e.target.value as any })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                 >
                   <option value="none">No rounding</option>
                   <option value="5min">Round to nearest 5 minutes</option>
@@ -301,8 +302,8 @@ export default function Settings() {
                 </select>
               </div>
 
-              <div className="pt-4 border-t border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Workday Boundaries</h3>
+              <div className="pt-4 border-t border-glass-border">
+                <h3 className="text-sm font-display font-semibold text-txt-primary mb-3">Workday Boundaries</h3>
 
                 <div className="flex items-center mb-3">
                   <input
@@ -310,15 +311,15 @@ export default function Settings() {
                     id="enableBoundaryCheck"
                     checked={settings.enableBoundaryCheck}
                     onChange={(e) => setSettings({ ...settings, enableBoundaryCheck: e.target.checked })}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="w-4 h-4 text-focus border-glass-border bg-glass-bg rounded focus:ring-focus/30"
                   />
-                  <label htmlFor="enableBoundaryCheck" className="ml-2 text-sm font-medium text-gray-700">
+                  <label htmlFor="enableBoundaryCheck" className="ml-2 text-sm font-medium text-txt-secondary">
                     Show confirmation when starting work outside preferred hours
                   </label>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
                     Preferred Workday End Time
                   </label>
                   <input
@@ -326,9 +327,9 @@ export default function Settings() {
                     value={settings.workdayEndTime}
                     onChange={(e) => setSettings({ ...settings, workdayEndTime: e.target.value })}
                     disabled={!settings.enableBoundaryCheck}
-                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                    className="px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 disabled:opacity-40 disabled:text-txt-dim"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-txt-dim">
                     You'll be asked to confirm if you start work after this time
                   </p>
                 </div>
@@ -338,20 +339,20 @@ export default function Settings() {
 
           {/* Goals Management Section */}
           <section>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">
               Goals & Identity
             </h2>
-            <div className="space-y-4 bg-white p-6 rounded-lg border border-gray-200">
+            <div className="space-y-4 glass-surface p-6">
               <GoalsManagement />
             </div>
           </section>
 
           {/* Task Tracking Preferences Section */}
           <section>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">
               Task Tracking
             </h2>
-            <div className="space-y-4 bg-white p-6 rounded-lg border border-gray-200">
+            <div className="space-y-4 glass-surface p-6">
               <TaskTrackingPreferences />
             </div>
           </section>
@@ -361,16 +362,16 @@ export default function Settings() {
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="px-6 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 text-sm font-display font-medium text-drip-bg bg-focus hover:bg-focus-light rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? 'Saving...' : 'Save Settings'}
             </button>
 
             {saveMessage && (
-              <div className={`px-4 py-2 rounded text-sm ${
+              <div className={`px-4 py-2 rounded-xl text-sm ${
                 saveMessage.type === 'success'
-                  ? 'bg-green-50 text-green-800 border border-green-200'
-                  : 'bg-red-50 text-red-800 border border-red-200'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  : 'bg-red-500/10 text-red-400 border border-red-500/20'
               }`}>
                 {saveMessage.text}
               </div>
@@ -378,6 +379,7 @@ export default function Settings() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

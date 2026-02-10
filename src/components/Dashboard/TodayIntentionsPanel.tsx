@@ -31,23 +31,23 @@ export default function TodayIntentionsPanel() {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg border border-gray-200">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">Today's Intentions</h2>
+    <div className="glass-surface p-6">
+      <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Today's Intentions</h2>
 
       {/* Intentions Chips */}
       <div className="flex flex-wrap gap-2 mb-3">
         {intentions.map((intention, index) => (
           <div
             key={index}
-            className="group inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-900 rounded-full text-sm font-medium hover:bg-blue-100 transition-colors"
+            className="group inline-flex items-center gap-2 px-4 py-2 bg-focus/10 text-focus border border-focus/20 rounded-full text-sm font-medium hover:bg-focus/20 transition-colors"
           >
             <span className="flex items-center gap-1">
-              <span className="text-blue-600">⚡</span>
+              <span className="text-focus">⚡</span>
               {intention}
             </span>
             <button
               onClick={() => handleRemove(index)}
-              className="opacity-0 group-hover:opacity-100 text-blue-600 hover:text-blue-800 transition-opacity"
+              className="opacity-0 group-hover:opacity-100 text-focus/60 hover:text-focus transition-opacity"
               aria-label="Remove intention"
             >
               ✕
@@ -56,7 +56,7 @@ export default function TodayIntentionsPanel() {
         ))}
 
         {intentions.length === 0 && (
-          <p className="text-gray-400 text-sm py-1">No intentions set for today</p>
+          <p className="text-txt-muted text-sm py-1">No intentions set for today</p>
         )}
       </div>
 
@@ -67,7 +67,7 @@ export default function TodayIntentionsPanel() {
         onChange={(e) => setNewIntention(e.target.value)}
         onKeyPress={handleKeyPress}
         placeholder="Add intention..."
-        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+        className="w-full px-4 py-2 bg-glass-bg border border-glass-border rounded-full text-sm text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
       />
     </div>
   );

@@ -104,18 +104,18 @@ export default function TrackedTasksPanel({ onNavigateToTask }: TrackedTasksPane
 
   if (isLoading) {
     return (
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
-        <div className="text-gray-500">Loading tasks...</div>
+      <div className="glass-surface p-6">
+        <div className="text-txt-muted">Loading tasks...</div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white p-6 rounded-lg border border-gray-200">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">Your Key Tasks</h2>
+    <div className="glass-surface p-6">
+      <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Your Key Tasks</h2>
 
       {tasks.length === 0 ? (
-        <p className="text-gray-400 text-sm">
+        <p className="text-txt-muted text-sm">
           No tracked tasks. Mark tasks as tracked in Settings to see them here.
         </p>
       ) : (
@@ -124,16 +124,16 @@ export default function TrackedTasksPanel({ onNavigateToTask }: TrackedTasksPane
             const isExpanded = expandedTasks.has(task.taskId);
 
             return (
-              <div key={task.taskId} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
+              <div key={task.taskId} className="border border-glass-border rounded-xl p-4 hover:border-white/10 transition-colors">
                 {/* Line 1: Project Name / Title + Task ID */}
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">{task.title}</h3>
+                    <h3 className="font-semibold text-txt-primary truncate">{task.title}</h3>
                     {task.projectName && (
-                      <p className="text-xs text-gray-500 mt-0.5">{task.projectName}</p>
+                      <p className="text-xs text-txt-muted mt-0.5">{task.projectName}</p>
                     )}
                   </div>
-                  <span className="ml-3 text-sm font-mono text-gray-600 flex-shrink-0">
+                  <span className="ml-3 text-sm font-mono text-txt-muted flex-shrink-0">
                     ID: {task.taskId}
                   </span>
                 </div>
@@ -141,13 +141,13 @@ export default function TrackedTasksPanel({ onNavigateToTask }: TrackedTasksPane
                 {/* Line 2: Solid Progress Bar */}
                 <div className="mb-2">
                   <div className="flex items-center gap-2 mb-1">
-                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="flex-1 h-2 bg-glass-border rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-blue-500 rounded-full transition-all"
+                        className="h-full bg-focus rounded-full transition-all"
                         style={{ width: `${task.progress}%` }}
                       />
                     </div>
-                    <span className="text-xs font-semibold text-gray-700 w-10 text-right">
+                    <span className="text-xs font-semibold text-txt-secondary w-10 text-right">
                       {task.progress}%
                     </span>
                   </div>
@@ -155,14 +155,14 @@ export default function TrackedTasksPanel({ onNavigateToTask }: TrackedTasksPane
 
                 {/* Line 3: Time Spent + View Details */}
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">
+                  <span className="text-txt-secondary">
                     <span className="font-medium">{task.timeSpent}</span> spent
                   </span>
                   <div className="flex items-center gap-3">
                     {task.milestones.length > 0 && (
                       <button
                         onClick={() => toggleExpanded(task.taskId)}
-                        className="text-blue-600 hover:text-blue-700 text-xs font-medium"
+                        className="text-focus hover:text-focus-light text-xs font-medium"
                       >
                         {isExpanded ? '▼' : '▶'} Milestones ({task.milestones.filter(m => m.completed).length}/{task.milestones.length})
                       </button>
@@ -170,7 +170,7 @@ export default function TrackedTasksPanel({ onNavigateToTask }: TrackedTasksPane
                     {onNavigateToTask && (
                       <button
                         onClick={() => onNavigateToTask(task.taskId)}
-                        className="text-blue-600 hover:text-blue-700 text-xs font-medium"
+                        className="text-focus hover:text-focus-light text-xs font-medium"
                       >
                         View Details →
                       </button>
@@ -180,7 +180,7 @@ export default function TrackedTasksPanel({ onNavigateToTask }: TrackedTasksPane
 
                 {/* Collapsible Milestones Section */}
                 {isExpanded && task.milestones.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
+                  <div className="mt-3 pt-3 border-t border-glass-border">
                     <div className="space-y-1.5">
                       {task.milestones.map((milestone) => (
                         <div key={milestone.id} className="flex items-center gap-2 text-sm">
@@ -188,9 +188,9 @@ export default function TrackedTasksPanel({ onNavigateToTask }: TrackedTasksPane
                             type="checkbox"
                             checked={milestone.completed}
                             onChange={() => handleToggleMilestone(milestone.id)}
-                            className="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded"
+                            className="w-3.5 h-3.5 text-focus border-glass-border bg-glass-bg rounded"
                           />
-                          <span className={milestone.completed ? 'line-through text-gray-400' : 'text-gray-700'}>
+                          <span className={milestone.completed ? 'line-through text-txt-dim' : 'text-txt-secondary'}>
                             {milestone.title}
                           </span>
                         </div>

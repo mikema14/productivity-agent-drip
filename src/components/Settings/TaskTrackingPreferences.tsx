@@ -73,14 +73,14 @@ export default function TaskTrackingPreferences() {
     <div className="space-y-4">
       {/* Message Display */}
       {message && (
-        <div className="p-3 bg-blue-50 text-blue-800 rounded border border-blue-200 text-sm">
+        <div className="p-3 bg-focus/10 text-focus rounded-xl border border-focus/20 text-sm">
           {message}
         </div>
       )}
 
       {/* Add New Task */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
           Track New Task
         </label>
         <div className="flex gap-2">
@@ -88,17 +88,17 @@ export default function TaskTrackingPreferences() {
             value={newTaskId}
             onChange={e => setNewTaskId(e.target.value)}
             placeholder="Enter task ID (e.g., TASK-123)"
-            className="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
             onKeyPress={e => e.key === 'Enter' && handleAddTask()}
           />
           <button
             onClick={handleAddTask}
-            className="px-6 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded"
+            className="px-6 py-2 text-sm font-display font-medium text-drip-bg bg-focus hover:bg-focus-light rounded-xl"
           >
             Add Task
           </button>
         </div>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-txt-dim mt-1">
           Tracked tasks appear in the Dashboard
         </p>
       </div>
@@ -106,26 +106,26 @@ export default function TaskTrackingPreferences() {
       {/* Search */}
       {taskList.length > 0 && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
             Search Tasks
           </label>
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Filter by task ID..."
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
           />
         </div>
       )}
 
       {/* Task List */}
       <div>
-        <h3 className="text-sm font-medium text-gray-700 mb-2">
+        <h3 className="text-sm font-medium text-txt-muted mb-2">
           Tracked Tasks ({filteredTasks.filter(t => t.tracked).length})
         </h3>
 
         {filteredTasks.length === 0 ? (
-          <p className="text-gray-500 text-sm">
+          <p className="text-txt-muted text-sm">
             {searchQuery ? 'No tasks match your search' : 'No tracked tasks yet'}
           </p>
         ) : (
@@ -133,20 +133,20 @@ export default function TaskTrackingPreferences() {
             {filteredTasks.map(pref => (
               <div
                 key={pref.taskId}
-                className="flex items-center justify-between p-3 border border-gray-200 rounded hover:bg-gray-50"
+                className="flex items-center justify-between p-3 border border-glass-border rounded-xl hover:bg-glass-hover"
               >
                 <div className="flex items-center gap-3 flex-1">
                   <input
                     type="checkbox"
                     checked={pref.tracked}
                     onChange={() => handleToggleTracked(pref.taskId, pref.tracked)}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded"
+                    className="w-4 h-4 text-focus border-glass-border bg-glass-bg rounded"
                   />
-                  <span className="font-mono text-sm font-semibold text-gray-900">
+                  <span className="font-mono text-sm font-semibold text-txt-primary">
                     {pref.taskId}
                   </span>
                   {pref.pinned && (
-                    <span className="px-2 py-1 text-xs font-medium text-blue-800 bg-blue-100 rounded">
+                    <span className="px-2 py-1 text-xs font-medium text-focus bg-focus/10 border border-focus/20 rounded">
                       Pinned
                     </span>
                   )}
@@ -155,17 +155,17 @@ export default function TaskTrackingPreferences() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleTogglePinned(pref.taskId)}
-                    className={`px-3 py-1 text-sm rounded ${
+                    className={`px-3 py-1 text-sm rounded-xl ${
                       pref.pinned
-                        ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
-                        : 'text-gray-600 bg-gray-50 hover:bg-gray-100'
+                        ? 'text-focus bg-focus/10 hover:bg-focus/20'
+                        : 'text-txt-muted bg-glass-bg hover:bg-glass-hover'
                     }`}
                   >
                     {pref.pinned ? 'Unpin' : 'Pin'}
                   </button>
                   <button
                     onClick={() => handleToggleTracked(pref.taskId, pref.tracked)}
-                    className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
+                    className="px-3 py-1 text-sm text-red-400 hover:bg-red-500/10 rounded-xl"
                   >
                     Remove
                   </button>

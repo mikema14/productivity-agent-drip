@@ -24,7 +24,6 @@ export default function TaskIdInput({ value, onChange, onTaskSelect, placeholder
   }, []);
 
   useEffect(() => {
-    // Filter tasks based on input value
     if (value.trim()) {
       const searchTerm = value.toLowerCase();
       const filtered = recentTasks.filter(
@@ -39,7 +38,6 @@ export default function TaskIdInput({ value, onChange, onTaskSelect, placeholder
   }, [value, recentTasks]);
 
   useEffect(() => {
-    // Close dropdown on click outside
     function handleClickOutside(event: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setIsOpen(false);
@@ -77,42 +75,36 @@ export default function TaskIdInput({ value, onChange, onTaskSelect, placeholder
     onChange(task.task_id);
     onTaskSelect(task.task_id, task.title);
     setIsOpen(false);
-    // Reset flag after a short delay
     setTimeout(() => setIsSelectingFromDropdown(false), 100);
   };
 
   const handleBlur = async () => {
-    // Don't process blur if we're selecting from dropdown
     if (isSelectingFromDropdown) {
       return;
     }
 
     setIsOpen(false);
 
-    // If user typed a task ID that's not in dropdown, try to fetch it
     const taskId = value.trim();
     if (!taskId) return;
 
-    // Check if it's already in recent tasks
     const existingTask = recentTasks.find(t => t.task_id === taskId);
     if (existingTask) {
       onTaskSelect(existingTask.task_id, existingTask.title);
       return;
     }
 
-    // Try to fetch from cache first
     try {
       const cachedTask = await window.logAPI.getCachedTask(taskId);
       if (cachedTask) {
         onTaskSelect(cachedTask.task_id, cachedTask.title);
-        loadRecentTasks(); // Refresh recent tasks
+        loadRecentTasks();
         return;
       }
     } catch (error) {
       console.error('Failed to fetch cached task:', error);
     }
 
-    // Not in cache, fetch from API
     try {
       const baseUrl = await window.timerAPI.getSettings('apiBaseUrl') || 'https://es.easyproject.com';
       const apiKey = await window.timerAPI.getSettings('apiKey');
@@ -125,7 +117,7 @@ export default function TaskIdInput({ value, onChange, onTaskSelect, placeholder
       const issueData = await window.timerAPI.getIssue(baseUrl, apiKey, taskId);
       if (issueData) {
         onTaskSelect(issueData.taskId, issueData.title);
-        loadRecentTasks(); // Refresh recent tasks
+        loadRecentTasks();
       }
     } catch (error) {
       console.error('Failed to fetch task from API:', error);
@@ -142,25 +134,27 @@ export default function TaskIdInput({ value, onChange, onTaskSelect, placeholder
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl
+                   text-txt-primary placeholder-txt-dim
+                   focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
       />
 
       {isOpen && filteredTasks.length > 0 && (
-        <div className="absolute z-10 min-w-80 w-max max-w-lg mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-64 overflow-auto">
+        <div className="absolute z-10 min-w-80 w-max max-w-lg mt-1 bg-drip-elevated border border-glass-border rounded-xl shadow-glass max-h-64 overflow-auto">
           {filteredTasks.map((task) => (
             <div
               key={task.task_id}
               onMouseDown={(e) => {
-                e.preventDefault(); // Prevent blur from firing
+                e.preventDefault();
                 handleSelectTask(task);
               }}
-              className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+              className="px-3 py-2.5 hover:bg-glass-hover cursor-pointer transition-colors first:rounded-t-xl last:rounded-b-xl"
             >
               <div className="flex items-center gap-3">
-                <span className="font-mono text-blue-600 dark:text-blue-400 shrink-0 w-20">
+                <span className="text-focus font-mono shrink-0 w-20">
                   #{task.task_id}
                 </span>
-                <span className="text-gray-700 dark:text-gray-300">
+                <span className="text-txt-secondary">
                   {task.title}
                 </span>
               </div>

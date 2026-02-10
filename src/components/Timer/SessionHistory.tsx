@@ -17,7 +17,6 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
   const isGrouped = sessionViewMode === 'grouped';
   const [sessionsWithTitles, setSessionsWithTitles] = useState<SessionWithTitle[]>([]);
 
-  // Load task titles for sessions
   useEffect(() => {
     async function loadTaskTitles() {
       const sessionsWithTitlesTemp: SessionWithTitle[] = [];
@@ -46,7 +45,6 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
     loadTaskTitles();
   }, [sessions]);
 
-  // Apply grouping if enabled
   const displaySessions = useMemo(() => {
     if (!isGrouped) {
       return sessionsWithTitles.map(s => ({
@@ -57,7 +55,6 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
       }));
     }
 
-    // Group sessions by task ID, preserving taskTitle
     const grouped = new Map<string, SessionWithTitle[]>();
 
     sessionsWithTitles.forEach(session => {
@@ -68,9 +65,7 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
       grouped.get(key)!.push(session);
     });
 
-    // Convert groups to grouped sessions
     return Array.from(grouped.entries()).map(([taskId, group]) => {
-      // Don't merge unassigned sessions
       if (taskId.startsWith('unassigned-')) {
         return {
           ...group[0],
@@ -80,7 +75,6 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
         };
       }
 
-      // Don't merge if only one session
       if (group.length === 1) {
         return {
           ...group[0],
@@ -90,14 +84,12 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
         };
       }
 
-      // Merge multiple sessions with same task ID
       const totalMinutes = group.reduce((sum, s) => sum + s.duration_minutes, 0);
       const comments = group
         .map(s => s.comment)
         .filter(Boolean)
         .join('; ');
 
-      // Take first session as base, override with merged data
       return {
         ...group[0],
         id: `merged-${taskId}`,
@@ -108,18 +100,18 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
         isMerged: true,
         sourceCount: group.length,
         sourceEntries: group,
-        taskTitle: group[0].taskTitle, // Preserve task title
+        taskTitle: group[0].taskTitle,
       };
     });
   }, [sessionsWithTitles, isGrouped]);
 
   if (sessions.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
+      <div className="glass-surface p-6">
+        <h2 className="text-xl font-display font-semibold text-txt-primary mb-4">
           Today's Sessions
         </h2>
-        <p className="text-gray-500 text-center py-8">
+        <p className="text-txt-muted text-center py-8">
           No sessions completed yet. Start your first focus session!
         </p>
       </div>
@@ -127,14 +119,14 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow p-6">
+    <div className="glass-surface p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-gray-900">
+        <h2 className="text-xl font-display font-semibold text-txt-primary">
           Today's Sessions ({sessions.length})
         </h2>
         <button
           onClick={() => setSessionViewMode(isGrouped ? 'flat' : 'grouped')}
-          className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 transition-colors"
+          className="glass-button text-xs text-txt-muted"
         >
           {isGrouped ? '⊟ Show Flat' : '⊞ Group by Task'}
         </button>
@@ -150,22 +142,22 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
             isMerged={session.isMerged}
             sourceCount={session.sourceCount}
           >
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
+            <div className="p-4 bg-glass-bg rounded-xl border border-glass-border hover:border-glass-hover transition-colors">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   {/* Duration Badge */}
-                  <div className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-medium rounded-full">
+                  <div className="px-3 py-1 bg-focus-muted text-focus text-sm font-mono font-medium rounded-full">
                     {session.duration_minutes} min
                   </div>
 
                   {/* Task ID and Title */}
                   {session.task_id && (
                     <div className="flex flex-col gap-1">
-                      <div className="px-3 py-1 bg-green-100 text-green-700 text-sm font-mono font-medium rounded-full">
+                      <div className="px-3 py-1 bg-glass-bg border border-glass-border text-txt-secondary text-sm font-mono font-medium rounded-full">
                         #{session.task_id}
                       </div>
                       {session.taskTitle && (
-                        <span className="text-xs text-gray-500 truncate max-w-xs">
+                        <span className="text-xs text-txt-muted truncate max-w-xs">
                           {session.taskTitle}
                         </span>
                       )}
@@ -176,17 +168,17 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
                 {/* Status */}
                 <div className="flex items-center gap-2">
                   {session.logged ? (
-                    <span className="text-xs text-green-600 font-medium">✓ Logged</span>
+                    <span className="text-xs text-focus font-medium">✓ Logged</span>
                   ) : (
-                    <span className="text-xs text-gray-400 font-medium">Not logged</span>
+                    <span className="text-xs text-txt-dim font-medium">Not logged</span>
                   )}
                 </div>
               </div>
 
               {/* Intention Display */}
               {session.comment && (
-                <div className="mt-2 text-sm text-gray-500 italic">
-                  <span className="font-medium not-italic">Intention:</span> {session.comment}
+                <div className="mt-2 text-sm text-txt-muted italic">
+                  <span className="font-medium not-italic text-txt-secondary">Intention:</span> {session.comment}
                 </div>
               )}
             </div>
@@ -195,10 +187,10 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
       </div>
 
       {/* Summary */}
-      <div className="mt-6 pt-4 border-t border-gray-200">
+      <div className="mt-6 pt-4 border-t border-glass-border">
         <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Total focus time:</span>
-          <span className="font-bold text-gray-900">
+          <span className="text-txt-secondary">Total focus time:</span>
+          <span className="font-display font-semibold text-txt-primary">
             {sessions.reduce((sum, s) => sum + s.duration_minutes, 0)} minutes
           </span>
         </div>

@@ -121,7 +121,8 @@ export const useTimerStore = create<TimerStore>()(
       status: 'break',
       remainingSeconds: duration,
       isPaused: false,
-      intervalId: 999999 // Dummy ID
+      intervalId: 999999, // Dummy ID
+      sessionStartTime: new Date()
     });
 
     // Show notification
@@ -242,6 +243,31 @@ export const useTimerStore = create<TimerStore>()(
       set({ intervalId: null });
     }
 
+    // Save break session to database
+    if (window.timerAPI && state.sessionStartTime) {
+      const endTime = new Date();
+      const durationMs = endTime.getTime() - state.sessionStartTime.getTime();
+      const durationMinutes = Math.round(durationMs / 60000);
+
+      if (durationMinutes >= 1) {
+        try {
+          await window.timerAPI.saveSession({
+            start_at: formatDateTime(state.sessionStartTime),
+            end_at: formatDateTime(endTime),
+            duration_minutes: durationMinutes,
+            task_id: null,
+            source: 'break',
+            comment: 'Break',
+            logged: 0,
+            log_sent_at: null,
+            server_entry_id: null
+          });
+        } catch (error) {
+          console.error('[Timer] Failed to save break session:', error);
+        }
+      }
+    }
+
     // Show notification
     notifyBreakComplete();
 
@@ -250,7 +276,8 @@ export const useTimerStore = create<TimerStore>()(
       status: 'idle',
       remainingSeconds: FOCUS_DURATION,
       intervalId: null,
-      isPaused: false
+      isPaused: false,
+      sessionStartTime: null
     });
   },
 

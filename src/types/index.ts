@@ -31,7 +31,7 @@ export interface PomodoroSession {
   end_at: string | null;
   duration_minutes: number;
   task_id: string | null;
-  source: 'pomodoro' | 'manual' | 'calendar';
+  source: 'pomodoro' | 'manual' | 'calendar' | 'break';
   comment: string | null;
   logged: 0 | 1;
   log_sent_at: string | null;

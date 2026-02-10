@@ -25,31 +25,31 @@ export default function TimerControls({
     return (
       <button
         onClick={onStart}
-        className="px-12 py-4 bg-blue-600 hover:bg-blue-700 text-white
-                 font-bold text-lg rounded-xl transition-colors duration-200
-                 shadow-lg hover:shadow-xl"
+        className="px-12 py-4 bg-focus text-drip-bg
+                 font-display font-semibold text-lg rounded-2xl transition-all duration-200
+                 shadow-glow-focus hover:scale-[1.02] active:scale-[0.98]"
       >
-        Start Focus Session
+        Begin Focus
       </button>
     );
   }
 
   return (
-    <div className="flex items-center gap-4 justify-center">
+    <div className="flex items-center gap-3 justify-center">
       {/* Pause/Resume Button */}
       {isPaused ? (
         <button
           onClick={onResume}
-          className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white
-                   font-semibold rounded-lg transition-colors duration-200"
+          className="px-8 py-3 bg-focus/10 border border-focus/20 text-focus
+                   font-display font-medium rounded-xl transition-all duration-200
+                   hover:bg-focus/20"
         >
           Resume
         </button>
       ) : (
         <button
           onClick={onPause}
-          className="px-8 py-3 bg-yellow-600 hover:bg-yellow-700 text-white
-                   font-semibold rounded-lg transition-colors duration-200"
+          className="glass-button text-txt-secondary font-display font-medium"
         >
           Pause
         </button>
@@ -59,8 +59,9 @@ export default function TimerControls({
       {status === 'focus' && (
         <button
           onClick={onFinishEarly}
-          className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white
-                   font-semibold rounded-lg transition-colors duration-200"
+          className="px-8 py-3 bg-focus/10 border border-focus/20 text-focus
+                   font-display font-medium rounded-xl transition-all duration-200
+                   hover:bg-focus/20"
         >
           Finish Early
         </button>
@@ -69,8 +70,7 @@ export default function TimerControls({
       {/* Skip Button */}
       <button
         onClick={onSkip}
-        className="px-8 py-3 bg-gray-600 hover:bg-gray-700 text-white
-                 font-semibold rounded-lg transition-colors duration-200"
+        className="glass-button text-txt-muted font-display font-medium"
       >
         Skip
       </button>
@@ -78,8 +78,8 @@ export default function TimerControls({
       {/* Cancel Button */}
       <button
         onClick={onCancel}
-        className="px-8 py-3 bg-red-600 hover:bg-red-700 text-white
-                 font-semibold rounded-lg transition-colors duration-200"
+        className="px-4 py-2 text-txt-dim hover:text-red-400 font-display font-medium
+                 transition-colors duration-200"
       >
         Cancel
       </button>

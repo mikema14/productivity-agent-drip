@@ -248,10 +248,13 @@ export default function DailyLog() {
     });
   };
 
-  const totalDuration = mergedEntries.reduce((sum, entry) => sum + entry.durationMinutes, 0);
+  const workEntries = mergedEntries.filter(e => e.source !== 'break');
+  const breakEntries = mergedEntries.filter(e => e.source === 'break');
+  const totalDuration = workEntries.reduce((sum, entry) => sum + entry.durationMinutes, 0);
+  const totalBreakMinutes = breakEntries.reduce((sum, entry) => sum + entry.durationMinutes, 0);
   const markedCount = mergedEntries.filter(e => e.markedToLog && !e.logged).length;
   const loggedCount = mergedEntries.filter(e => e.logged).length;
-  const toggleableCount = mergedEntries.filter(e => !e.logged && !e.isProposal).length;
+  const toggleableCount = mergedEntries.filter(e => !e.logged && !e.isProposal && e.source !== 'break').length;
   const allSelected = toggleableCount > 0 && markedCount === toggleableCount;
 
   const formatTotalTime = (minutes: number) => {
@@ -263,21 +266,21 @@ export default function DailyLog() {
   return (
     <div className="flex flex-col h-full">
       {/* Header - Simplified single row */}
-      <div className="flex-none px-6 py-4 border-b border-gray-200 bg-white">
+      <div className="flex-none px-6 py-4 border-b border-glass-border bg-drip-surface/60 backdrop-blur-xl">
         <div className="flex items-center justify-between">
           {/* Left: Title + Date Navigation */}
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-gray-900">Daily Log</h1>
+            <h1 className="text-xl font-display font-semibold text-txt-primary">Daily Log</h1>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => handleDateChange(-1)}
-                className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded"
+                className="glass-button text-txt-muted text-sm px-2 py-1"
               >
                 ←
               </button>
               <button
                 onClick={goToToday}
-                className="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded flex items-center gap-1.5"
+                className="glass-button text-txt-secondary text-sm px-3 py-1 flex items-center gap-1.5"
               >
                 <span>{formatDate(selectedDate)}</span>
                 <button
@@ -286,7 +289,7 @@ export default function DailyLog() {
                     handleSyncCalendar();
                   }}
                   disabled={isSyncing}
-                  className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                  className="text-txt-muted hover:text-txt-primary disabled:opacity-50"
                   title={isSyncing ? 'Syncing calendar...' : 'Sync calendar'}
                 >
                   <span className={isSyncing ? 'animate-spin' : ''}>🔄</span>
@@ -294,7 +297,7 @@ export default function DailyLog() {
               </button>
               <button
                 onClick={() => handleDateChange(1)}
-                className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded"
+                className="glass-button text-txt-muted text-sm px-2 py-1"
               >
                 →
               </button>
@@ -302,18 +305,24 @@ export default function DailyLog() {
           </div>
 
           {/* Right: Stats as plain text */}
-          <div className="flex items-center gap-2 text-sm text-gray-600">
+          <div className="flex items-center gap-2 text-sm text-txt-muted">
             <span className="font-medium">Total: {formatTotalTime(totalDuration)}</span>
+            {totalBreakMinutes > 0 && (
+              <>
+                <span>·</span>
+                <span className="text-emerald-400">{totalBreakMinutes}m break</span>
+              </>
+            )}
             {markedCount > 0 && (
               <>
                 <span>·</span>
-                <span className="text-blue-600">{markedCount} to log</span>
+                <span className="text-focus">{markedCount} to log</span>
               </>
             )}
             {loggedCount > 0 && (
               <>
                 <span>·</span>
-                <span className="text-green-600">{loggedCount} logged</span>
+                <span className="text-emerald-400">{loggedCount} logged</span>
               </>
             )}
           </div>
@@ -324,14 +333,14 @@ export default function DailyLog() {
       <div className="flex-1 overflow-auto">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="text-gray-500">Loading entries...</div>
+            <div className="text-txt-muted">Loading entries...</div>
           </div>
         ) : entries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500">
+          <div className="flex flex-col items-center justify-center h-full text-txt-muted">
             <p className="text-lg">No entries for this day</p>
             <button
               onClick={() => setShowAddModal(true)}
-              className="mt-4 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded"
+              className="mt-4 px-4 py-2 text-sm text-focus hover:bg-focus/10 rounded"
             >
               Add your first entry
             </button>
@@ -362,7 +371,7 @@ export default function DailyLog() {
               {viewMode === 'timeline' ? (
                 <TimelineView entries={entries} />
               ) : (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden p-4">
+                <div className="glass-surface overflow-hidden p-4">
                   {mergedEntries.map((entry, index) => (
                     <TimelineItem
                       key={entry.id}
@@ -415,17 +424,17 @@ export default function DailyLog() {
 
       {/* Success Toast */}
       {showSuccessToast && (
-        <div className="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-4 z-50">
+        <div className="fixed bottom-4 right-4 bg-emerald-500/90 backdrop-blur-sm border border-emerald-500/30 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-4 z-50">
           <span>✓ {successCount} {successCount === 1 ? 'entry' : 'entries'} logged</span>
           <button
             onClick={() => window.open(buildEPLink(selectedDate), '_blank')}
-            className="underline font-medium hover:text-green-100"
+            className="underline font-medium hover:text-emerald-100"
           >
             View in Easy Project →
           </button>
           <button
             onClick={() => setShowSuccessToast(false)}
-            className="text-green-200 hover:text-white text-xl leading-none"
+            className="text-emerald-200 hover:text-white text-xl leading-none"
           >
             ✕
           </button>

@@ -18,6 +18,8 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
   const [isEditing, setIsEditing] = useState(false);
   const [editedEntry, setEditedEntry] = useState(entry);
 
+  const isBreak = entry.source === 'break';
+
   const handleTaskSelect = (taskId: string, title: string) => {
     setEditedEntry({ ...editedEntry, taskId, title });
   };
@@ -47,23 +49,30 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
     return `${mins}m`;
   };
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
+  const getTypeBadge = () => {
+    const badgeLabel = isBreak ? 'break' : entry.type;
+    switch (badgeLabel) {
       case 'pomodoro':
-        return 'bg-red-100 text-red-700';
+        return 'bg-focus/10 text-focus border border-focus/20';
+      case 'break':
+        return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
       case 'adhoc':
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-glass-bg text-txt-secondary border border-glass-border';
       case 'calendar':
-        return 'bg-purple-100 text-purple-700';
+        return 'bg-purple-500/10 text-purple-400 border border-purple-500/20';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-glass-bg text-txt-secondary border border-glass-border';
     }
+  };
+
+  const getBadgeLabel = () => {
+    return isBreak ? 'break' : entry.type;
   };
 
   if (isEditing) {
     const editContainerClass = inTimeline
-      ? 'py-2 bg-blue-50 rounded'
-      : 'px-6 py-4 border-b border-gray-100 bg-blue-50';
+      ? 'py-2 bg-focus/5 border border-focus/20 rounded-xl'
+      : 'px-6 py-4 border-b border-glass-border bg-focus/5 border border-focus/20 rounded-xl';
     return (
       <div className={editContainerClass}>
         <div className="space-y-3">
@@ -82,7 +91,7 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
               value={editedEntry.title}
               onChange={(e) => setEditedEntry({ ...editedEntry, title: e.target.value })}
               placeholder="Title"
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 text-sm bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
             />
             <input
               type="number"
@@ -90,7 +99,7 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
               onChange={(e) => setEditedEntry({ ...editedEntry, durationMinutes: parseInt(e.target.value) || 0 })}
               min="1"
               placeholder="Duration"
-              className="w-24 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-24 px-3 py-2 text-sm bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
             />
           </div>
 
@@ -100,7 +109,7 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
             value={editedEntry.comment || ''}
             onChange={(e) => setEditedEntry({ ...editedEntry, comment: e.target.value })}
             placeholder="Comment"
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 text-sm bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
           />
 
           {/* Row 3: Billable and Actions */}
@@ -110,20 +119,20 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
                 type="checkbox"
                 checked={editedEntry.billable ?? true}
                 onChange={(e) => setEditedEntry({ ...editedEntry, billable: e.target.checked })}
-                className="w-4 h-4"
+                className="w-4 h-4 accent-focus"
               />
-              <span className="text-sm text-gray-700">Billable</span>
+              <span className="text-sm text-txt-secondary">Billable</span>
             </label>
             <div className="flex gap-2">
               <button
                 onClick={handleSave}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="px-4 py-2 text-sm bg-focus text-drip-bg font-display font-medium rounded-xl hover:bg-focus/90"
               >
                 Save
               </button>
               <button
                 onClick={handleCancel}
-                className="px-4 py-2 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                className="px-4 py-2 text-sm glass-button text-txt-muted"
               >
                 Cancel
               </button>
@@ -136,8 +145,8 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
 
   // Card layout for non-edit mode
   const containerClass = inTimeline
-    ? `py-2 hover:bg-gray-50 rounded ${entry.logged ? 'bg-green-50/30' : ''}`
-    : `px-6 py-4 border-b border-gray-100 hover:bg-gray-50 ${entry.logged ? 'bg-green-50/50' : ''}`;
+    ? `py-2 hover:bg-glass-hover rounded ${entry.logged ? 'bg-emerald-500/5' : ''} ${isBreak ? 'bg-emerald-500/5' : ''}`
+    : `px-6 py-4 border-b border-glass-border hover:bg-glass-hover ${entry.logged ? 'bg-emerald-500/5' : ''} ${isBreak ? 'bg-emerald-500/5' : ''}`;
 
   return (
     <div className={containerClass}>
@@ -145,10 +154,12 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
       <div className="flex items-start gap-4 mb-2">
         {/* Checkbox or Checkmark */}
         <div className="flex-shrink-0 pt-1">
-          {entry.logged ? (
-            <span className="text-green-600 text-lg">✓</span>
+          {isBreak ? (
+            <span className="text-emerald-400 text-lg opacity-50">~</span>
+          ) : entry.logged ? (
+            <span className="text-emerald-400 text-lg">✓</span>
           ) : entry.isProposal ? (
-            <span className="text-gray-400">-</span>
+            <span className="text-txt-dim">-</span>
           ) : (
             <input
               type="checkbox"
@@ -157,7 +168,7 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
                 e.stopPropagation();
                 onToggleLog(entry.id);
               }}
-              className="w-5 h-5 cursor-pointer"
+              className="w-5 h-5 cursor-pointer accent-focus"
             />
           )}
         </div>
@@ -165,12 +176,12 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
         {/* Title + Badges */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-gray-900 truncate">{entry.title}</span>
-            <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${getTypeColor(entry.type)}`}>
-              {entry.type}
+            <span className="font-medium text-txt-primary truncate">{entry.title}</span>
+            <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${getTypeBadge()}`}>
+              {getBadgeLabel()}
             </span>
             {entry.isMerged && (
-              <span className="inline-block px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded font-medium">
+              <span className="inline-block px-2 py-1 text-xs bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded font-medium">
                 {entry.sourceCount} sessions
               </span>
             )}
@@ -179,28 +190,32 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
 
         {/* Duration */}
         <div className="flex-shrink-0">
-          <span className="font-mono font-medium text-gray-900">{formatDuration(entry.durationMinutes)}</span>
+          <span className="font-mono font-medium text-txt-primary">{formatDuration(entry.durationMinutes)}</span>
         </div>
       </div>
 
       {/* Row 2: Comment */}
-      <div className="ml-9 mb-2">
-        <span className="text-sm text-gray-600 italic">
-          {entry.comment || 'No comment'}
-        </span>
-      </div>
+      {!isBreak && (
+        <div className="ml-9 mb-2">
+          <span className="text-sm text-txt-muted italic">
+            {entry.comment || 'No comment'}
+          </span>
+        </div>
+      )}
 
       {/* Row 3: Task ID | Billable | Actions */}
       <div className="ml-9 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          {/* Task ID */}
-          <TaskDisplay taskId={entry.taskId} />
+          {/* Task ID - hide for breaks */}
+          {!isBreak && <TaskDisplay taskId={entry.taskId} />}
 
-          {/* Billable Badge */}
-          {entry.billable ? (
-            <span className="text-xs text-green-600">✓ Billable</span>
-          ) : (
-            <span className="text-xs text-gray-400">Not billable</span>
+          {/* Billable Badge - hide for breaks */}
+          {!isBreak && (
+            entry.billable ? (
+              <span className="text-xs text-emerald-400">✓ Billable</span>
+            ) : (
+              <span className="text-xs text-txt-dim">Not billable</span>
+            )
           )}
         </div>
 
@@ -212,13 +227,13 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
                 <>
                   <button
                     onClick={() => onAccept(entry.id)}
-                    className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                    className="px-3 py-1 text-sm bg-emerald-500/80 text-white rounded hover:bg-emerald-500"
                   >
                     Accept
                   </button>
                   <button
                     onClick={() => onDismiss(entry.id)}
-                    className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
+                    className="px-3 py-1 text-sm glass-button text-txt-muted"
                   >
                     Dismiss
                   </button>
@@ -226,21 +241,23 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
               )}
               {!entry.isProposal && (
                 <>
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded"
-                  >
-                    Edit
-                  </button>
+                  {!isBreak && (
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="px-3 py-1 text-sm text-focus hover:bg-focus/10 rounded"
+                    >
+                      Edit
+                    </button>
+                  )}
                   <button
                     onClick={() => onDelete(entry.id)}
-                    className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
+                    className="px-3 py-1 text-sm text-red-400 hover:bg-red-500/10 rounded"
                     title={entry.isMerged ? `Delete all ${entry.sourceCount} sessions` : 'Delete this entry'}
                   >
                     Delete
                   </button>
-                  {entry.isMerged && (
-                    <span className="text-xs text-gray-400 italic">
+                  {entry.isMerged && !isBreak && (
+                    <span className="text-xs text-txt-dim italic">
                       {entry.sourceCount} sessions
                     </span>
                   )}
@@ -249,7 +266,7 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
             </>
           )}
           {entry.logged && (
-            <span className="text-sm text-green-600 font-medium">Logged to Easy Project</span>
+            <span className="text-sm text-emerald-400 font-medium">Logged to Easy Project</span>
           )}
         </div>
       </div>

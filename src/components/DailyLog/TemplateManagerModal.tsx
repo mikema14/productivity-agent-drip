@@ -5,7 +5,7 @@ import AddTemplateModal from './AddTemplateModal';
 interface TemplateManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onTemplatesChanged: () => void;
+  onTemplatesChanged?: () => void;
 }
 
 export default function TemplateManagerModal({ isOpen, onClose, onTemplatesChanged }: TemplateManagerModalProps) {
@@ -44,7 +44,7 @@ export default function TemplateManagerModal({ isOpen, onClose, onTemplatesChang
         await window.logAPI.addTemplate(template);
       }
       await loadTemplates();
-      onTemplatesChanged();
+      onTemplatesChanged?.();
       setIsAddModalOpen(false);
       setEditingTemplate(null);
     } catch (error) {
@@ -66,7 +66,7 @@ export default function TemplateManagerModal({ isOpen, onClose, onTemplatesChang
     try {
       await window.logAPI.deleteTemplate(id);
       await loadTemplates();
-      onTemplatesChanged();
+      onTemplatesChanged?.();
     } catch (error) {
       console.error('Failed to delete template:', error);
       alert('Failed to delete template');
@@ -87,15 +87,15 @@ export default function TemplateManagerModal({ isOpen, onClose, onTemplatesChang
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl p-6">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="glass-surface-elevated w-full max-w-2xl p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-xl font-display font-semibold text-txt-primary">
               Manage Templates
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              className="text-txt-muted hover:text-txt-primary"
             >
               ✕
             </button>
@@ -104,7 +104,7 @@ export default function TemplateManagerModal({ isOpen, onClose, onTemplatesChang
           <div className="mb-4">
             <button
               onClick={handleAddNew}
-              className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+              className="px-4 py-2 bg-focus text-drip-bg font-display font-medium rounded-xl hover:bg-focus/90"
             >
               + Add Template
             </button>
@@ -112,20 +112,20 @@ export default function TemplateManagerModal({ isOpen, onClose, onTemplatesChang
 
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {templates.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+              <p className="text-txt-muted text-center py-8">
                 No templates yet. Click "Add Template" to create one.
               </p>
             ) : (
               templates.map((template) => (
                 <div
                   key={template.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600"
+                  className="flex items-center justify-between p-3 bg-glass-bg border border-glass-border rounded-xl"
                 >
                   <div className="flex-1">
-                    <div className="font-medium text-gray-900 dark:text-white">
+                    <div className="font-medium text-txt-primary">
                       {template.name}
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                    <div className="text-sm text-txt-muted">
                       Task {template.task_id} · {template.default_duration || 15}m ·{' '}
                       {template.billable ? 'Billable' : 'Non-billable'}
                       {template.comment && (
@@ -136,13 +136,13 @@ export default function TemplateManagerModal({ isOpen, onClose, onTemplatesChang
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleEdit(template)}
-                      className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded"
+                      className="px-3 py-1 text-sm text-focus hover:bg-focus/10 rounded"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => handleDelete(template.id)}
-                      className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 rounded"
+                      className="px-3 py-1 text-sm text-red-400 hover:bg-red-500/10 rounded"
                     >
                       Delete
                     </button>
@@ -155,7 +155,7 @@ export default function TemplateManagerModal({ isOpen, onClose, onTemplatesChang
           <div className="mt-6">
             <button
               onClick={onClose}
-              className="w-full px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md"
+              className="w-full glass-button text-txt-muted px-4 py-2"
             >
               Close
             </button>
@@ -248,17 +248,19 @@ function EditTemplateModal({ isOpen, onClose, onSave, template }: EditTemplateMo
     }
   };
 
+  const inputClass = "w-full px-3 py-2 bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30";
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]">
+      <div className="glass-surface-elevated w-full max-w-md p-6">
+        <h2 className="text-xl font-display font-semibold mb-4 text-txt-primary">
           {template ? 'Edit Template' : 'Add Quick Log Template'}
         </h2>
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-txt-secondary mb-1">
                 Template Name
               </label>
               <input
@@ -266,13 +268,13 @@ function EditTemplateModal({ isOpen, onClose, onSave, template }: EditTemplateMo
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Admin, Meeting"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className={inputClass}
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-txt-secondary mb-1">
                 Task ID
               </label>
               <input
@@ -280,13 +282,13 @@ function EditTemplateModal({ isOpen, onClose, onSave, template }: EditTemplateMo
                 value={taskId}
                 onChange={(e) => setTaskId(e.target.value)}
                 placeholder="e.g., 229602"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className={inputClass}
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-txt-secondary mb-1">
                 Default Duration (minutes)
               </label>
               <input
@@ -295,12 +297,12 @@ function EditTemplateModal({ isOpen, onClose, onSave, template }: EditTemplateMo
                 onChange={(e) => setDuration(e.target.value)}
                 placeholder="15"
                 min="1"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-txt-secondary mb-1">
                 Default Comment (optional)
               </label>
               <input
@@ -308,7 +310,7 @@ function EditTemplateModal({ isOpen, onClose, onSave, template }: EditTemplateMo
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="e.g., Team meeting, Admin work"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className={inputClass}
               />
             </div>
 
@@ -318,9 +320,9 @@ function EditTemplateModal({ isOpen, onClose, onSave, template }: EditTemplateMo
                 id="billable"
                 checked={billable}
                 onChange={(e) => setBillable(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                className="w-4 h-4 accent-focus"
               />
-              <label htmlFor="billable" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="billable" className="ml-2 text-sm font-medium text-txt-secondary">
                 Billable
               </label>
             </div>
@@ -331,14 +333,14 @@ function EditTemplateModal({ isOpen, onClose, onSave, template }: EditTemplateMo
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md disabled:opacity-50"
+              className="flex-1 glass-button text-txt-muted px-4 py-2 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="flex-1 px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-focus text-drip-bg font-display font-medium rounded-xl disabled:opacity-50 hover:bg-focus/90"
             >
               {isSaving ? 'Saving...' : template ? 'Update Template' : 'Save Template'}
             </button>

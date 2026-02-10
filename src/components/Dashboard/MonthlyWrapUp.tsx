@@ -86,7 +86,7 @@ export default function MonthlyWrapUp() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading monthly summary...</div>
+        <div className="text-txt-muted">Loading monthly summary...</div>
       </div>
     );
   }
@@ -94,18 +94,19 @@ export default function MonthlyWrapUp() {
   if (!stats) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">No data available for this month</div>
+        <div className="text-txt-muted">No data available for this month</div>
       </div>
     );
   }
 
   return (
+    <div className="max-w-5xl mx-auto p-8">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Monthly Wrap-Up</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-3xl font-display font-semibold text-txt-primary">Monthly Wrap-Up</h1>
+          <p className="text-txt-secondary mt-2">
             Reflect on your progress without pressure
           </p>
         </div>
@@ -114,13 +115,13 @@ export default function MonthlyWrapUp() {
         <div className="flex gap-2">
           <button
             onClick={exportJSON}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+            className="glass-button px-4 py-2 text-sm font-medium text-txt-secondary"
           >
             Export JSON
           </button>
           <button
             onClick={exportCSV}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+            className="glass-button px-4 py-2 text-sm font-medium text-txt-secondary"
           >
             Export CSV
           </button>
@@ -128,16 +129,16 @@ export default function MonthlyWrapUp() {
       </div>
 
       {/* Month/Year Picker */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
+      <div className="glass-surface p-6">
         <div className="flex gap-4 items-center">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
               Month
             </label>
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
             >
               {monthNames.map((name, index) => (
                 <option key={name} value={index + 1}>
@@ -148,13 +149,13 @@ export default function MonthlyWrapUp() {
           </div>
 
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
               Year
             </label>
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
             >
               {years.map((year) => (
                 <option key={year} value={year}>
@@ -168,33 +169,33 @@ export default function MonthlyWrapUp() {
 
       {/* Summary Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <div className="text-sm text-gray-600 mb-1">Total Work</div>
-          <div className="text-3xl font-bold text-gray-900">{formatHours(stats.totalMinutes)}</div>
+        <div className="glass-surface p-6">
+          <div className="text-sm text-txt-muted mb-1">Total Work</div>
+          <div className="text-3xl font-mono font-semibold text-txt-primary">{formatHours(stats.totalMinutes)}</div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <div className="text-sm text-gray-600 mb-1">Deep Work</div>
-          <div className="text-3xl font-bold text-blue-600">
+        <div className="glass-surface p-6">
+          <div className="text-sm text-txt-muted mb-1">Deep Work</div>
+          <div className="text-3xl font-mono font-semibold text-focus">
             {formatHours(stats.deepWorkMinutes)}
             {stats.totalMinutes > 0 && (
-              <span className="text-sm font-normal text-gray-600 ml-2">
+              <span className="text-sm font-normal text-txt-muted ml-2">
                 ({Math.round((stats.deepWorkMinutes / stats.totalMinutes) * 100)}%)
               </span>
             )}
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <div className="text-sm text-gray-600 mb-1">Best Streak</div>
-          <div className="text-3xl font-bold text-green-600">
+        <div className="glass-surface p-6">
+          <div className="text-sm text-txt-muted mb-1">Best Streak</div>
+          <div className="text-3xl font-mono font-semibold text-emerald-400">
             {stats.bestDayStreak} {stats.bestDayStreak === 1 ? 'day' : 'days'}
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <div className="text-sm text-gray-600 mb-1">Days Worked</div>
-          <div className="text-3xl font-bold text-purple-600">
+        <div className="glass-surface p-6">
+          <div className="text-sm text-txt-muted mb-1">Days Worked</div>
+          <div className="text-3xl font-mono font-semibold text-purple-400">
             {stats.daysWorked} / {stats.dailyMinutes.length}
           </div>
         </div>
@@ -202,12 +203,12 @@ export default function MonthlyWrapUp() {
 
       {/* Reflections */}
       {stats.reflections && stats.reflections.length > 0 && (
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Reflections</h2>
+        <div className="glass-surface p-6">
+          <h2 className="text-xl font-display font-semibold text-txt-primary mb-4">Reflections</h2>
           <div className="space-y-4">
             {stats.reflections.map((r: { date: string; reflection: string }) => (
-              <div key={r.date} className="border-l-4 border-blue-500 pl-4">
-                <div className="text-sm text-gray-600 font-medium mb-1">
+              <div key={r.date} className="border-l-2 border-focus/50 pl-4">
+                <div className="text-sm text-txt-muted font-medium mb-1">
                   {new Date(r.date).toLocaleDateString('en-US', {
                     weekday: 'long',
                     year: 'numeric',
@@ -215,7 +216,7 @@ export default function MonthlyWrapUp() {
                     day: 'numeric'
                   })}
                 </div>
-                <div className="text-gray-700">{r.reflection}</div>
+                <div className="text-txt-secondary">{r.reflection}</div>
               </div>
             ))}
           </div>
@@ -223,18 +224,18 @@ export default function MonthlyWrapUp() {
       )}
 
       {/* Daily Breakdown */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Daily Breakdown</h2>
+      <div className="glass-surface p-6">
+        <h2 className="text-xl font-display font-semibold text-txt-primary mb-4">Daily Breakdown</h2>
         <div className="grid grid-cols-7 gap-2">
           {stats.dailyMinutes.map((day: { date: string; minutes: number }) => {
             const dayNum = new Date(day.date).getDate();
             const intensity = day.minutes >= 480 ? 4 : day.minutes >= 240 ? 3 : day.minutes >= 60 ? 2 : day.minutes >= 1 ? 1 : 0;
-            const colors = ['bg-gray-100', 'bg-blue-100', 'bg-blue-300', 'bg-blue-500', 'bg-blue-700'];
+            const colors = ['bg-glass-bg', 'bg-focus/10', 'bg-focus/20', 'bg-focus/40', 'bg-focus/60'];
 
             return (
               <div
                 key={day.date}
-                className={`aspect-square rounded flex flex-col items-center justify-center ${colors[intensity]} text-gray-800 text-sm font-medium`}
+                className={`aspect-square rounded-lg flex flex-col items-center justify-center ${colors[intensity]} text-txt-primary text-sm font-medium`}
                 title={`${day.date}: ${formatHours(day.minutes)}`}
               >
                 <div className="text-xs">{dayNum}</div>
@@ -243,25 +244,26 @@ export default function MonthlyWrapUp() {
             );
           })}
         </div>
-        <div className="mt-4 flex items-center gap-4 text-xs text-gray-600">
+        <div className="mt-4 flex items-center gap-4 text-xs text-txt-muted">
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-gray-100 rounded"></div>
+            <div className="w-3 h-3 bg-glass-bg rounded"></div>
             <span>0h</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-blue-100 rounded"></div>
+            <div className="w-3 h-3 bg-focus/10 rounded"></div>
             <span>1-4h</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-blue-300 rounded"></div>
+            <div className="w-3 h-3 bg-focus/20 rounded"></div>
             <span>4-8h</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-blue-700 rounded"></div>
+            <div className="w-3 h-3 bg-focus/60 rounded"></div>
             <span>8h+</span>
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

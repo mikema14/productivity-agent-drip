@@ -48,14 +48,14 @@ export default function QuickLogBar({ currentDate, onOpenTemplateManager }: Quic
   }
 
   return (
-    <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+    <div className="mb-4 p-3 bg-glass-bg/30 border border-glass-border backdrop-blur-sm rounded-xl">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Quick Log:</span>
+        <span className="text-sm font-medium text-txt-muted">Quick Log:</span>
         {templates.map((template) => (
           <button
             key={template.id}
             onClick={() => handleTemplateClick(template)}
-            className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 rounded-md border border-blue-200 dark:border-blue-800 transition-colors"
+            className="px-3 py-1.5 text-sm font-medium text-focus bg-focus/10 hover:bg-focus/20 rounded-lg border border-focus/20 transition-colors"
             title={`Task ${template.task_id} - ${template.default_duration || 15}m`}
           >
             {template.name}
@@ -63,7 +63,7 @@ export default function QuickLogBar({ currentDate, onOpenTemplateManager }: Quic
         ))}
         <button
           onClick={onOpenTemplateManager}
-          className="px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md border border-gray-300 dark:border-gray-600 transition-colors"
+          className="glass-button text-txt-muted px-3 py-1.5 text-sm font-medium"
         >
           + Manage
         </button>

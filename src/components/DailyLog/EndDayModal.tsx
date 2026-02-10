@@ -131,21 +131,21 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8">
-          <div className="text-gray-500">Loading day summary...</div>
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="glass-surface-elevated p-8">
+          <div className="text-txt-muted">Loading day summary...</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="glass-surface-elevated max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-4">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">End Day - {date}</h2>
-          <p className="text-sm text-gray-600 mt-1">Review your day and set intentions for tomorrow</p>
+        <div className="px-6 py-4 border-b border-glass-border">
+          <h2 className="text-2xl font-display font-semibold text-txt-primary">End Day - {date}</h2>
+          <p className="text-sm text-txt-secondary mt-1">Review your day and set intentions for tomorrow</p>
         </div>
 
         {/* Content */}
@@ -153,17 +153,17 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
           {/* Section 1: Today's Intentions */}
           {todayIntentions.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <h3 className="text-lg font-display font-semibold text-txt-primary mb-3 flex items-center gap-2">
                 <span>⚡</span>
                 <span>Today's Plan</span>
               </h3>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="text-sm text-gray-600 mb-2">What you set out to do today:</div>
+              <div className="bg-glass-bg border border-glass-border rounded-xl p-4">
+                <div className="text-sm text-txt-muted mb-2">What you set out to do today:</div>
                 <div className="space-y-2">
                   {todayIntentions.map((intention, index) => (
                     <div key={index} className="flex items-start gap-2">
-                      <span className="text-blue-600 mt-0.5">•</span>
-                      <span className="text-gray-900">{intention}</span>
+                      <span className="text-focus mt-0.5">•</span>
+                      <span className="text-txt-primary">{intention}</span>
                     </div>
                   ))}
                 </div>
@@ -173,22 +173,22 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
 
           {/* Section 2: Review */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <h3 className="text-lg font-display font-semibold text-txt-primary mb-3 flex items-center gap-2">
               <span>📊</span>
               <span>Review</span>
             </h3>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+            <div className="bg-glass-bg border border-glass-border rounded-xl p-4 space-y-3">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <div className="text-sm text-gray-600">Total Work</div>
-                  <div className="text-2xl font-bold text-gray-900">{formatHours(totalMinutes)}</div>
+                  <div className="text-sm text-txt-muted">Total Work</div>
+                  <div className="text-2xl font-bold text-txt-primary">{formatHours(totalMinutes)}</div>
                 </div>
                 <div>
-                  <div className="text-sm text-gray-600">Deep Work</div>
-                  <div className="text-2xl font-bold text-blue-600">
+                  <div className="text-sm text-txt-muted">Deep Work</div>
+                  <div className="text-2xl font-bold text-focus font-mono">
                     {formatHours(deepWorkMinutes)}
                     {totalMinutes > 0 && (
-                      <span className="text-sm font-normal text-gray-600 ml-2">
+                      <span className="text-sm font-normal text-txt-muted ml-2">
                         ({Math.round((deepWorkMinutes / totalMinutes) * 100)}%)
                       </span>
                     )}
@@ -197,10 +197,10 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
               </div>
               {tasksWorked.length > 0 && (
                 <div>
-                  <div className="text-sm text-gray-600 mb-1">Tasks Worked On:</div>
+                  <div className="text-sm text-txt-muted mb-1">Tasks Worked On:</div>
                   <div className="flex flex-wrap gap-2">
                     {tasksWorked.map(taskId => (
-                      <span key={taskId} className="px-2 py-1 bg-white border border-blue-300 rounded text-sm font-mono">
+                      <span key={taskId} className="px-2 py-1 bg-drip-elevated border border-glass-border text-txt-secondary rounded-full text-sm font-mono">
                         #{taskId}
                       </span>
                     ))}
@@ -212,42 +212,42 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
 
           {/* Section 3: Reflection */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <h3 className="text-lg font-display font-semibold text-txt-primary mb-3 flex items-center gap-2">
               <span>💭</span>
               <span>Reflection</span>
-              <span className="text-sm font-normal text-gray-500">(optional)</span>
+              <span className="text-sm font-normal text-txt-dim">(optional)</span>
             </h3>
             <textarea
               value={reflection}
               onChange={(e) => setReflection(e.target.value)}
               placeholder="What moved forward today? What did you learn?"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full px-4 py-3 bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30 resize-none"
               rows={3}
             />
           </div>
 
           {/* Section 3: Daily Notes */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <h3 className="text-lg font-display font-semibold text-txt-primary mb-3 flex items-center gap-2">
               <span>📝</span>
               <span>Daily Notes</span>
-              <span className="text-sm font-normal text-gray-500">(optional)</span>
+              <span className="text-sm font-normal text-txt-dim">(optional)</span>
             </h3>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Blockers, links, reminders for tomorrow..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full px-4 py-3 bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30 resize-none"
               rows={3}
             />
           </div>
 
           {/* Section 4: Tomorrow */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <h3 className="text-lg font-display font-semibold text-txt-primary mb-3 flex items-center gap-2">
               <span>✨</span>
               <span>Tomorrow's Intentions</span>
-              <span className="text-sm font-normal text-gray-500">(1-3 items)</span>
+              <span className="text-sm font-normal text-txt-dim">(1-3 items)</span>
             </h3>
             <div className="space-y-2">
               <input
@@ -255,39 +255,39 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
                 value={tomorrowIntention1}
                 onChange={(e) => setTomorrowIntention1(e.target.value)}
                 placeholder="First intention..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
               />
               <input
                 type="text"
                 value={tomorrowIntention2}
                 onChange={(e) => setTomorrowIntention2(e.target.value)}
                 placeholder="Second intention (optional)"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
               />
               <input
                 type="text"
                 value={tomorrowIntention3}
                 onChange={(e) => setTomorrowIntention3(e.target.value)}
                 placeholder="Third intention (optional)"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
               />
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-glass-border flex justify-end gap-3">
           <button
             onClick={onClose}
             disabled={isSaving}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded disabled:opacity-50"
+            className="glass-button text-txt-muted px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={isSaving}
-            className="px-6 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50"
+            className="px-6 py-2 text-sm bg-focus text-drip-bg font-display font-medium rounded-xl disabled:opacity-50 hover:bg-focus/90"
           >
             {isSaving ? 'Saving...' : 'End Day'}
           </button>

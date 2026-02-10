@@ -31,7 +31,7 @@ export function initDB(): Database.Database {
       end_at DATETIME,
       duration_minutes INTEGER NOT NULL DEFAULT 25,
       task_id TEXT,
-      source TEXT CHECK(source IN ('pomodoro', 'manual', 'calendar')) DEFAULT 'pomodoro',
+      source TEXT CHECK(source IN ('pomodoro', 'manual', 'calendar', 'break')) DEFAULT 'pomodoro',
       comment TEXT,
       logged INTEGER DEFAULT 0,
       log_sent_at DATETIME,
@@ -222,6 +222,35 @@ function runMigrations(database: Database.Database) {
     }
   } catch (error) {
     console.error('Migration error (log_templates comment):', error);
+  }
+
+  // Migration: Add 'break' to source CHECK constraint on pomodoro_sessions
+  try {
+    const tableInfo = database.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='pomodoro_sessions'").get() as { sql: string } | undefined;
+    if (tableInfo && !tableInfo.sql.includes("'break'")) {
+      console.log('Running migration: Adding break to source CHECK constraint');
+      database.exec(`
+        ALTER TABLE pomodoro_sessions RENAME TO pomodoro_sessions_old;
+        CREATE TABLE pomodoro_sessions (
+          id TEXT PRIMARY KEY,
+          start_at DATETIME NOT NULL,
+          end_at DATETIME,
+          duration_minutes INTEGER NOT NULL DEFAULT 25,
+          task_id TEXT,
+          source TEXT CHECK(source IN ('pomodoro', 'manual', 'calendar', 'break')) DEFAULT 'pomodoro',
+          comment TEXT,
+          logged INTEGER DEFAULT 0,
+          log_sent_at DATETIME,
+          server_entry_id INTEGER,
+          billable INTEGER DEFAULT 1
+        );
+        INSERT INTO pomodoro_sessions SELECT * FROM pomodoro_sessions_old;
+        DROP TABLE pomodoro_sessions_old;
+      `);
+      console.log('Migration complete: pomodoro_sessions source CHECK updated');
+    }
+  } catch (error) {
+    console.error('Migration error (pomodoro_sessions source CHECK):', error);
   }
 
   // Migration: Create shutdown_rituals table if it doesn't exist

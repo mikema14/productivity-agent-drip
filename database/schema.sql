@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS pomodoro_sessions (
   end_at DATETIME,
   duration_minutes INTEGER NOT NULL DEFAULT 25,
   task_id TEXT,
-  source TEXT CHECK(source IN ('pomodoro', 'manual', 'calendar')) DEFAULT 'pomodoro',
+  source TEXT CHECK(source IN ('pomodoro', 'manual', 'calendar', 'break')) DEFAULT 'pomodoro',
   comment TEXT,
   logged INTEGER DEFAULT 0,
   log_sent_at DATETIME,

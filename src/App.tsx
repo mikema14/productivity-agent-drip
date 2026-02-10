@@ -13,6 +13,7 @@ import { useLogStore } from './stores/logStore';
 function App() {
   const [currentView, setCurrentView] = useState('timer');
   const [currentTaskId, setCurrentTaskId] = useState<string>('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Load session count and check for stuck timer states on mount
   useEffect(() => {
@@ -84,7 +85,7 @@ function App() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar onNavigate={setCurrentView} currentView={currentView} />
+      <Sidebar onNavigate={setCurrentView} currentView={currentView} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(c => !c)} />
       <MainContent>{renderView()}</MainContent>
     </div>
   );

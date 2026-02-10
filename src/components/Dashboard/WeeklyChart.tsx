@@ -44,18 +44,18 @@ export default function WeeklyChart() {
   const maxMinutes = Math.max(...weekData.map(d => d.total), 1);
 
   return (
-    <div className="bg-white p-6 rounded-lg border border-gray-200">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">Weekly Focus</h2>
+    <div className="glass-surface p-6">
+      <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Weekly Focus</h2>
 
       {/* Legend */}
       <div className="flex items-center gap-4 mb-3 text-xs">
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 bg-blue-300 rounded" />
-          <span className="text-gray-600">Total Work</span>
+          <div className="w-3 h-3 bg-focus/30 rounded" />
+          <span className="text-txt-muted">Total Work</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 bg-blue-600 rounded" />
-          <span className="text-gray-600">Deep Work</span>
+          <div className="w-3 h-3 bg-focus rounded" />
+          <span className="text-txt-muted">Deep Work</span>
         </div>
       </div>
 
@@ -70,25 +70,25 @@ export default function WeeklyChart() {
             <div key={date} className="flex-1 flex flex-col items-center">
               {/* Bar container */}
               <div className="flex-1 w-full flex items-end justify-center mb-1 relative">
-                {/* Total work bar (background - light blue) */}
+                {/* Total work bar (background - light) */}
                 <div
                   className={`w-full rounded-t absolute bottom-0 ${
-                    total > 0 ? 'bg-blue-300' : 'bg-gray-200'
+                    total > 0 ? 'bg-focus/30' : 'bg-glass-border'
                   }`}
                   style={{ height: total > 0 ? `${totalHeightPercent}%` : '4px' }}
                 />
-                {/* Deep work bar (foreground - dark blue overlay) */}
+                {/* Deep work bar (foreground - solid) */}
                 {deepWork > 0 && (
                   <div
-                    className="w-full rounded-t absolute bottom-0 bg-blue-600 transition-all cursor-pointer hover:bg-blue-700"
+                    className="w-full rounded-t absolute bottom-0 bg-focus transition-all cursor-pointer hover:bg-focus-light"
                     style={{ height: `${deepHeightPercent}%` }}
                     title={`${date}\nTotal: ${total}m\nDeep Work: ${deepWork}m (${total > 0 ? Math.round((deepWork / total) * 100) : 0}%)`}
                   />
                 )}
               </div>
               {/* Labels */}
-              <span className="text-xs text-gray-600">{dayLabel}</span>
-              <span className="text-xs text-gray-400">{Math.round(total)}m</span>
+              <span className="text-xs text-txt-muted">{dayLabel}</span>
+              <span className="text-xs text-txt-dim">{Math.round(total)}m</span>
             </div>
           );
         })}
