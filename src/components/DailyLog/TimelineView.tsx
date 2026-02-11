@@ -127,42 +127,66 @@ export default function TimelineView({ entries }: TimelineViewProps) {
             );
           })}
 
-          {/* Scheduled entry blocks */}
-          {scheduledEntries.map((entry) => {
-            const start = new Date(entry.startTime!);
-            const top = getTop(start);
-            const height = Math.max(getHeight(entry.durationMinutes), 20);
-            const isBreak = entry.source === 'break';
+          {/* Scheduled entry blocks with overlap resolution */}
+          {(() => {
+            const OVERLAP_GAP = 3;
+            const blocks = scheduledEntries.map((entry) => ({
+              id: entry.id,
+              top: getTop(new Date(entry.startTime!)),
+              height: Math.max(getHeight(entry.durationMinutes), 20),
+              entry,
+            }));
 
-            return (
-              <div
-                key={entry.id}
-                className={`absolute left-14 right-4 rounded-lg border transition-colors overflow-hidden ${getBlockClasses(entry)}`}
-                style={{ top, height }}
-              >
-                <div className="px-2 py-1 flex items-center gap-2 h-full">
-                  <span className={`text-xs font-mono font-medium truncate ${getDurationColor(entry)}`}>
-                    {entry.durationMinutes}m
-                  </span>
-                  {isBreak && (
-                    <span className="text-xs text-emerald-400/70">Break</span>
-                  )}
-                  {!isBreak && entry.taskId && (
-                    <span className="text-xs font-mono text-txt-muted">#{entry.taskId}</span>
-                  )}
-                  {!isBreak && entry.type === 'calendar' && (
-                    <span className="text-xs text-blue-400/70 truncate">{entry.title}</span>
-                  )}
-                  {!isBreak && entry.type !== 'calendar' && entry.comment && height > 30 && (
-                    <span className="text-xs text-txt-dim truncate">{entry.comment}</span>
-                  )}
-                  {!isBreak && entry.logged && (
-                    <span className="text-xs text-focus ml-auto">&#10003;</span>
-                  )}
+            blocks.sort((a, b) => a.top - b.top);
+
+            // Resolve overlaps
+            const adjustedTops: Map<string, number> = new Map();
+            for (let i = 0; i < blocks.length; i++) {
+              let adjustedTop = blocks[i].top;
+              for (let j = 0; j < i; j++) {
+                const prevTop = adjustedTops.get(blocks[j].id)!;
+                const prevBottom = prevTop + blocks[j].height;
+                if (adjustedTop < prevBottom && adjustedTop + blocks[i].height > prevTop) {
+                  adjustedTop = Math.max(adjustedTop, prevBottom + OVERLAP_GAP);
+                }
+              }
+              adjustedTops.set(blocks[i].id, adjustedTop);
+            }
+
+            return blocks.map(({ id, height, entry }) => {
+              const top = adjustedTops.get(id)!;
+              const isBreak = entry.source === 'break';
+
+              return (
+                <div
+                  key={id}
+                  className={`absolute left-14 right-4 rounded-lg border transition-colors overflow-hidden ${getBlockClasses(entry)}`}
+                  style={{ top, height }}
+                >
+                  <div className="px-2 py-1 flex items-center gap-2 h-full">
+                    <span className={`text-xs font-mono font-medium truncate ${getDurationColor(entry)}`}>
+                      {entry.durationMinutes}m
+                    </span>
+                    {isBreak && (
+                      <span className="text-xs text-emerald-400/70">Break</span>
+                    )}
+                    {!isBreak && entry.taskId && (
+                      <span className="text-xs font-mono text-txt-muted">#{entry.taskId}</span>
+                    )}
+                    {!isBreak && entry.type === 'calendar' && (
+                      <span className="text-xs text-blue-400/70 truncate">{entry.title}</span>
+                    )}
+                    {!isBreak && entry.type !== 'calendar' && entry.comment && height > 30 && (
+                      <span className="text-xs text-txt-dim truncate">{entry.comment}</span>
+                    )}
+                    {!isBreak && entry.logged && (
+                      <span className="text-xs text-focus ml-auto">&#10003;</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
 
           {/* Active session hatched block */}
           {status === 'focus' && isToday && sessionStartTime && (() => {

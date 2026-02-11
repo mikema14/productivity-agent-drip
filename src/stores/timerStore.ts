@@ -29,6 +29,7 @@ export const useTimerStore = create<TimerStore>()(
     (set, get) => ({
       status: 'idle',
       remainingSeconds: FOCUS_DURATION,
+      totalDuration: FOCUS_DURATION,
       currentTaskId: null,
       sessionCount: 0,
       isPaused: false,
@@ -88,6 +89,7 @@ export const useTimerStore = create<TimerStore>()(
     set({
       status: 'focus',
       remainingSeconds: FOCUS_DURATION,
+      totalDuration: FOCUS_DURATION,
       currentTaskId: taskId || null,
       isPaused: false,
       intervalId: 999999, // Dummy ID to indicate timer is running (actual timer in main process)
@@ -120,6 +122,7 @@ export const useTimerStore = create<TimerStore>()(
     set({
       status: 'break',
       remainingSeconds: duration,
+      totalDuration: duration,
       isPaused: false,
       intervalId: 999999, // Dummy ID
       sessionStartTime: new Date()
@@ -207,6 +210,7 @@ export const useTimerStore = create<TimerStore>()(
       sessionStartTime: null,
       status: 'idle',
       remainingSeconds: FOCUS_DURATION,
+      totalDuration: FOCUS_DURATION,
       isPaused: false,
       showCompletionModal: true, // SHOW MODAL instead of auto-starting break
       lastTaskId: state.currentTaskId,
@@ -275,6 +279,7 @@ export const useTimerStore = create<TimerStore>()(
     set({
       status: 'idle',
       remainingSeconds: FOCUS_DURATION,
+      totalDuration: FOCUS_DURATION,
       intervalId: null,
       isPaused: false,
       sessionStartTime: null
@@ -404,6 +409,7 @@ export const useTimerStore = create<TimerStore>()(
       set({
         status: 'idle',
         remainingSeconds: FOCUS_DURATION,
+        totalDuration: FOCUS_DURATION,
         sessionCount: newCount,
         intention: '',
         isPaused: false,
@@ -446,6 +452,7 @@ export const useTimerStore = create<TimerStore>()(
     set({
       status: 'idle',
       remainingSeconds: FOCUS_DURATION,
+      totalDuration: FOCUS_DURATION,
       currentTaskId: null,
       isPaused: false,
       intervalId: null,
@@ -543,6 +550,7 @@ export function checkTimerHydration() {
     useTimerStore.setState({
       status: 'idle',
       remainingSeconds: FOCUS_DURATION,
+      totalDuration: FOCUS_DURATION,
       isPaused: false,
       intervalId: null,
       sessionStartTime: null,
@@ -591,6 +599,12 @@ export function setupMainTimerListeners() {
   // Listen for timer extension events
   window.timerAPI.onTimerExtended((newRemaining: number) => {
     console.log('[Timer] Received extended event from main process, new remaining:', newRemaining);
-    useTimerStore.setState({ remainingSeconds: newRemaining });
+    const state = useTimerStore.getState();
+    // Update totalDuration to account for extension (add the difference)
+    const extended = newRemaining - state.remainingSeconds;
+    useTimerStore.setState({
+      remainingSeconds: newRemaining,
+      totalDuration: state.totalDuration + extended,
+    });
   });
 }

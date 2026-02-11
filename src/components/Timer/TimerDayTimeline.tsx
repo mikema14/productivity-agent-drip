@@ -276,76 +276,119 @@ export default function TimerDayTimeline({ sessions, calendarProposals, onRefres
             );
           })}
 
-          {/* Session blocks */}
-          {dateSessions.map((session) => {
-            const start = new Date(session.start_at);
-            const top = getTop(start);
-            const height = Math.max(getHeight(session.duration_minutes), 20);
-            const isLogged = session.logged === 1;
-            const isBreak = session.source === 'break';
+          {/* Session + Calendar blocks with overlap resolution */}
+          {(() => {
+            // Build unified block list with computed positions
+            const OVERLAP_GAP = 3;
+            const blocks: { id: string; top: number; height: number; type: 'session' | 'calendar'; data: any }[] = [];
 
-            return (
-              <div
-                key={session.id}
-                className={`absolute left-14 right-4 rounded-lg border transition-colors overflow-hidden
-                  ${isBreak
-                    ? 'bg-emerald-500/15 border-emerald-500/30'
-                    : isLogged
-                      ? 'bg-focus/15 border-focus/30'
-                      : 'bg-focus/10 border-focus/20'
-                  }`}
-                style={{ top, height }}
-              >
-                <div className="px-2 py-1 flex items-center gap-2 h-full">
-                  <span className={`text-xs font-mono font-medium truncate ${isBreak ? 'text-emerald-400' : 'text-focus'}`}>
-                    {session.duration_minutes}m
-                  </span>
-                  {isBreak && (
-                    <span className="text-xs text-emerald-400/70">Break</span>
-                  )}
-                  {!isBreak && session.task_id && (
-                    <span className="text-xs font-mono text-txt-muted">#{session.task_id}</span>
-                  )}
-                  {!isBreak && session.comment && height > 30 && (
-                    <span className="text-xs text-txt-dim truncate">{session.comment}</span>
-                  )}
-                  {!isBreak && isLogged && (
-                    <span className="text-xs text-focus ml-auto">&#10003;</span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+            dateSessions.forEach((session) => {
+              const start = new Date(session.start_at);
+              blocks.push({
+                id: session.id,
+                top: getTop(start),
+                height: Math.max(getHeight(session.duration_minutes), 20),
+                type: 'session',
+                data: session,
+              });
+            });
 
-          {/* Calendar event blocks */}
-          {dateProposals.map((proposal) => {
-            const start = new Date(proposal.start_at);
-            const top = getTop(start);
-            const height = Math.max(getHeight(proposal.duration_minutes), 20);
-            const isAccepted = proposal.accepted === 1;
+            dateProposals.forEach((proposal) => {
+              const start = new Date(proposal.start_at);
+              blocks.push({
+                id: proposal.id,
+                top: getTop(start),
+                height: Math.max(getHeight(proposal.duration_minutes), 20),
+                type: 'calendar',
+                data: proposal,
+              });
+            });
 
-            return (
-              <div
-                key={proposal.id}
-                className={`absolute left-14 right-4 rounded-lg border overflow-hidden
-                  ${isAccepted
-                    ? 'bg-blue-500/15 border-blue-500/30'
-                    : 'bg-blue-500/5 border-blue-500/15 border-dashed'
-                  }`}
-                style={{ top, height }}
-              >
-                <div className="px-2 py-1 flex items-center gap-2 h-full">
-                  <span className="text-xs font-mono text-blue-400 font-medium truncate">
-                    {proposal.duration_minutes}m
-                  </span>
-                  <span className="text-xs text-blue-400/70 truncate">{proposal.title}</span>
-                  {proposal.task_id && (
-                    <span className="text-xs font-mono text-txt-muted">#{proposal.task_id}</span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+            // Sort by top position
+            blocks.sort((a, b) => a.top - b.top);
+
+            // Resolve overlaps: shift overlapping blocks below previous block's bottom edge
+            const adjustedTops: Map<string, number> = new Map();
+            for (let i = 0; i < blocks.length; i++) {
+              let adjustedTop = blocks[i].top;
+              for (let j = 0; j < i; j++) {
+                const prevTop = adjustedTops.get(blocks[j].id)!;
+                const prevBottom = prevTop + blocks[j].height;
+                if (adjustedTop < prevBottom && adjustedTop + blocks[i].height > prevTop) {
+                  adjustedTop = Math.max(adjustedTop, prevBottom + OVERLAP_GAP);
+                }
+              }
+              adjustedTops.set(blocks[i].id, adjustedTop);
+            }
+
+            return blocks.map((block) => {
+              const top = adjustedTops.get(block.id)!;
+              const { height } = block;
+
+              if (block.type === 'session') {
+                const session = block.data as PomodoroSession;
+                const isLogged = session.logged === 1;
+                const isBreak = session.source === 'break';
+
+                return (
+                  <div
+                    key={session.id}
+                    className={`absolute left-14 right-4 rounded-lg border transition-colors overflow-hidden
+                      ${isBreak
+                        ? 'bg-emerald-500/15 border-emerald-500/30'
+                        : isLogged
+                          ? 'bg-focus/15 border-focus/30'
+                          : 'bg-focus/10 border-focus/20'
+                      }`}
+                    style={{ top, height }}
+                  >
+                    <div className="px-2 py-1 flex items-center gap-2 h-full">
+                      <span className={`text-xs font-mono font-medium truncate ${isBreak ? 'text-emerald-400' : 'text-focus'}`}>
+                        {session.duration_minutes}m
+                      </span>
+                      {isBreak && (
+                        <span className="text-xs text-emerald-400/70">Break</span>
+                      )}
+                      {!isBreak && session.task_id && (
+                        <span className="text-xs font-mono text-txt-muted">#{session.task_id}</span>
+                      )}
+                      {!isBreak && session.comment && height > 30 && (
+                        <span className="text-xs text-txt-dim truncate">{session.comment}</span>
+                      )}
+                      {!isBreak && isLogged && (
+                        <span className="text-xs text-focus ml-auto">&#10003;</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              } else {
+                const proposal = block.data as CalendarProposal;
+                const isAccepted = proposal.accepted === 1;
+
+                return (
+                  <div
+                    key={proposal.id}
+                    className={`absolute left-14 right-4 rounded-lg border overflow-hidden
+                      ${isAccepted
+                        ? 'bg-blue-500/15 border-blue-500/30'
+                        : 'bg-blue-500/5 border-blue-500/15 border-dashed'
+                      }`}
+                    style={{ top, height }}
+                  >
+                    <div className="px-2 py-1 flex items-center gap-2 h-full">
+                      <span className="text-xs font-mono text-blue-400 font-medium truncate">
+                        {proposal.duration_minutes}m
+                      </span>
+                      <span className="text-xs text-blue-400/70 truncate">{proposal.title}</span>
+                      {proposal.task_id && (
+                        <span className="text-xs font-mono text-txt-muted">#{proposal.task_id}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+            });
+          })()}
 
           {/* Active session hatched block */}
           {status === 'focus' && isToday && sessionStartTime && (() => {

@@ -22,6 +22,7 @@ export interface TimerState {
   continueFromModal: () => void;
   startBreakFromModal: () => void;
   extendSession: (minutes: number) => void;
+  totalDuration: number;
 }
 
 // Database types

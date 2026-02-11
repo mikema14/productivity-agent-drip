@@ -13,6 +13,7 @@ export default function Timer() {
   const {
     status,
     remainingSeconds,
+    totalDuration,
     currentTaskId,
     sessionCount,
     intention,
@@ -39,20 +40,12 @@ export default function Timer() {
   const [pendingTaskId, setPendingTaskId] = useState<string | undefined>(undefined);
   const [workdayEndTime, setWorkdayEndTime] = useState('18:00');
   const [enableBoundaryCheck, setEnableBoundaryCheck] = useState(false);
-  const [totalDuration, setTotalDuration] = useState(25 * 60);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
 
   // Track session start time for time range display
   useEffect(() => {
     if (status === 'focus') setSessionStartTime(new Date());
     if (status === 'idle') setSessionStartTime(null);
-  }, [status]);
-
-  // Capture total duration when entering focus/break
-  useEffect(() => {
-    if (status === 'focus' || status === 'break') {
-      setTotalDuration(remainingSeconds);
-    }
   }, [status]);
 
   // Load today's sessions on mount and when status changes (e.g. break completes)
@@ -203,7 +196,7 @@ export default function Timer() {
   const ringStroke =
     status === 'focus' ? '#f59e0b'
     : status === 'break' ? '#34d399'
-    : '#64748b';
+    : '#f59e0b';
 
   const glowColor =
     status === 'focus' ? 'rgba(245, 158, 11, 0.25)'
