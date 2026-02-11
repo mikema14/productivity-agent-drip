@@ -161,9 +161,18 @@ export default function TimerDayTimeline({ sessions, calendarProposals, onRefres
     taskId: string | null;
     comment: string | null;
     billable: boolean;
+    startTime: string | null;
   }) => {
     if (window.logAPI) {
       const dateStr = toDateStr(selectedDate);
+      // Convert HH:MM start time to ISO datetime for start_time column
+      let startTimeValue: string | null = null;
+      if (entry.startTime) {
+        const [hours, minutes] = entry.startTime.split(':').map(Number);
+        const startDate = new Date(selectedDate);
+        startDate.setHours(hours, minutes, 0, 0);
+        startTimeValue = startDate.toISOString();
+      }
       await window.logAPI.addAdhocEntry({
         date: dateStr,
         duration_minutes: entry.durationMinutes,
@@ -176,6 +185,7 @@ export default function TimerDayTimeline({ sessions, calendarProposals, onRefres
         completed: 0,
         marked_to_log: 1,
         logged: 0,
+        start_time: startTimeValue,
       });
       onRefresh();
     }

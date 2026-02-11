@@ -467,6 +467,23 @@ export const useTimerStore = create<TimerStore>()(
     get().startFocus(state.currentTaskId || undefined);
   },
 
+  dismissCompletionModal: () => {
+    set({
+      showCompletionModal: false,
+      intention: '',
+      status: 'idle',
+      remainingSeconds: FOCUS_DURATION,
+      totalDuration: FOCUS_DURATION,
+      currentTaskId: null,
+      isPaused: false,
+      intervalId: null,
+      sessionStartTime: null,
+    });
+    if (window.timerAPI) {
+      window.timerAPI.updateTrayTime('Ready');
+    }
+  },
+
   startBreakFromModal: () => {
     const state = get();
     set({ showCompletionModal: false, intention: '' }); // Clear intention on break

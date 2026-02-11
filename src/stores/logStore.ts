@@ -102,7 +102,7 @@ export const useLogStore = create<LogState>()(
         id: e.id,
         type: 'adhoc' as const,
         date: e.date,
-        startTime: null,
+        startTime: e.start_time || null,
         durationMinutes: e.duration_minutes,
         taskId: e.task_id,
         title: e.title,
@@ -143,8 +143,17 @@ export const useLogStore = create<LogState>()(
     }
   },
 
-  addManualEntry: async (entry: Partial<LogEntry>) => {
+  addManualEntry: async (entry: Partial<LogEntry> & { startTime?: string | null }) => {
     const { selectedDate } = get();
+
+    // Convert HH:MM start time to ISO datetime
+    let startTimeValue: string | null = null;
+    if (entry.startTime) {
+      const [hours, minutes] = entry.startTime.split(':').map(Number);
+      const startDate = new Date(selectedDate);
+      startDate.setHours(hours, minutes, 0, 0);
+      startTimeValue = startDate.toISOString();
+    }
 
     const newEntry = {
       date: entry.date || selectedDate,
@@ -152,8 +161,13 @@ export const useLogStore = create<LogState>()(
       title: entry.title || '',
       task_id: entry.taskId || null,
       comment: entry.comment || null,
-      marked_to_log: 1,
-      billable: entry.billable !== undefined ? entry.billable : true, // Default to billable=true
+      marked_to_log: 1 as 0 | 1,
+      logged: 0 as 0 | 1,
+      is_todo: 0 as 0 | 1,
+      due_date: null,
+      completed: 0 as 0 | 1,
+      billable: (entry.billable !== undefined ? (entry.billable ? 1 : 0) : 1) as 0 | 1,
+      start_time: startTimeValue,
     };
 
     try {

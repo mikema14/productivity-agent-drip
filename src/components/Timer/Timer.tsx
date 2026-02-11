@@ -28,6 +28,7 @@ export default function Timer() {
     isPaused,
     continueFromModal,
     startBreakFromModal,
+    dismissCompletionModal,
     extendSession
   } = useTimerStore();
 
@@ -451,6 +452,7 @@ export default function Timer() {
         <CompletionPromptModal
           onContinue={continueFromModal}
           onBreak={startBreakFromModal}
+          onDismiss={dismissCompletionModal}
           taskId={currentTaskId}
           intention={intention}
         />

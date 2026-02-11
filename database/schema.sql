@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS adhoc_entries (
   logged INTEGER DEFAULT 0,
   comment TEXT,
   billable INTEGER DEFAULT 1,
+  start_time TEXT,
   FOREIGN KEY (task_id) REFERENCES task_cache(task_id)
 );
 

@@ -21,6 +21,7 @@ export interface TimerState {
   reset: () => void;
   continueFromModal: () => void;
   startBreakFromModal: () => void;
+  dismissCompletionModal: () => void;
   extendSession: (minutes: number) => void;
   totalDuration: number;
 }
@@ -62,6 +63,7 @@ export interface AdhocEntry {
   logged: 0 | 1;
   comment: string | null;
   billable?: 0 | 1;
+  start_time: string | null;
 }
 
 export interface CalendarProposal {

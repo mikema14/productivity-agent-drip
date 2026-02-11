@@ -10,8 +10,8 @@ export default function ViewToggle({ viewMode, onViewChange }: ViewToggleProps) 
         onClick={() => onViewChange('list')}
         className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
           viewMode === 'list'
-            ? 'bg-drip-elevated text-txt-primary shadow-glass-sm border border-glass-border'
-            : 'text-txt-muted hover:text-txt-primary hover:bg-glass-hover'
+            ? 'bg-focus/15 text-focus border border-focus/30'
+            : 'text-txt-secondary hover:text-txt-primary hover:bg-glass-hover'
         }`}
       >
         List
@@ -20,8 +20,8 @@ export default function ViewToggle({ viewMode, onViewChange }: ViewToggleProps) 
         onClick={() => onViewChange('timeline')}
         className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
           viewMode === 'timeline'
-            ? 'bg-drip-elevated text-txt-primary shadow-glass-sm border border-glass-border'
-            : 'text-txt-muted hover:text-txt-primary hover:bg-glass-hover'
+            ? 'bg-focus/15 text-focus border border-focus/30'
+            : 'text-txt-secondary hover:text-txt-primary hover:bg-glass-hover'
         }`}
       >
         Timeline

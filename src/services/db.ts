@@ -52,7 +52,8 @@ export function initDB(): Database.Database {
       marked_to_log INTEGER DEFAULT 0,
       logged INTEGER DEFAULT 0,
       comment TEXT,
-      billable INTEGER DEFAULT 1
+      billable INTEGER DEFAULT 1,
+      start_time TEXT
     );
 
     CREATE TABLE IF NOT EXISTS calendar_proposals (
@@ -222,6 +223,20 @@ function runMigrations(database: Database.Database) {
     }
   } catch (error) {
     console.error('Migration error (log_templates comment):', error);
+  }
+
+  // Migration: Add start_time column to adhoc_entries
+  try {
+    const adhocInfo2 = database.pragma('table_info(adhoc_entries)');
+    const hasStartTime = adhocInfo2.some((col: any) => col.name === 'start_time');
+
+    if (!hasStartTime) {
+      console.log('Running migration: Adding start_time column to adhoc_entries');
+      database.exec('ALTER TABLE adhoc_entries ADD COLUMN start_time TEXT');
+      console.log('Migration complete: adhoc_entries.start_time');
+    }
+  } catch (error) {
+    console.error('Migration error (adhoc_entries start_time):', error);
   }
 
   // Migration: Add 'break' to source CHECK constraint on pomodoro_sessions
@@ -547,8 +562,8 @@ export function addAdhocEntry(
 
   const stmt = database.prepare(`
     INSERT INTO adhoc_entries
-    (id, date, duration_minutes, title, task_id, is_todo, due_date, completed, marked_to_log, logged, comment, billable)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (id, date, duration_minutes, title, task_id, is_todo, due_date, completed, marked_to_log, logged, comment, billable, start_time)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -563,7 +578,8 @@ export function addAdhocEntry(
     entry.marked_to_log || 1,
     entry.logged || 0,
     entry.comment,
-    entry.billable !== undefined ? (entry.billable ? 1 : 0) : 1 // Default to billable=true
+    entry.billable !== undefined ? (entry.billable ? 1 : 0) : 1, // Default to billable=true
+    entry.start_time || null
   );
 
   return id;

@@ -97,7 +97,7 @@ export default function DailyLog() {
   };
 
   const handleAddEntry = async (entry: any) => {
-    await addManualEntry(entry);
+    await addManualEntry({ ...entry, startTime: entry.startTime });
   };
 
   const handleAcceptProposal = async (id: string) => {
@@ -372,12 +372,12 @@ export default function DailyLog() {
                 <TimelineView entries={entries} />
               ) : (
                 <div className="glass-surface overflow-hidden p-4">
-                  {mergedEntries.map((entry, index) => (
+                  {workEntries.map((entry, index) => (
                     <TimelineItem
                       key={entry.id}
                       timestamp={entry.startTime}
                       isFirst={index === 0}
-                      isLast={index === mergedEntries.length - 1}
+                      isLast={index === workEntries.length - 1}
                       isMerged={entry.isMerged}
                       sourceCount={entry.sourceCount}
                     >

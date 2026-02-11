@@ -1,6 +1,7 @@
 interface CompletionPromptModalProps {
   onContinue: () => void;
   onBreak: () => void;
+  onDismiss: () => void;
   taskId: string | null;
   intention: string;
 }
@@ -8,15 +9,27 @@ interface CompletionPromptModalProps {
 export default function CompletionPromptModal({
   onContinue,
   onBreak,
+  onDismiss,
   taskId,
   intention
 }: CompletionPromptModalProps) {
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="glass-surface-elevated max-w-md w-full mx-4 animate-scale-in">
-        <div className="px-6 py-4 border-b border-glass-border">
-          <h2 className="text-xl font-display font-semibold text-txt-primary">Session Complete!</h2>
-          <p className="text-sm text-txt-muted mt-1">What would you like to do next?</p>
+        <div className="px-6 py-4 border-b border-glass-border flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-display font-semibold text-txt-primary">Session Complete!</h2>
+            <p className="text-sm text-txt-muted mt-1">What would you like to do next?</p>
+          </div>
+          <button
+            onClick={onDismiss}
+            className="text-txt-muted hover:text-txt-primary transition-colors p-1 -mr-1"
+            title="Dismiss"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <div className="px-6 py-6">
@@ -59,6 +72,13 @@ export default function CompletionPromptModal({
                 <path d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 4.323V3a1 1 0 011-1z" />
               </svg>
               Start Break
+            </button>
+
+            <button
+              onClick={onDismiss}
+              className="w-full py-2 text-sm text-txt-muted hover:text-txt-secondary transition-colors"
+            >
+              Done for now
             </button>
           </div>
         </div>

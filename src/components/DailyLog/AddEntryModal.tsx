@@ -10,6 +10,7 @@ interface AddEntryModalProps {
     taskId: string | null;
     comment: string | null;
     billable: boolean;
+    startTime: string | null;
   }) => Promise<void>;
 }
 
@@ -19,6 +20,13 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
   const [taskId, setTaskId] = useState('');
   const [comment, setComment] = useState('');
   const [billable, setBillable] = useState(true);
+  const [startTime, setStartTime] = useState<string>(
+    () => {
+      const now = new Date();
+      return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    }
+  );
+  const [hasStartTime, setHasStartTime] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<LogTemplate[]>([]);
@@ -68,6 +76,7 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
         taskId: taskId.trim() || null,
         comment: comment.trim() || null,
         billable,
+        startTime: hasStartTime ? startTime : null,
       });
       onClose();
     } catch (err) {
@@ -125,6 +134,42 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
               disabled={isSubmitting}
               autoFocus
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-txt-secondary mb-1">
+              Start Time
+              {hasStartTime && (
+                <button
+                  type="button"
+                  onClick={() => setHasStartTime(false)}
+                  className="ml-2 text-xs text-txt-muted hover:text-txt-secondary transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </label>
+            {hasStartTime ? (
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-full px-3 py-2 bg-glass-bg border border-glass-border text-txt-primary rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
+                disabled={isSubmitting}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setHasStartTime(true);
+                  const now = new Date();
+                  setStartTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`);
+                }}
+                className="w-full px-3 py-2 bg-glass-bg border border-glass-border border-dashed text-txt-muted rounded-xl hover:bg-glass-hover transition-colors text-sm text-left"
+              >
+                No start time (unscheduled) — click to set
+              </button>
+            )}
           </div>
 
           <div>
