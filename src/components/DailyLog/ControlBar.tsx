@@ -62,7 +62,6 @@ export default function ControlBar(props: ControlBarProps) {
           onClick={props.onManageTemplates}
           className="glass-button text-txt-secondary text-sm px-3 py-1.5 flex items-center gap-1.5"
         >
-          <span>📋</span>
           <span>Templates</span>
         </button>
 
