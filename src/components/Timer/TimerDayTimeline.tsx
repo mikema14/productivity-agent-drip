@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTimerStore } from '../../stores/timerStore';
 import AddEntryModal from '../DailyLog/AddEntryModal';
-import type { PomodoroSession, CalendarProposal } from '../../types';
+import type { PomodoroSession, CalendarProposal, AdhocEntry } from '../../types';
 
 interface TimerDayTimelineProps {
   sessions: PomodoroSession[];
   calendarProposals?: CalendarProposal[];
+  adhocEntries?: AdhocEntry[];
   onRefresh: () => void;
 }
 
@@ -38,7 +39,7 @@ function toDateStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-export default function TimerDayTimeline({ sessions, calendarProposals, onRefresh }: TimerDayTimelineProps) {
+export default function TimerDayTimeline({ sessions, calendarProposals, adhocEntries, onRefresh }: TimerDayTimelineProps) {
   const { status, sessionStartTime, currentTaskId, intention, remainingSeconds } = useTimerStore();
   const timelineRef = useRef<HTMLDivElement>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -77,6 +78,12 @@ export default function TimerDayTimeline({ sessions, calendarProposals, onRefres
     return (calendarProposals || []).filter(p => p.date === dateStr && p.dismissed !== 1);
   }, [calendarProposals, selectedDate]);
 
+  // Filter adhoc entries for selected date
+  const dateAdhocEntries = useMemo(() => {
+    const dateStr = toDateStr(selectedDate);
+    return (adhocEntries || []).filter(e => e.date === dateStr);
+  }, [adhocEntries, selectedDate]);
+
   // Compute dynamic start/end hours
   const { startHour, endHour } = useMemo(() => {
     let minHour = 8;
@@ -99,6 +106,14 @@ export default function TimerDayTimeline({ sessions, calendarProposals, onRefres
       if (endH > maxHour) maxHour = endH;
     });
 
+    dateAdhocEntries.filter(e => e.start_time).forEach(e => {
+      const start = new Date(e.start_time!);
+      const h = start.getHours();
+      if (h < minHour) minHour = h;
+      const endH = h + Math.ceil(e.duration_minutes / 60) + 1;
+      if (endH > maxHour) maxHour = endH;
+    });
+
     const now = new Date();
     if (isSameDay(selectedDate, now)) {
       const nowH = now.getHours();
@@ -110,7 +125,7 @@ export default function TimerDayTimeline({ sessions, calendarProposals, onRefres
       startHour: Math.max(0, minHour - 1),
       endHour: Math.min(24, maxHour + 1),
     };
-  }, [dateSessions, dateProposals, selectedDate]);
+  }, [dateSessions, dateProposals, dateAdhocEntries, selectedDate]);
 
   const totalHours = endHour - startHour;
 
@@ -286,11 +301,11 @@ export default function TimerDayTimeline({ sessions, calendarProposals, onRefres
             );
           })}
 
-          {/* Session + Calendar blocks with overlap resolution */}
+          {/* Session + Calendar + Adhoc blocks with overlap resolution */}
           {(() => {
             // Build unified block list with computed positions
             const OVERLAP_GAP = 3;
-            const blocks: { id: string; top: number; height: number; type: 'session' | 'calendar'; data: any }[] = [];
+            const blocks: { id: string; top: number; height: number; type: 'session' | 'calendar' | 'adhoc'; data: any }[] = [];
 
             dateSessions.forEach((session) => {
               const start = new Date(session.start_at);
@@ -311,6 +326,17 @@ export default function TimerDayTimeline({ sessions, calendarProposals, onRefres
                 height: Math.max(getHeight(proposal.duration_minutes), 20),
                 type: 'calendar',
                 data: proposal,
+              });
+            });
+
+            dateAdhocEntries.filter(e => e.start_time).forEach((entry) => {
+              const start = new Date(entry.start_time!);
+              blocks.push({
+                id: entry.id,
+                top: getTop(start),
+                height: Math.max(getHeight(entry.duration_minutes), 20),
+                type: 'adhoc',
+                data: entry,
               });
             });
 
@@ -371,7 +397,7 @@ export default function TimerDayTimeline({ sessions, calendarProposals, onRefres
                     </div>
                   </div>
                 );
-              } else {
+              } else if (block.type === 'calendar') {
                 const proposal = block.data as CalendarProposal;
                 const isAccepted = proposal.accepted === 1;
 
@@ -392,6 +418,34 @@ export default function TimerDayTimeline({ sessions, calendarProposals, onRefres
                       <span className="text-xs text-blue-400/70 truncate">{proposal.title}</span>
                       {proposal.task_id && (
                         <span className="text-xs font-mono text-txt-muted">#{proposal.task_id}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              } else {
+                const entry = block.data as AdhocEntry;
+                const isLogged = entry.logged === 1;
+
+                return (
+                  <div
+                    key={entry.id}
+                    className={`absolute left-14 right-4 rounded-lg border overflow-hidden
+                      ${isLogged
+                        ? 'bg-glass-bg/20 border-glass-border'
+                        : 'bg-glass-bg/10 border-glass-border border-dashed'
+                      }`}
+                    style={{ top, height }}
+                  >
+                    <div className="px-2 py-1 flex items-center gap-2 h-full">
+                      <span className="text-xs font-mono text-txt-secondary font-medium truncate">
+                        {entry.duration_minutes}m
+                      </span>
+                      <span className="text-xs text-txt-muted truncate">{entry.title}</span>
+                      {entry.task_id && (
+                        <span className="text-xs font-mono text-txt-dim">#{entry.task_id}</span>
+                      )}
+                      {isLogged && (
+                        <span className="text-xs text-txt-secondary ml-auto">&#10003;</span>
                       )}
                     </div>
                   </div>
@@ -466,6 +520,27 @@ export default function TimerDayTimeline({ sessions, calendarProposals, onRefres
           )}
         </div>
       </div>
+
+      {/* Unscheduled adhoc entries (no start_time) */}
+      {dateAdhocEntries.filter(e => !e.start_time).length > 0 && (
+        <div className="flex-none border-t border-glass-border px-4 py-2">
+          <p className="text-xs text-txt-dim mb-1">Unscheduled</p>
+          <div className="space-y-1">
+            {dateAdhocEntries.filter(e => !e.start_time).map(entry => (
+              <div key={entry.id} className="flex items-center gap-2 px-2 py-1 rounded bg-glass-bg/10 border border-glass-border border-dashed">
+                <span className="text-xs font-mono text-txt-secondary">{entry.duration_minutes}m</span>
+                <span className="text-xs text-txt-muted truncate">{entry.title}</span>
+                {entry.task_id && (
+                  <span className="text-xs font-mono text-txt-dim">#{entry.task_id}</span>
+                )}
+                {entry.logged === 1 && (
+                  <span className="text-xs text-txt-secondary ml-auto">&#10003;</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* FAB */}
       <button

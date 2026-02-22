@@ -123,8 +123,8 @@ export const useLogStore = create<LogState>()(
           taskId: p.task_id,
           title: p.title,
           comment: p.comment || null,
-          logged: false,
-          markedToLog: p.accepted === 1, // Only mark accepted ones for logging
+          logged: p.logged === 1,
+          markedToLog: p.accepted === 1 && p.logged === 0, // Only mark accepted, unlogged ones for logging
           isProposal: p.accepted === 0, // True if not yet accepted
         }));
 
@@ -388,6 +388,10 @@ export const useLogStore = create<LogState>()(
           });
         } else if (entry.type === 'adhoc') {
           await window.logAPI.updateAdhocEntry(entry.id, {
+            logged: 1,
+          });
+        } else if (entry.type === 'calendar') {
+          await window.logAPI.updateCalendarProposal?.(entry.id, {
             logged: 1,
           });
         }

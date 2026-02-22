@@ -21,7 +21,16 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
   const isBreak = entry.source === 'break';
 
   const handleTaskSelect = (taskId: string, title: string) => {
-    setEditedEntry({ ...editedEntry, taskId, title });
+    if (entry.type === 'calendar') {
+      // Keep original event name; copy it to comment if comment is empty
+      setEditedEntry({
+        ...editedEntry,
+        taskId,
+        comment: editedEntry.comment || editedEntry.title,
+      });
+    } else {
+      setEditedEntry({ ...editedEntry, taskId, title });
+    }
   };
 
   const handleSave = () => {

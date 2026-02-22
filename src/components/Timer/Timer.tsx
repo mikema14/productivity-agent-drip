@@ -7,7 +7,7 @@ import TaskIdInput from '../shared/TaskIdInput';
 import CompletionPromptModal from './CompletionPromptModal';
 import DailyIntentionBanner from '../shared/DailyIntentionBanner';
 import BoundaryConfirmDialog from './BoundaryConfirmDialog';
-import type { PomodoroSession, CalendarProposal } from '../../types';
+import type { PomodoroSession, CalendarProposal, AdhocEntry } from '../../types';
 
 export default function Timer() {
   const {
@@ -36,6 +36,7 @@ export default function Timer() {
   const [taskTitle, setTaskTitle] = useState('');
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
   const [calendarProposals, setCalendarProposals] = useState<CalendarProposal[]>([]);
+  const [adhocEntries, setAdhocEntries] = useState<AdhocEntry[]>([]);
   const [lastSession, setLastSession] = useState<PomodoroSession | null>(null);
   const [showBoundaryDialog, setShowBoundaryDialog] = useState(false);
   const [pendingTaskId, setPendingTaskId] = useState<string | undefined>(undefined);
@@ -87,10 +88,13 @@ export default function Timer() {
         const todaySessions = await window.timerAPI.getSessions(today);
         setSessions(todaySessions);
 
-        // Also fetch calendar proposals
+        // Also fetch calendar proposals and adhoc entries
         if (window.logAPI) {
           const proposals = await window.logAPI.getCalendarProposals(today);
           setCalendarProposals(proposals);
+
+          const adhoc = await window.logAPI.getAdhocEntries(today);
+          setAdhocEntries(adhoc);
         }
       } catch (error) {
         console.error('Failed to load sessions:', error);
@@ -444,7 +448,7 @@ export default function Timer() {
 
       {/* RIGHT PANEL: Day Timeline */}
       <div className="w-1/2 relative overflow-hidden">
-        <TimerDayTimeline sessions={sessions} calendarProposals={calendarProposals} onRefresh={loadSessions} />
+        <TimerDayTimeline sessions={sessions} calendarProposals={calendarProposals} adhocEntries={adhocEntries} onRefresh={loadSessions} />
       </div>
 
       {/* Completion Prompt Modal */}

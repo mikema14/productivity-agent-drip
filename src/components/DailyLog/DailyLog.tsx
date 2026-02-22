@@ -427,7 +427,7 @@ export default function DailyLog() {
         <div className="fixed bottom-4 right-4 bg-emerald-500/90 backdrop-blur-sm border border-emerald-500/30 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-4 z-50">
           <span>✓ {successCount} {successCount === 1 ? 'entry' : 'entries'} logged</span>
           <button
-            onClick={() => window.open(buildEPLink(selectedDate), '_blank')}
+            onClick={() => window.timerAPI?.openExternal?.(buildEPLink(selectedDate))}
             className="underline font-medium hover:text-emerald-100"
           >
             View in Easy Project →

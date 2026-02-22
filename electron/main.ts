@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Notification, net } from 'electron';
+import { app, BrowserWindow, ipcMain, Notification, net, shell } from 'electron';
 import { join } from 'path';
 import {
   initDB,
@@ -188,6 +188,17 @@ ipcMain.handle('get-last-session-with-task', async (_event, date: string) => {
     return { success: true, session };
   } catch (error) {
     console.error('Failed to get last session:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// Open URL in default external browser (e.g. Safari)
+ipcMain.handle('open-external', async (_event, url: string) => {
+  try {
+    await shell.openExternal(url);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to open external URL:', error);
     return { success: false, error: (error as Error).message };
   }
 });

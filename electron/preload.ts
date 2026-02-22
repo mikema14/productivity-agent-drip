@@ -95,6 +95,10 @@ const timerAPI: TimerAPI = {
     throw new Error(result.error || 'Failed to get days since last log');
   },
 
+  openExternal: async (url: string): Promise<void> => {
+    await ipcRenderer.invoke('open-external', url);
+  },
+
   // Main process timer control
   startMainTimer: async (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10): Promise<void> => {
     const result = await ipcRenderer.invoke('start-main-timer', duration, timerType, nextBreakDuration);

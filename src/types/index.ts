@@ -78,6 +78,7 @@ export interface CalendarProposal {
   dismissed: 0 | 1;
   task_id: string | null;
   comment: string | null;
+  logged: 0 | 1;
 }
 
 export interface DailySummary {
@@ -180,6 +181,7 @@ export interface TimerAPI {
   postTimeEntry?: (baseUrl: string, apiKey: string, payload: TimeEntryPayload) => Promise<number>;
   fetchCalendarFeed?: (url: string) => Promise<string>;
   getDaysSinceLastLog?: () => Promise<number | null>;
+  openExternal?: (url: string) => Promise<void>;
   // Main process timer control
   startMainTimer: (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10) => Promise<void>;
   pauseMainTimer: () => Promise<void>;

@@ -179,6 +179,13 @@ function runMigrations(database: Database.Database) {
       database.exec('ALTER TABLE calendar_proposals ADD COLUMN comment TEXT');
       console.log('Migration complete');
     }
+
+    const hasLoggedColumn = tableInfo.some((col: any) => col.name === 'logged');
+    if (!hasLoggedColumn) {
+      console.log('Running migration: Adding logged column to calendar_proposals');
+      database.exec('ALTER TABLE calendar_proposals ADD COLUMN logged INTEGER DEFAULT 0');
+      console.log('Migration complete: calendar_proposals.logged');
+    }
   } catch (error) {
     console.error('Migration error:', error);
   }
@@ -405,6 +412,7 @@ export function getLastSessionWithTask(date: string): PomodoroSession | null {
   const stmt = database.prepare(`
     SELECT * FROM pomodoro_sessions
     WHERE date(start_at) = date(?)
+      AND source != 'break'
       AND (task_id IS NOT NULL OR comment IS NOT NULL)
     ORDER BY start_at DESC
     LIMIT 1
