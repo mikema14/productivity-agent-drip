@@ -168,6 +168,167 @@ export function initDB(): Database.Database {
   return db;
 }
 
+// ==================== WEEKLY SUMMARIES ====================
+
+export function getWeeklySummary(weekStart: string) {
+  const database = getDB();
+  return database.prepare('SELECT * FROM weekly_summaries WHERE week_start = ?').get(weekStart) as any | null;
+}
+
+export function getWeeklySummariesInRange(startDate: string, endDate: string) {
+  const database = getDB();
+  return database.prepare(
+    'SELECT * FROM weekly_summaries WHERE week_start BETWEEN ? AND ? ORDER BY week_start ASC'
+  ).all(startDate, endDate) as any[];
+}
+
+export function computeWeeklySummary(weekStart: string): void {
+  const database = getDB();
+
+  // Calculate week end (Sunday)
+  const start = new Date(weekStart);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const endStr = end.toISOString().split('T')[0];
+
+  // Get all sessions in the week
+  const sessions = database.prepare(`
+    SELECT * FROM pomodoro_sessions
+    WHERE date(start_at) BETWEEN date(?) AND date(?)
+  `).all(weekStart, endStr) as any[];
+
+  // Get all adhoc entries in the week
+  const adhocEntries = database.prepare(`
+    SELECT * FROM adhoc_entries
+    WHERE date BETWEEN ? AND ?
+  `).all(weekStart, endStr) as any[];
+
+  // Total minutes = all work (sessions excl. breaks + adhoc)
+  const totalMinutes = sessions
+    .filter((s: any) => s.source !== 'break')
+    .reduce((sum: number, s: any) => sum + s.duration_minutes, 0)
+    + adhocEntries.reduce((sum: number, e: any) => sum + e.duration_minutes, 0);
+
+  // Deep work = pomodoro focus sessions only
+  const deepWorkSessions = sessions.filter((s: any) => s.source === 'pomodoro');
+  const deepWorkMinutes = deepWorkSessions.reduce((sum: number, s: any) => sum + s.duration_minutes, 0);
+
+  // Sessions completed = pomodoro sessions (focus only, not breaks)
+  const sessionsCompleted = deepWorkSessions.length;
+
+  // Sessions started — we count all non-break sessions (pomodoro + manual that have a timer context)
+  // For now, same as completed since we only save completed sessions
+  const sessionsStarted = sessionsCompleted;
+
+  // Average session duration
+  const avgSessionMinutes = sessionsCompleted > 0
+    ? deepWorkMinutes / sessionsCompleted
+    : 0;
+
+  // Time-of-day breakdown from pomodoro sessions (deep work only)
+  const hourBuckets: Record<number, number> = {};
+  let morningMinutes = 0;
+  let afternoonMinutes = 0;
+  let eveningMinutes = 0;
+
+  for (const s of deepWorkSessions) {
+    const hour = new Date(s.start_at).getHours();
+    hourBuckets[hour] = (hourBuckets[hour] || 0) + s.duration_minutes;
+
+    if (hour >= 6 && hour < 12) morningMinutes += s.duration_minutes;
+    else if (hour >= 12 && hour < 18) afternoonMinutes += s.duration_minutes;
+    else eveningMinutes += s.duration_minutes;
+  }
+
+  // Peak hour
+  let peakHour: number | null = null;
+  let peakMinutes = 0;
+  for (const [hour, minutes] of Object.entries(hourBuckets)) {
+    if (minutes > peakMinutes) {
+      peakMinutes = minutes;
+      peakHour = parseInt(hour);
+    }
+  }
+
+  // Unique tasks touched
+  const taskIds = new Set<string>();
+  sessions.forEach((s: any) => { if (s.task_id) taskIds.add(s.task_id); });
+  adhocEntries.forEach((e: any) => { if (e.task_id) taskIds.add(e.task_id); });
+
+  // Reflections count
+  const reflectionsCount = database.prepare(`
+    SELECT COUNT(*) as count FROM shutdown_rituals
+    WHERE date BETWEEN ? AND ? AND reflection IS NOT NULL AND reflection != ''
+  `).get(weekStart, endStr) as any;
+
+  // Upsert
+  database.prepare(`
+    INSERT INTO weekly_summaries (
+      week_start, total_minutes, deep_work_minutes, sessions_completed, sessions_started,
+      avg_session_minutes, peak_hour, morning_minutes, afternoon_minutes, evening_minutes,
+      tasks_touched, reflections_count, computed_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(week_start) DO UPDATE SET
+      total_minutes = excluded.total_minutes,
+      deep_work_minutes = excluded.deep_work_minutes,
+      sessions_completed = excluded.sessions_completed,
+      sessions_started = excluded.sessions_started,
+      avg_session_minutes = excluded.avg_session_minutes,
+      peak_hour = excluded.peak_hour,
+      morning_minutes = excluded.morning_minutes,
+      afternoon_minutes = excluded.afternoon_minutes,
+      evening_minutes = excluded.evening_minutes,
+      tasks_touched = excluded.tasks_touched,
+      reflections_count = excluded.reflections_count,
+      computed_at = datetime('now')
+  `).run(
+    weekStart, totalMinutes, deepWorkMinutes, sessionsCompleted, sessionsStarted,
+    avgSessionMinutes, peakHour, morningMinutes, afternoonMinutes, eveningMinutes,
+    taskIds.size, reflectionsCount?.count || 0
+  );
+}
+
+export function getTaskTotalMinutes(taskId: string): number {
+  const database = getDB();
+  const result = database.prepare(`
+    SELECT COALESCE(
+      (SELECT SUM(duration_minutes) FROM pomodoro_sessions WHERE task_id = ? AND source != 'break'), 0
+    ) + COALESCE(
+      (SELECT SUM(duration_minutes) FROM adhoc_entries WHERE task_id = ?), 0
+    ) as total_minutes
+  `).get(taskId, taskId) as any;
+  return result?.total_minutes || 0;
+}
+
+export function getShutdownReflectionsInRange(startDate: string, endDate: string) {
+  const database = getDB();
+  return database.prepare(`
+    SELECT date, reflection, notes FROM shutdown_rituals
+    WHERE date BETWEEN ? AND ? AND (reflection IS NOT NULL AND reflection != '')
+    ORDER BY date ASC
+  `).all(startDate, endDate) as Array<{ date: string; reflection: string; notes: string | null }>;
+}
+
+export function getSessionsByTimeOfDay(startDate: string, endDate: string) {
+  const database = getDB();
+  const sessions = database.prepare(`
+    SELECT start_at, duration_minutes FROM pomodoro_sessions
+    WHERE date(start_at) BETWEEN date(?) AND date(?) AND source = 'pomodoro'
+    ORDER BY start_at ASC
+  `).all(startDate, endDate) as Array<{ start_at: string; duration_minutes: number }>;
+
+  const hourMap: Record<number, number> = {};
+  for (const s of sessions) {
+    const hour = new Date(s.start_at).getHours();
+    hourMap[hour] = (hourMap[hour] || 0) + s.duration_minutes;
+  }
+
+  return Object.entries(hourMap).map(([hour, minutes]) => ({
+    hour: parseInt(hour),
+    minutes
+  })).sort((a, b) => a.hour - b.hour);
+}
+
 function runMigrations(database: Database.Database) {
   // Migration: Add comment column to calendar_proposals if it doesn't exist
   try {
@@ -273,6 +434,60 @@ function runMigrations(database: Database.Database) {
     }
   } catch (error) {
     console.error('Migration error (pomodoro_sessions source CHECK):', error);
+  }
+
+  // Migration: Create weekly_summaries table
+  try {
+    const tables = database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='weekly_summaries'").all();
+    if (tables.length === 0) {
+      console.log('Running migration: Creating weekly_summaries table');
+      database.exec(`
+        CREATE TABLE weekly_summaries (
+          week_start TEXT PRIMARY KEY,
+          total_minutes INTEGER DEFAULT 0,
+          deep_work_minutes INTEGER DEFAULT 0,
+          sessions_completed INTEGER DEFAULT 0,
+          sessions_started INTEGER DEFAULT 0,
+          avg_session_minutes REAL DEFAULT 0,
+          peak_hour INTEGER,
+          morning_minutes INTEGER DEFAULT 0,
+          afternoon_minutes INTEGER DEFAULT 0,
+          evening_minutes INTEGER DEFAULT 0,
+          tasks_touched INTEGER DEFAULT 0,
+          reflections_count INTEGER DEFAULT 0,
+          computed_at TEXT
+        )
+      `);
+      console.log('Migration complete: weekly_summaries table created');
+    }
+  } catch (error) {
+    console.error('Migration error (weekly_summaries table):', error);
+  }
+
+  // Migration: Add target_hours to goals
+  try {
+    const goalsInfo = database.pragma('table_info(goals)');
+    const hasTargetHours = goalsInfo.some((col: any) => col.name === 'target_hours');
+    if (!hasTargetHours) {
+      console.log('Running migration: Adding target_hours column to goals');
+      database.exec('ALTER TABLE goals ADD COLUMN target_hours INTEGER');
+      console.log('Migration complete: goals.target_hours');
+    }
+  } catch (error) {
+    console.error('Migration error (goals target_hours):', error);
+  }
+
+  // Migration: Add goal_id to task_preferences
+  try {
+    const tpInfo = database.pragma('table_info(task_preferences)');
+    const hasGoalId = tpInfo.some((col: any) => col.name === 'goal_id');
+    if (!hasGoalId) {
+      console.log('Running migration: Adding goal_id column to task_preferences');
+      database.exec('ALTER TABLE task_preferences ADD COLUMN goal_id TEXT');
+      console.log('Migration complete: task_preferences.goal_id');
+    }
+  } catch (error) {
+    console.error('Migration error (task_preferences goal_id):', error);
   }
 
   // Migration: Create shutdown_rituals table if it doesn't exist
@@ -892,7 +1107,8 @@ export function getTaskPreference(taskId: string): TaskPreference | null {
     taskId: row.task_id,
     tracked: Boolean(row.tracked),
     pinned: Boolean(row.pinned),
-    milestoneIds: JSON.parse(row.milestone_ids)
+    milestoneIds: JSON.parse(row.milestone_ids),
+    goalId: row.goal_id || undefined
   };
 }
 
@@ -903,26 +1119,36 @@ export function getAllTaskPreferences(): TaskPreference[] {
     taskId: row.task_id,
     tracked: Boolean(row.tracked),
     pinned: Boolean(row.pinned),
-    milestoneIds: JSON.parse(row.milestone_ids)
+    milestoneIds: JSON.parse(row.milestone_ids),
+    goalId: row.goal_id || undefined
   }));
 }
 
 export function setTaskPreference(taskId: string, pref: Partial<TaskPreference>): void {
   const database = getDB();
   database.prepare(`
-    INSERT INTO task_preferences (task_id, tracked, pinned, milestone_ids)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO task_preferences (task_id, tracked, pinned, milestone_ids, goal_id)
+    VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(task_id) DO UPDATE SET
       tracked = excluded.tracked,
       pinned = excluded.pinned,
       milestone_ids = excluded.milestone_ids,
+      goal_id = excluded.goal_id,
       updated_at = CURRENT_TIMESTAMP
   `).run(
     taskId,
     pref.tracked ? 1 : 0,
     pref.pinned ? 1 : 0,
-    JSON.stringify(pref.milestoneIds || [])
+    JSON.stringify(pref.milestoneIds || []),
+    pref.goalId || null
   );
+}
+
+export function setTaskGoalId(taskId: string, goalId: string | null): void {
+  const database = getDB();
+  database.prepare(`
+    UPDATE task_preferences SET goal_id = ?, updated_at = CURRENT_TIMESTAMP WHERE task_id = ?
+  `).run(goalId, taskId);
 }
 
 // ==================== MILESTONES ====================
@@ -1014,7 +1240,8 @@ export function getGoal(id: string): Goal | null {
     description: row.description,
     identityReinforcement: row.identity_reinforcement,
     milestoneIds: JSON.parse(row.milestone_ids),
-    active: Boolean(row.active)
+    active: Boolean(row.active),
+    targetHours: row.target_hours ?? undefined
   };
 }
 
@@ -1027,7 +1254,8 @@ export function getAllGoals(): Goal[] {
     description: row.description,
     identityReinforcement: row.identity_reinforcement,
     milestoneIds: JSON.parse(row.milestone_ids),
-    active: Boolean(row.active)
+    active: Boolean(row.active),
+    targetHours: row.target_hours ?? undefined
   }));
 }
 
@@ -1042,22 +1270,24 @@ export function getActiveGoal(): Goal | null {
     description: row.description,
     identityReinforcement: row.identity_reinforcement,
     milestoneIds: JSON.parse(row.milestone_ids),
-    active: true
+    active: true,
+    targetHours: row.target_hours ?? undefined
   };
 }
 
 export function createGoal(goal: Goal): void {
   const database = getDB();
   database.prepare(`
-    INSERT INTO goals (id, title, description, identity_reinforcement, milestone_ids, active)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO goals (id, title, description, identity_reinforcement, milestone_ids, active, target_hours)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(
     goal.id,
     goal.title,
     goal.description,
     goal.identityReinforcement || null,
     JSON.stringify(goal.milestoneIds),
-    goal.active ? 1 : 0
+    goal.active ? 1 : 0,
+    goal.targetHours ?? null
   );
 }
 
@@ -1071,6 +1301,7 @@ export function updateGoal(id: string, patch: Partial<Goal>): void {
   if (patch.identityReinforcement !== undefined) { fields.push('identity_reinforcement = ?'); values.push(patch.identityReinforcement); }
   if (patch.milestoneIds !== undefined) { fields.push('milestone_ids = ?'); values.push(JSON.stringify(patch.milestoneIds)); }
   if (patch.active !== undefined) { fields.push('active = ?'); values.push(patch.active ? 1 : 0); }
+  if (patch.targetHours !== undefined) { fields.push('target_hours = ?'); values.push(patch.targetHours ?? null); }
 
   fields.push('updated_at = CURRENT_TIMESTAMP');
   values.push(id);

@@ -759,7 +759,7 @@ export const useLogStore = create<LogState>()(
     };
   },
 
-  getMonthlyStats: async (year: number, month: number, trackedTaskIds: string[]) => {
+  getMonthlyStats: async (year: number, month: number) => {
     if (!window.logAPI) return null;
 
     // Calculate date range for the month (1-indexed month)
@@ -775,55 +775,37 @@ export const useLogStore = create<LogState>()(
         window.logAPI.getAdhocEntriesInRange?.(startDateStr, endDateStr) || Promise.resolve([])
       ]);
 
-      // Calculate total minutes
+      // Total minutes = all work (sessions excl. breaks + adhoc)
       const totalMinutes = [
-        ...sessions.map(s => s.duration_minutes),
+        ...sessions.filter(s => s.source !== 'break').map(s => s.duration_minutes),
         ...adhocEntries.map(e => e.duration_minutes)
       ].reduce((sum, minutes) => sum + minutes, 0);
 
-      // Calculate deep work minutes
-      // If no tasks marked as tracked → ALL work = deep work (per spec)
-      const deepWorkMinutes = trackedTaskIds.length > 0
-        ? [
-            ...sessions.filter(s => s.task_id && trackedTaskIds.includes(s.task_id)).map(s => s.duration_minutes),
-            ...adhocEntries.filter(e => e.task_id && trackedTaskIds.includes(e.task_id)).map(e => e.duration_minutes)
-          ].reduce((sum, minutes) => sum + minutes, 0)
-        : totalMinutes; // All work counts as deep work
+      // Deep work = pomodoro focus sessions only (source='pomodoro')
+      const deepWorkMinutes = sessions
+        .filter(s => s.source === 'pomodoro')
+        .reduce((sum, s) => sum + s.duration_minutes, 0);
 
-      // Calculate best day streak
+      // Daily breakdown
       const daysInMonth = endDate.getDate();
-      const dailyMinutes: { date: string; minutes: number }[] = [];
+      const dailyMinutes: { date: string; minutes: number; deepMinutes: number }[] = [];
       for (let day = 1; day <= daysInMonth; day++) {
         const dateObj = new Date(year, month - 1, day);
         const dateStr = dateObj.toISOString().split('T')[0];
-        const dayMinutes = [
-          ...sessions.filter(s => s.start_at.startsWith(dateStr)).map(s => s.duration_minutes),
+        const dayTotal = [
+          ...sessions.filter(s => s.start_at.startsWith(dateStr) && s.source !== 'break').map(s => s.duration_minutes),
           ...adhocEntries.filter(e => e.date === dateStr).map(e => e.duration_minutes)
         ].reduce((sum, minutes) => sum + minutes, 0);
-        dailyMinutes.push({ date: dateStr, minutes: dayMinutes });
+        const dayDeep = sessions
+          .filter(s => s.start_at.startsWith(dateStr) && s.source === 'pomodoro')
+          .reduce((sum, s) => sum + s.duration_minutes, 0);
+        dailyMinutes.push({ date: dateStr, minutes: dayTotal, deepMinutes: dayDeep });
       }
 
-      // Find longest streak of days with >0 work
-      let maxStreak = 0;
-      let currentStreak = 0;
-      for (const day of dailyMinutes) {
-        if (day.minutes > 0) {
-          currentStreak++;
-          maxStreak = Math.max(maxStreak, currentStreak);
-        } else {
-          currentStreak = 0;
-        }
-      }
-
-      // Fetch reflections from shutdown rituals (if available)
-      const reflections: Array<{ date: string; reflection: string }> = [];
-      if (window.dashboardAPI?.getShutdownRitual) {
-        for (const day of dailyMinutes) {
-          const ritual = await window.dashboardAPI.getShutdownRitual(day.date);
-          if (ritual?.reflection) {
-            reflections.push({ date: day.date, reflection: ritual.reflection });
-          }
-        }
+      // Fetch reflections using range query (replaces N+1 loop)
+      let reflections: Array<{ date: string; reflection: string; notes: string | null }> = [];
+      if (window.dashboardAPI?.getShutdownReflectionsInRange) {
+        reflections = await window.dashboardAPI.getShutdownReflectionsInRange(startDateStr, endDateStr);
       }
 
       return {
@@ -831,7 +813,6 @@ export const useLogStore = create<LogState>()(
         month,
         totalMinutes,
         deepWorkMinutes,
-        bestDayStreak: maxStreak,
         daysWorked: dailyMinutes.filter(d => d.minutes > 0).length,
         dailyMinutes,
         reflections

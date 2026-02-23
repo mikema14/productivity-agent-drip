@@ -4,15 +4,12 @@ import MainContent from './components/Layout/MainContent';
 import Timer from './components/Timer/Timer';
 import DailyLog from './components/DailyLog/DailyLog';
 import Settings from './components/Settings/Settings';
-import DashboardPage from './components/Dashboard/DashboardPage';
-import TaskDetailsPage from './components/Dashboard/TaskDetailsPage';
-import MonthlyWrapUp from './components/Dashboard/MonthlyWrapUp';
+import ProgressPage from './components/Progress/ProgressPage';
 import { loadSessionCount, checkTimerHydration, cleanupTimerIntervals, setupMainTimerListeners } from './stores/timerStore';
 import { useLogStore } from './stores/logStore';
 
 function App() {
   const [currentView, setCurrentView] = useState('timer');
-  const [currentTaskId, setCurrentTaskId] = useState<string>('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Load session count and check for stuck timer states on mount
@@ -58,24 +55,14 @@ function App() {
     checkLastLog();
   }, []);
 
-  // Navigation handler for task details
-  const navigateToTask = (taskId: string) => {
-    setCurrentTaskId(taskId);
-    setCurrentView('task-details');
-  };
-
   const renderView = () => {
     switch (currentView) {
       case 'timer':
         return <Timer />;
       case 'daily-log':
         return <DailyLog />;
-      case 'dashboard':
-        return <DashboardPage onNavigateToTask={navigateToTask} />;
-      case 'task-details':
-        return <TaskDetailsPage taskId={currentTaskId} />;
-      case 'monthly-wrapup':
-        return <MonthlyWrapUp />;
+      case 'progress':
+        return <ProgressPage />;
       case 'settings':
         return <Settings />;
       default:

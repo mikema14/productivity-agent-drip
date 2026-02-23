@@ -33,6 +33,7 @@ import {
   getTaskPreference,
   getAllTaskPreferences,
   setTaskPreference,
+  setTaskGoalId,
   getMilestone,
   getMilestonesByParent,
   createMilestone,
@@ -49,7 +50,13 @@ import {
   getShutdownRitual,
   saveShutdownRitual,
   unlockDay,
-  isDayLocked
+  isDayLocked,
+  getWeeklySummary,
+  getWeeklySummariesInRange,
+  computeWeeklySummary,
+  getTaskTotalMinutes,
+  getShutdownReflectionsInRange,
+  getSessionsByTimeOfDay
 } from '../src/services/db';
 import { createTray, updateTray, destroyTray } from './tray';
 import {
@@ -814,6 +821,132 @@ ipcMain.handle('unlock-day', async (_event, date: string) => {
 
 ipcMain.handle('is-day-locked', async (_event, date: string) => {
   return isDayLocked(date);
+});
+
+// ==================== WEEKLY SUMMARIES ====================
+
+ipcMain.handle('get-weekly-summary', async (_event, weekStart: string) => {
+  try {
+    const summary = getWeeklySummary(weekStart);
+    return { success: true, summary };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('get-weekly-summaries-in-range', async (_event, startDate: string, endDate: string) => {
+  try {
+    const summaries = getWeeklySummariesInRange(startDate, endDate);
+    return { success: true, summaries };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('compute-weekly-summary', async (_event, weekStart: string) => {
+  try {
+    computeWeeklySummary(weekStart);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// ==================== PROGRESS QUERIES ====================
+
+ipcMain.handle('get-task-total-minutes', async (_event, taskId: string) => {
+  try {
+    const minutes = getTaskTotalMinutes(taskId);
+    return { success: true, minutes };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('get-shutdown-reflections-in-range', async (_event, startDate: string, endDate: string) => {
+  try {
+    const reflections = getShutdownReflectionsInRange(startDate, endDate);
+    return { success: true, reflections };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('get-sessions-by-time-of-day', async (_event, startDate: string, endDate: string) => {
+  try {
+    const data = getSessionsByTimeOfDay(startDate, endDate);
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('set-task-goal-id', async (_event, taskId: string, goalId: string | null) => {
+  try {
+    setTaskGoalId(taskId, goalId);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// ==================== OPENROUTER AI ====================
+
+ipcMain.handle('call-openrouter', async (_event, apiKey: string, model: string, systemPrompt: string, userMessage: string) => {
+  try {
+    return new Promise((resolve) => {
+      const payload = JSON.stringify({
+        model,
+        max_tokens: 1024,
+        temperature: 0.7,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMessage }]
+      });
+
+      const request = net.request({
+        method: 'POST',
+        url: 'https://openrouter.ai/api/v1/messages'
+      });
+
+      request.setHeader('Authorization', `Bearer ${apiKey}`);
+      request.setHeader('Content-Type', 'application/json');
+
+      let responseData = '';
+
+      request.on('response', (response) => {
+        response.on('data', (chunk) => {
+          responseData += chunk.toString();
+        });
+
+        response.on('end', () => {
+          if (response.statusCode === 200) {
+            try {
+              const data = JSON.parse(responseData);
+              const text = data.content?.[0]?.text || '';
+              resolve({ success: true, text });
+            } catch {
+              resolve({ success: false, error: 'Failed to parse AI response' });
+            }
+          } else if (response.statusCode === 401) {
+            resolve({ success: false, error: 'Invalid API key. Check your OpenRouter key in Settings.' });
+          } else if (response.statusCode === 429) {
+            resolve({ success: false, error: 'Rate limited. Try again in a moment.' });
+          } else {
+            resolve({ success: false, error: `OpenRouter error: ${response.statusCode}` });
+          }
+        });
+      });
+
+      request.on('error', (error) => {
+        resolve({ success: false, error: error.message });
+      });
+
+      request.write(payload);
+      request.end();
+    });
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
 });
 
 // ==================== MAIN PROCESS TIMER ====================

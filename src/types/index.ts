@@ -239,6 +239,7 @@ export interface TaskPreference {
   tracked: boolean;
   pinned: boolean;
   milestoneIds: string[];
+  goalId?: string;
 }
 
 export interface Milestone {
@@ -259,6 +260,35 @@ export interface Goal {
   identityReinforcement?: string;
   milestoneIds: string[];
   active: boolean;
+  targetHours?: number;
+}
+
+export interface WeeklySummary {
+  week_start: string;
+  total_minutes: number;
+  deep_work_minutes: number;
+  sessions_completed: number;
+  sessions_started: number;
+  avg_session_minutes: number;
+  peak_hour: number | null;
+  morning_minutes: number;
+  afternoon_minutes: number;
+  evening_minutes: number;
+  tasks_touched: number;
+  reflections_count: number;
+  computed_at: string | null;
+}
+
+export interface GoalProgress {
+  goalId: string;
+  goalTitle: string;
+  targetHours?: number;
+  accumulatedMinutes: number;
+  linkedTasks: Array<{
+    taskId: string;
+    title: string;
+    minutes: number;
+  }>;
 }
 
 export interface DailyIntentions {
@@ -316,6 +346,23 @@ export interface DashboardAPI {
   ) => Promise<void>;
   unlockDay: (date: string) => Promise<void>;
   isDayLocked: (date: string) => Promise<boolean>;
+
+  // Weekly Summaries
+  getWeeklySummary: (weekStart: string) => Promise<WeeklySummary | null>;
+  getWeeklySummariesInRange: (startDate: string, endDate: string) => Promise<WeeklySummary[]>;
+  computeWeeklySummary: (weekStart: string) => Promise<void>;
+
+  // Progress queries
+  getTaskTotalMinutes: (taskId: string) => Promise<number>;
+  getShutdownReflectionsInRange: (startDate: string, endDate: string) => Promise<Array<{ date: string; reflection: string; notes: string | null }>>;
+  getSessionsByTimeOfDay: (startDate: string, endDate: string) => Promise<Array<{ hour: number; minutes: number }>>;
+
+  // Task-Goal linking
+  setTaskGoalId: (taskId: string, goalId: string | null) => Promise<void>;
+}
+
+export interface AIAPI {
+  callOpenRouter: (apiKey: string, model: string, systemPrompt: string, userMessage: string) => Promise<{ success: boolean; text?: string; error?: string }>;
 }
 
 declare global {
@@ -323,6 +370,7 @@ declare global {
     timerAPI: TimerAPI;
     logAPI: LogAPI;
     dashboardAPI: DashboardAPI;
+    aiAPI: AIAPI;
   }
 }
 

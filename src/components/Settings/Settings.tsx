@@ -15,6 +15,8 @@ export default function Settings() {
     roundingMode: 'none' as 'none' | '5min' | '15min',
     workdayEndTime: '18:00',
     enableBoundaryCheck: false,
+    openRouterApiKey: '',
+    openRouterModel: 'anthropic/claude-4.5-sonnet-20250929',
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -38,6 +40,8 @@ export default function Settings() {
       const roundingMode = (await window.timerAPI.getSettings('roundingMode') || 'none') as 'none' | '5min' | '15min';
       const workdayEndTime = await window.timerAPI.getSettings('workdayEndTime') || '18:00';
       const enableBoundaryCheck = (await window.timerAPI.getSettings('enableBoundaryCheck') || 'false') === 'true';
+      const openRouterApiKey = await window.timerAPI.getSettings('openRouterApiKey') || '';
+      const openRouterModel = await window.timerAPI.getSettings('openRouterModel') || 'anthropic/claude-4.5-sonnet-20250929';
 
       setSettings({
         apiBaseUrl,
@@ -51,6 +55,8 @@ export default function Settings() {
         roundingMode,
         workdayEndTime,
         enableBoundaryCheck,
+        openRouterApiKey,
+        openRouterModel,
       });
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -73,6 +79,8 @@ export default function Settings() {
       await window.timerAPI.saveSettings('roundingMode', settings.roundingMode);
       await window.timerAPI.saveSettings('workdayEndTime', settings.workdayEndTime);
       await window.timerAPI.saveSettings('enableBoundaryCheck', settings.enableBoundaryCheck.toString());
+      await window.timerAPI.saveSettings('openRouterApiKey', settings.openRouterApiKey);
+      await window.timerAPI.saveSettings('openRouterModel', settings.openRouterModel);
 
       setSaveMessage({ type: 'success', text: 'Settings saved successfully!' });
       setTimeout(() => setSaveMessage(null), 3000);
@@ -333,6 +341,44 @@ export default function Settings() {
                     You'll be asked to confirm if you start work after this time
                   </p>
                 </div>
+              </div>
+            </div>
+          </section>
+
+          {/* AI Insights */}
+          <section>
+            <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">AI Insights</h2>
+            <div className="space-y-4 glass-surface p-6">
+              <div>
+                <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
+                  OpenRouter API Key
+                </label>
+                <input
+                  type="password"
+                  value={settings.openRouterApiKey}
+                  onChange={(e) => setSettings({ ...settings, openRouterApiKey: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                  placeholder="sk-or-..."
+                />
+                <p className="mt-1 text-xs text-txt-dim">
+                  Get your API key at openrouter.ai/keys — enables AI-powered work pattern analysis
+                </p>
+              </div>
+
+              <div>
+                <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
+                  Model
+                </label>
+                <input
+                  type="text"
+                  value={settings.openRouterModel}
+                  onChange={(e) => setSettings({ ...settings, openRouterModel: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                  placeholder="anthropic/claude-4.5-sonnet-20250929"
+                />
+                <p className="mt-1 text-xs text-txt-dim">
+                  OpenRouter model identifier (e.g., anthropic/claude-4.5-sonnet-20250929)
+                </p>
               </div>
             </div>
           </section>

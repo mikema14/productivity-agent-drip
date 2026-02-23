@@ -59,19 +59,6 @@ function BarChartIcon() {
   );
 }
 
-function CalendarIcon() {
-  return (
-    <svg {...svgProps}>
-      <rect x="2" y="3.5" width="14" height="12.5" rx="1.5" />
-      <line x1="2" y1="7.5" x2="16" y2="7.5" />
-      <line x1="5.5" y1="2" x2="5.5" y2="5" />
-      <line x1="12.5" y1="2" x2="12.5" y2="5" />
-      <line x1="6" y1="7.5" x2="6" y2="16" />
-      <line x1="12" y1="7.5" x2="12" y2="16" />
-      <line x1="2" y1="11.5" x2="16" y2="11.5" />
-    </svg>
-  );
-}
 
 function GearIcon() {
   return (
@@ -86,8 +73,7 @@ export default function Sidebar({ onNavigate, currentView, collapsed, onToggle }
   const menuItems: { id: string; label: string; icon: ReactNode }[] = [
     { id: 'timer', label: 'Timer', icon: <TimerIcon /> },
     { id: 'daily-log', label: 'Daily Log', icon: <ClipboardIcon /> },
-    { id: 'dashboard', label: 'Dashboard', icon: <BarChartIcon /> },
-    { id: 'monthly-wrapup', label: 'Monthly Wrap-Up', icon: <CalendarIcon /> },
+    { id: 'progress', label: 'Progress', icon: <BarChartIcon /> },
     { id: 'settings', label: 'Settings', icon: <GearIcon /> },
   ];
 

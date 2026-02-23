@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useLogStore } from '../../stores/logStore';
-import { useTaskPreferencesStore } from '../../stores/taskPreferencesStore';
 import { useIntentionsStore } from '../../stores/intentionsStore';
 import { useShutdownStore } from '../../stores/shutdownStore';
 
@@ -11,8 +9,6 @@ interface EndDayModalProps {
 }
 
 export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalProps) {
-  const logStore = useLogStore();
-  const { preferences } = useTaskPreferencesStore();
   const { getIntentions, addIntention } = useIntentionsStore();
   const { saveRitual } = useShutdownStore();
 
@@ -41,38 +37,32 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
   async function loadDayData() {
     setIsLoading(true);
     try {
-      // Get tracked task IDs (deep work tasks)
-      const trackedTaskIds = Array.from(preferences.values())
-        .filter(p => p.tracked)
-        .map(p => p.taskId);
+      // Get sessions and adhoc entries for today
+      const sessions = await window.logAPI.getSessions(date);
+      const adhocEntries = await window.logAPI.getAdhocEntries(date);
 
-      // Fetch total work data for today
-      const weeklyTotalData = await logStore.getDashboardWeeklyAllData();
+      // Total minutes = all work (sessions excl. breaks + adhoc)
+      const todayTotal = sessions
+        .filter(s => s.source !== 'break')
+        .reduce((sum, s) => sum + s.duration_minutes, 0)
+        + adhocEntries.reduce((sum, e) => sum + e.duration_minutes, 0);
 
-      // Fetch deep work data
-      // If no tasks marked as tracked → ALL work = deep work (per spec)
-      const weeklyDeepData = trackedTaskIds.length > 0
-        ? await logStore.getDashboardWeeklyData(trackedTaskIds)
-        : weeklyTotalData; // All work counts as deep work
+      // Deep work = pomodoro focus sessions only (source='pomodoro')
+      const todayDeep = sessions
+        .filter(s => s.source === 'pomodoro')
+        .reduce((sum, s) => sum + s.duration_minutes, 0);
 
-      // Find today's data (last item in the array)
-      const todayTotal = weeklyTotalData[weeklyTotalData.length - 1]?.minutes || 0;
-      const todayDeep = weeklyDeepData[weeklyDeepData.length - 1]?.minutes || 0;
-
-      // Get tasks worked on today
-      if (window.logAPI) {
-        const sessions = await window.logAPI.getSessions(date);
-        const adhocEntries = await window.logAPI.getAdhocEntries(date);
-
-        const taskIds = new Set<string>();
-        sessions.forEach(s => s.task_id && taskIds.add(s.task_id));
-        adhocEntries.forEach(e => e.task_id && taskIds.add(e.task_id));
-
-        setTasksWorked(Array.from(taskIds));
-      }
+      // Unique tasks worked on
+      const taskIds = new Set<string>();
+      sessions.forEach(s => s.task_id && taskIds.add(s.task_id));
+      adhocEntries.forEach(e => e.task_id && taskIds.add(e.task_id));
+      setTasksWorked(Array.from(taskIds));
 
       setTotalMinutes(todayTotal);
       setDeepWorkMinutes(todayDeep);
+
+      // Compute weekly summary for the current week after saving day data
+      // This keeps the weekly_summaries table fresh
     } catch (error) {
       console.error('Failed to load day data:', error);
     } finally {
@@ -108,6 +98,19 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
         notes.trim() || null,
         tomorrowIntentions.length > 0 ? tomorrowIntentions : null
       );
+
+      // Compute weekly summary for the current week
+      try {
+        const d = new Date(date);
+        const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon...
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const monday = new Date(d);
+        monday.setDate(monday.getDate() + mondayOffset);
+        const weekStart = monday.toISOString().split('T')[0];
+        await window.dashboardAPI.computeWeeklySummary(weekStart);
+      } catch (error) {
+        console.error('Failed to compute weekly summary:', error);
+      }
 
       // Auto-populate tomorrow's intentions
       if (tomorrowIntentions.length > 0) {

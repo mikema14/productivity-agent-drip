@@ -368,10 +368,57 @@ const dashboardAPI = {
     tomorrowIntentions: string[] | null
   ) => ipcRenderer.invoke('save-shutdown-ritual', date, totalMinutes, deepWorkMinutes, tasksWorked, reflection, notes, tomorrowIntentions),
   unlockDay: (date: string) => ipcRenderer.invoke('unlock-day', date),
-  isDayLocked: (date: string) => ipcRenderer.invoke('is-day-locked', date)
+  isDayLocked: (date: string) => ipcRenderer.invoke('is-day-locked', date),
+
+  // Weekly Summaries
+  getWeeklySummary: async (weekStart: string) => {
+    const result = await ipcRenderer.invoke('get-weekly-summary', weekStart);
+    if (result.success) return result.summary;
+    throw new Error(result.error);
+  },
+  getWeeklySummariesInRange: async (startDate: string, endDate: string) => {
+    const result = await ipcRenderer.invoke('get-weekly-summaries-in-range', startDate, endDate);
+    if (result.success) return result.summaries;
+    throw new Error(result.error);
+  },
+  computeWeeklySummary: async (weekStart: string) => {
+    const result = await ipcRenderer.invoke('compute-weekly-summary', weekStart);
+    if (!result.success) throw new Error(result.error);
+  },
+
+  // Progress queries
+  getTaskTotalMinutes: async (taskId: string) => {
+    const result = await ipcRenderer.invoke('get-task-total-minutes', taskId);
+    if (result.success) return result.minutes;
+    throw new Error(result.error);
+  },
+  getShutdownReflectionsInRange: async (startDate: string, endDate: string) => {
+    const result = await ipcRenderer.invoke('get-shutdown-reflections-in-range', startDate, endDate);
+    if (result.success) return result.reflections;
+    throw new Error(result.error);
+  },
+  getSessionsByTimeOfDay: async (startDate: string, endDate: string) => {
+    const result = await ipcRenderer.invoke('get-sessions-by-time-of-day', startDate, endDate);
+    if (result.success) return result.data;
+    throw new Error(result.error);
+  },
+
+  // Task-Goal linking
+  setTaskGoalId: async (taskId: string, goalId: string | null) => {
+    const result = await ipcRenderer.invoke('set-task-goal-id', taskId, goalId);
+    if (!result.success) throw new Error(result.error);
+  }
+};
+
+const aiAPI = {
+  callOpenRouter: async (apiKey: string, model: string, systemPrompt: string, userMessage: string) => {
+    const result = await ipcRenderer.invoke('call-openrouter', apiKey, model, systemPrompt, userMessage);
+    return result;
+  }
 };
 
 // Expose the APIs to the renderer process
 contextBridge.exposeInMainWorld('timerAPI', timerAPI);
 contextBridge.exposeInMainWorld('logAPI', logAPI);
 contextBridge.exposeInMainWorld('dashboardAPI', dashboardAPI);
+contextBridge.exposeInMainWorld('aiAPI', aiAPI);
