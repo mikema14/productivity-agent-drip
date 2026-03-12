@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useListsStore } from '../../stores/listsStore';
+import { resolveTaskNames } from '../../hooks/useTaskName';
 import type { ListItemColumn, ListItem, TaskList } from '../../types';
 
 interface TimerTaskListProps {
@@ -30,14 +31,11 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
   // Resolve task IDs to names for tooltips
   useEffect(() => {
     const ids = new Set<string>();
-    lists.forEach(l => { if (l.task_id) ids.add(l.task_id); });
-    items.forEach(i => { if (i.task_id) ids.add(i.task_id); });
-    ids.forEach(id => {
-      if (!taskNames[id]) {
-        window.logAPI.getCachedTask(id).then(task => {
-          if (task) setTaskNames(prev => ({ ...prev, [id]: task.title }));
-        }).catch(() => {});
-      }
+    lists.forEach(l => { if (l.task_id && !taskNames[l.task_id]) ids.add(l.task_id); });
+    items.forEach(i => { if (i.task_id && !taskNames[i.task_id]) ids.add(i.task_id); });
+    if (ids.size === 0) return;
+    resolveTaskNames([...ids]).then(names => {
+      if (Object.keys(names).length > 0) setTaskNames(prev => ({ ...prev, ...names }));
     });
   }, [lists, items]);
 

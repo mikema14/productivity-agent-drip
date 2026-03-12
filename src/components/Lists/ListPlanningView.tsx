@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useListsStore } from '../../stores/listsStore';
-import { useTaskName } from '../../hooks/useTaskName';
+import { useTaskName, resolveTaskNames } from '../../hooks/useTaskName';
 import AddItemInline from './AddItemInline';
 import DraggableItem from './DraggableItem';
 import TaskDetailInline from './TaskDetailInline';
@@ -62,13 +62,10 @@ export default function ListPlanningView() {
 
   // Resolve item task IDs to names for tooltips
   useEffect(() => {
-    const ids = new Set(items.filter(i => i.task_id).map(i => i.task_id!));
-    ids.forEach(id => {
-      if (!taskNames[id]) {
-        window.logAPI.getCachedTask(id).then(task => {
-          if (task) setTaskNames(prev => ({ ...prev, [id]: task.title }));
-        }).catch(() => {});
-      }
+    const ids = items.filter(i => i.task_id && !taskNames[i.task_id]).map(i => i.task_id!);
+    if (ids.length === 0) return;
+    resolveTaskNames([...new Set(ids)]).then(names => {
+      if (Object.keys(names).length > 0) setTaskNames(prev => ({ ...prev, ...names }));
     });
   }, [items]);
 
