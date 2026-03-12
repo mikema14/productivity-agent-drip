@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useTaskPreferencesStore } from '../../stores/taskPreferencesStore';
-import type { TaskPreference } from '../../types';
 
 export default function TaskTrackingPreferences() {
   const {
@@ -10,19 +9,13 @@ export default function TaskTrackingPreferences() {
     togglePinned
   } = useTaskPreferencesStore();
 
-  const [taskList, setTaskList] = useState<TaskPreference[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [newTaskId, setNewTaskId] = useState('');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    loadPreferences();
+    loadAll();
   }, []);
-
-  const loadPreferences = async () => {
-    await loadAll();
-    setTaskList(Array.from(preferences.values()));
-  };
 
   const handleAddTask = async () => {
     if (!newTaskId.trim()) {
@@ -33,7 +26,6 @@ export default function TaskTrackingPreferences() {
     try {
       await setTracked(newTaskId.trim(), true);
       setNewTaskId('');
-      await loadPreferences();
       showMessage(`Task ${newTaskId} is now tracked`);
     } catch (error) {
       showMessage('Failed to add task');
@@ -43,7 +35,6 @@ export default function TaskTrackingPreferences() {
   const handleToggleTracked = async (taskId: string, currentValue: boolean) => {
     try {
       await setTracked(taskId, !currentValue);
-      await loadPreferences();
       showMessage(`Task ${taskId} ${!currentValue ? 'tracked' : 'untracked'}`);
     } catch (error) {
       showMessage('Failed to update task');
@@ -53,7 +44,6 @@ export default function TaskTrackingPreferences() {
   const handleTogglePinned = async (taskId: string) => {
     try {
       await togglePinned(taskId);
-      await loadPreferences();
       showMessage(`Task ${taskId} pin toggled`);
     } catch (error) {
       showMessage('Failed to toggle pin');
@@ -65,7 +55,7 @@ export default function TaskTrackingPreferences() {
     setTimeout(() => setMessage(''), 3000);
   };
 
-  const filteredTasks = taskList.filter(t =>
+  const filteredTasks = Array.from(preferences.values()).filter(t =>
     t.taskId.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -104,7 +94,7 @@ export default function TaskTrackingPreferences() {
       </div>
 
       {/* Search */}
-      {taskList.length > 0 && (
+      {preferences.size > 0 && (
         <div>
           <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
             Search Tasks

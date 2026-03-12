@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { WeeklySummary } from '../../types';
 import { generateWeeklyPatterns, generateReflectionSynthesis, generateActionableCoaching } from '../../services/ai';
 
@@ -31,11 +31,43 @@ interface InsightState {
   loading: boolean;
 }
 
+type InsightsRecord = Record<TabId, InsightState>;
+
 const TAB_META: Record<TabId, { label: string; icon: string }> = {
   patterns: { label: 'Patterns', icon: '~' },
   reflections: { label: 'Synthesis', icon: '>' },
   coaching: { label: 'Coach', icon: '*' },
 };
+
+const EMPTY_INSIGHTS: InsightsRecord = {
+  patterns: { text: null, error: null, loading: false },
+  reflections: { text: null, error: null, loading: false },
+  coaching: { text: null, error: null, loading: false },
+};
+
+function cacheKey(period: string) {
+  return `ai-insights-${period}`;
+}
+
+function loadCachedInsights(period: string): InsightsRecord {
+  try {
+    const raw = sessionStorage.getItem(cacheKey(period));
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { ...EMPTY_INSIGHTS };
+}
+
+function saveInsightsToCache(period: string, insights: InsightsRecord) {
+  try {
+    // Don't cache loading states
+    const toSave: InsightsRecord = {
+      patterns: { ...insights.patterns, loading: false },
+      reflections: { ...insights.reflections, loading: false },
+      coaching: { ...insights.coaching, loading: false },
+    };
+    sessionStorage.setItem(cacheKey(period), JSON.stringify(toSave));
+  } catch {}
+}
 
 export default function AIInsightsPanel({
   weeklySummaries,
@@ -45,11 +77,12 @@ export default function AIInsightsPanel({
   period,
 }: AIInsightsPanelProps) {
   const [activeTab, setActiveTab] = useState<TabId>('patterns');
-  const [insights, setInsights] = useState<Record<TabId, InsightState>>({
-    patterns: { text: null, error: null, loading: false },
-    reflections: { text: null, error: null, loading: false },
-    coaching: { text: null, error: null, loading: false },
-  });
+  const [insights, setInsights] = useState<InsightsRecord>(() => loadCachedInsights(period));
+
+  // Restore cached insights when period changes
+  useEffect(() => {
+    setInsights(loadCachedInsights(period));
+  }, [period]);
 
   const generateInsight = async (tab: TabId) => {
     setInsights(prev => ({
@@ -68,45 +101,50 @@ export default function AIInsightsPanel({
         const patternsText = insights.patterns.text || 'No pattern analysis available yet.';
         const reflectionsText = insights.reflections.text || 'No reflection synthesis available yet.';
         if (!monthlyStats) {
-          setInsights(prev => ({
-            ...prev,
-            coaching: { text: null, error: 'No monthly data available.', loading: false }
-          }));
+          setInsights(prev => {
+            const updated = { ...prev, coaching: { text: null, error: 'No monthly data available.', loading: false } };
+            saveInsightsToCache(period, updated);
+            return updated;
+          });
           return;
         }
         result = await generateActionableCoaching(patternsText, reflectionsText, monthlyStats);
       }
 
       if (result === null) {
-        setInsights(prev => ({
-          ...prev,
-          [tab]: { text: null, error: 'Add your OpenRouter API key in Settings to enable AI insights.', loading: false }
-        }));
+        setInsights(prev => {
+          const updated = { ...prev, [tab]: { text: null, error: 'Add your OpenRouter API key in Settings to enable AI insights.', loading: false } };
+          saveInsightsToCache(period, updated);
+          return updated;
+        });
       } else if ('error' in result) {
-        setInsights(prev => ({
-          ...prev,
-          [tab]: { text: null, error: result.error, loading: false }
-        }));
+        setInsights(prev => {
+          const updated = { ...prev, [tab]: { text: null, error: result.error, loading: false } };
+          saveInsightsToCache(period, updated);
+          return updated;
+        });
       } else {
-        setInsights(prev => ({
-          ...prev,
-          [tab]: { text: result.text, error: null, loading: false }
-        }));
+        setInsights(prev => {
+          const updated = { ...prev, [tab]: { text: result.text, error: null, loading: false } };
+          saveInsightsToCache(period, updated);
+          return updated;
+        });
       }
     } catch {
-      setInsights(prev => ({
-        ...prev,
-        [tab]: { text: null, error: 'Something went wrong. Try again.', loading: false }
-      }));
+      setInsights(prev => {
+        const updated = { ...prev, [tab]: { text: null, error: 'Something went wrong. Try again.', loading: false } };
+        saveInsightsToCache(period, updated);
+        return updated;
+      });
     }
   };
 
   const current = insights[activeTab];
 
   return (
-    <div className="ai-panel-border rounded-2xl p-5 h-full flex flex-col">
+    <div className="ai-panel-border rounded-2xl p-5 flex flex-col" style={{ maxHeight: '500px' }}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 flex-none">
         <div className="flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-focus animate-pulse" />
           <span className="text-xs uppercase tracking-[0.15em] text-txt-muted font-display">AI Insights</span>
@@ -121,7 +159,7 @@ export default function AIInsightsPanel({
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-0.5 mb-4">
+      <div className="flex gap-0.5 mb-4 flex-none">
         {(Object.keys(TAB_META) as TabId[]).map(tab => {
           const meta = TAB_META[tab];
           const isActive = activeTab === tab;
@@ -147,7 +185,7 @@ export default function AIInsightsPanel({
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {current.loading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 py-8">
             <div className="w-6 h-6 border-2 border-focus/20 border-t-focus rounded-full animate-spin" />

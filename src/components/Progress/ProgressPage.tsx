@@ -5,7 +5,6 @@ import MetricsRow from './MetricsRow';
 import MonthlyCalendar from './MonthlyCalendar';
 import AIInsightsPanel from './AIInsightsPanel';
 import ReflectionsSection from './ReflectionsSection';
-import GoalProgressSection from './GoalProgressSection';
 
 interface MonthlyStats {
   year: number;
@@ -164,14 +163,9 @@ export default function ProgressPage() {
           </div>
         </div>
 
-        {/* Bottom section: Reflections + Goals side by side */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="progress-stagger progress-stagger-5">
-            <ReflectionsSection reflections={monthlyStats?.reflections || []} />
-          </div>
-          <div className="progress-stagger progress-stagger-5">
-            <GoalProgressSection />
-          </div>
+        {/* Bottom section: Reflections */}
+        <div className="progress-stagger progress-stagger-5">
+          <ReflectionsSection reflections={monthlyStats?.reflections || []} />
         </div>
       </div>
     </div>

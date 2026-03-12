@@ -36,7 +36,21 @@ export default function TimelineView({ entries }: TimelineViewProps) {
   }, [status]);
 
   // Split entries into scheduled and unscheduled
-  const scheduledEntries = useMemo(() => entries.filter(e => e.startTime), [entries]);
+  const allScheduledEntries = useMemo(() => entries.filter(e => e.startTime), [entries]);
+
+  // Exclude any scheduled entry that overlaps with the current active session/break block.
+  // This prevents double-rendering when a just-completed session/break is in the DB
+  // while simultaneously being shown as the "live" active block.
+  const scheduledEntries = useMemo(() => {
+    if ((status === 'focus' || status === 'break') && sessionStartTime) {
+      const activeStart = new Date(sessionStartTime).getTime();
+      return allScheduledEntries.filter(e =>
+        !e.startTime || new Date(e.startTime).getTime() < activeStart
+      );
+    }
+    return allScheduledEntries;
+  }, [allScheduledEntries, status, sessionStartTime]);
+
   const unscheduledEntries = useMemo(() => entries.filter(e => !e.startTime), [entries]);
 
   // Dynamic hour range

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import GoalsManagement from './GoalsManagement';
 import TaskTrackingPreferences from './TaskTrackingPreferences';
 
 export default function Settings() {
@@ -380,16 +379,6 @@ export default function Settings() {
                   OpenRouter model identifier (e.g., anthropic/claude-4.5-sonnet-20250929)
                 </p>
               </div>
-            </div>
-          </section>
-
-          {/* Goals Management Section */}
-          <section>
-            <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">
-              Goals & Identity
-            </h2>
-            <div className="space-y-4 glass-surface p-6">
-              <GoalsManagement />
             </div>
           </section>
 
