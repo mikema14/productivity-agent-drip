@@ -1,0 +1,159 @@
+import { useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+import type { ListItem, Subtask } from '../../types';
+
+interface TaskDetailInlineProps {
+  item: ListItem;
+  listColor: string;
+  isFolderList: boolean;
+  onUpdate: (id: string, updates: Partial<ListItem>) => Promise<void>;
+  onClose: () => void;
+}
+
+export default function TaskDetailInline({ item, listColor, onUpdate, onClose }: TaskDetailInlineProps) {
+  const [title, setTitle] = useState(item.title);
+  const [description, setDescription] = useState(item.description || '');
+  const [subtasks, setSubtasks] = useState<Subtask[]>(() => {
+    try { return JSON.parse(item.subtasks || '[]'); } catch { return []; }
+  });
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+
+  const saveTitle = () => {
+    if (title.trim() && title !== item.title) {
+      onUpdate(item.id, { title: title.trim() });
+    }
+  };
+
+  const saveDescription = () => {
+    if (description !== (item.description || '')) {
+      onUpdate(item.id, { description: description || null });
+    }
+  };
+
+  const saveSubtasks = (updated: Subtask[]) => {
+    setSubtasks(updated);
+    onUpdate(item.id, { subtasks: JSON.stringify(updated) });
+  };
+
+  const addSubtask = () => {
+    if (!newSubtaskTitle.trim()) return;
+    const updated = [...subtasks, { id: uuidv4(), title: newSubtaskTitle.trim(), completed: false }];
+    saveSubtasks(updated);
+    setNewSubtaskTitle('');
+  };
+
+  const toggleSubtask = (id: string) => {
+    const updated = subtasks.map(s => s.id === id ? { ...s, completed: !s.completed } : s);
+    saveSubtasks(updated);
+  };
+
+  const deleteSubtask = (id: string) => {
+    const updated = subtasks.filter(s => s.id !== id);
+    saveSubtasks(updated);
+  };
+
+  const doneCount = subtasks.filter(s => s.completed).length;
+
+  return (
+    <div className="mx-1 mb-2 p-3 rounded-xl bg-drip-bg/90 backdrop-blur-xl border border-glass-border space-y-3 animate-fade-in">
+      {/* Title */}
+      <div className="flex items-center gap-2">
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          onBlur={saveTitle}
+          onKeyDown={e => e.key === 'Enter' && saveTitle()}
+          className="flex-1 bg-transparent text-sm font-medium text-txt-primary border-b border-transparent focus:border-glass-border outline-none transition-colors"
+        />
+        <button onClick={onClose} className="text-txt-muted hover:text-txt-secondary p-0.5">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M4 10l6-6M10 10L4 4" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Description */}
+      <div>
+        <textarea
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          onBlur={saveDescription}
+          placeholder="Add a description..."
+          rows={3}
+          className="w-full bg-drip-surface/60 border border-glass-border rounded-lg px-3 py-2 text-sm text-txt-primary placeholder-txt-dim resize-y outline-none focus:ring-1 focus:ring-focus/20 transition-all"
+        />
+      </div>
+
+      {/* Subtasks */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-txt-muted">
+            <rect x="1" y="1" width="5" height="5" rx="1" />
+            <rect x="1" y="8" width="5" height="5" rx="1" />
+            <line x1="8" y1="3.5" x2="13" y2="3.5" />
+            <line x1="8" y1="10.5" x2="13" y2="10.5" />
+          </svg>
+          <span className="text-xs text-txt-muted font-medium">
+            {subtasks.length > 0 ? `${doneCount}/${subtasks.length} Subtasks` : 'Subtasks'}
+          </span>
+          {subtasks.length > 0 && (
+            <div className="flex-1 h-1 rounded-full bg-glass-bg overflow-hidden ml-2">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{ width: `${subtasks.length > 0 ? (doneCount / subtasks.length) * 100 : 0}%`, backgroundColor: listColor }}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-0.5">
+          {subtasks.map(subtask => (
+            <div key={subtask.id} className="group flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-glass-hover transition-colors">
+              <button
+                onClick={() => toggleSubtask(subtask.id)}
+                className={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
+                  subtask.completed
+                    ? 'border-transparent'
+                    : 'border-glass-border hover:border-focus/50'
+                }`}
+                style={subtask.completed ? { backgroundColor: listColor } : undefined}
+              >
+                {subtask.completed && (
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M2 5l2.5 2.5L8 3" />
+                  </svg>
+                )}
+              </button>
+              <span className={`flex-1 text-sm ${subtask.completed ? 'text-txt-muted line-through' : 'text-txt-primary'}`}>
+                {subtask.title}
+              </span>
+              <button
+                onClick={() => deleteSubtask(subtask.id)}
+                className="opacity-0 group-hover:opacity-100 p-0.5 text-txt-muted hover:text-red-400 transition-all"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M2 3h8M4 3V2h4v1M5 5v4M7 5v4" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Add subtask input */}
+        <div className="flex items-center gap-2 mt-1 px-2">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-txt-dim flex-shrink-0">
+            <line x1="6" y1="2" x2="6" y2="10" />
+            <line x1="2" y1="6" x2="10" y2="6" />
+          </svg>
+          <input
+            value={newSubtaskTitle}
+            onChange={e => setNewSubtaskTitle(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') addSubtask(); }}
+            placeholder="Add subtask..."
+            className="flex-1 bg-transparent text-sm text-txt-primary placeholder-txt-dim outline-none"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

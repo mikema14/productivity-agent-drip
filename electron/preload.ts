@@ -417,8 +417,71 @@ const aiAPI = {
   }
 };
 
+const listsAPI = {
+  getLists: async () => {
+    const result = await ipcRenderer.invoke('get-lists');
+    if (result.success) return result.lists;
+    throw new Error(result.error || 'Failed to get lists');
+  },
+  createList: async (list: any) => {
+    const result = await ipcRenderer.invoke('create-list', list);
+    if (result.success) return result.id;
+    throw new Error(result.error || 'Failed to create list');
+  },
+  updateList: async (id: string, updates: any) => {
+    const result = await ipcRenderer.invoke('update-list', id, updates);
+    if (!result.success) throw new Error(result.error || 'Failed to update list');
+  },
+  deleteList: async (id: string) => {
+    const result = await ipcRenderer.invoke('delete-list', id);
+    if (!result.success) throw new Error(result.error || 'Failed to delete list');
+  },
+  getListItems: async (listId: string) => {
+    const result = await ipcRenderer.invoke('get-list-items', listId);
+    if (result.success) return result.items;
+    throw new Error(result.error || 'Failed to get list items');
+  },
+  getAllListItems: async () => {
+    const result = await ipcRenderer.invoke('get-all-list-items');
+    if (result.success) return result.items;
+    throw new Error(result.error || 'Failed to get all list items');
+  },
+  createListItem: async (item: any) => {
+    const result = await ipcRenderer.invoke('create-list-item', item);
+    if (result.success) return result.id;
+    throw new Error(result.error || 'Failed to create list item');
+  },
+  updateListItem: async (id: string, updates: any) => {
+    const result = await ipcRenderer.invoke('update-list-item', id, updates);
+    if (!result.success) throw new Error(result.error || 'Failed to update list item');
+  },
+  deleteListItem: async (id: string) => {
+    const result = await ipcRenderer.invoke('delete-list-item', id);
+    if (!result.success) throw new Error(result.error || 'Failed to delete list item');
+  },
+  archiveList: async (id: string) => {
+    const result = await ipcRenderer.invoke('archive-list', id);
+    if (!result.success) throw new Error(result.error || 'Failed to archive list');
+  },
+  unarchiveList: async (id: string) => {
+    const result = await ipcRenderer.invoke('unarchive-list', id);
+    if (!result.success) throw new Error(result.error || 'Failed to unarchive list');
+  },
+  getArchivedLists: async () => {
+    const result = await ipcRenderer.invoke('get-archived-lists');
+    if (result.success) return result.lists;
+    throw new Error(result.error || 'Failed to get archived lists');
+  },
+  archiveOldCompleted: async () => {
+    const result = await ipcRenderer.invoke('archive-old-completed');
+    if (result.success) return result.count;
+    throw new Error(result.error || 'Failed to archive old completed');
+  },
+};
+
 // Expose the APIs to the renderer process
 contextBridge.exposeInMainWorld('timerAPI', timerAPI);
 contextBridge.exposeInMainWorld('logAPI', logAPI);
 contextBridge.exposeInMainWorld('dashboardAPI', dashboardAPI);
 contextBridge.exposeInMainWorld('aiAPI', aiAPI);
+contextBridge.exposeInMainWorld('listsAPI', listsAPI);

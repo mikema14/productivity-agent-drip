@@ -1,10 +1,12 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
+import { useListsStore } from '../../stores/listsStore';
 
 interface SidebarProps {
   onNavigate: (view: string) => void;
   currentView: string;
   collapsed: boolean;
   onToggle: () => void;
+  onCreateList: () => void;
 }
 
 function SidebarToggleIcon() {
@@ -59,7 +61,6 @@ function BarChartIcon() {
   );
 }
 
-
 function GearIcon() {
   return (
     <svg {...svgProps}>
@@ -69,7 +70,7 @@ function GearIcon() {
   );
 }
 
-export default function Sidebar({ onNavigate, currentView, collapsed, onToggle }: SidebarProps) {
+export default function Sidebar({ onNavigate, currentView, collapsed, onToggle, onCreateList }: SidebarProps) {
   const menuItems: { id: string; label: string; icon: ReactNode }[] = [
     { id: 'timer', label: 'Timer', icon: <TimerIcon /> },
     { id: 'daily-log', label: 'Daily Log', icon: <ClipboardIcon /> },
@@ -77,34 +78,32 @@ export default function Sidebar({ onNavigate, currentView, collapsed, onToggle }
     { id: 'settings', label: 'Settings', icon: <GearIcon /> },
   ];
 
+  const { lists, archivedLists, loadLists, selectedListId, selectList, showArchivedLists, toggleShowArchivedLists, unarchiveList } = useListsStore();
+
+  useEffect(() => { loadLists(); }, []);
+
+  const handleListClick = (listId: string) => {
+    selectList(listId);
+    onNavigate('lists');
+  };
+
+  const handleAllTasksClick = () => {
+    selectList(null);
+    onNavigate('all-lists');
+  };
+
   return (
     <div className={`${collapsed ? 'w-[76px]' : 'w-64'} bg-drip-surface/60 backdrop-blur-xl border-r border-glass-border text-txt-primary h-screen flex flex-col overflow-hidden transition-all duration-200`}>
-      {/* Titlebar header — clears macOS traffic lights */}
+      {/* Titlebar header */}
       {collapsed ? (
-        <div
-          className="h-[68px] flex items-end pb-2 shrink-0 pl-[33px]"
-          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-        >
-          <button
-            onClick={onToggle}
-            title="Expand sidebar"
-            className="text-txt-muted hover:text-txt-secondary transition-colors duration-200"
-            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-          >
+        <div className="h-[68px] flex items-end pb-2 shrink-0 pl-[33px]" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+          <button onClick={onToggle} title="Expand sidebar" className="text-txt-muted hover:text-txt-secondary transition-colors duration-200" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <SidebarToggleIcon />
           </button>
         </div>
       ) : (
-        <div
-          className="h-[52px] flex items-center shrink-0 pl-[78px] gap-2"
-          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-        >
-          <button
-            onClick={onToggle}
-            title="Collapse sidebar"
-            className="text-txt-muted hover:text-txt-secondary transition-colors duration-200"
-            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-          >
+        <div className="h-[52px] flex items-center shrink-0 pl-[78px] gap-2" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+          <button onClick={onToggle} title="Collapse sidebar" className="text-txt-muted hover:text-txt-secondary transition-colors duration-200" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <SidebarToggleIcon />
           </button>
           <span className="text-[13px] font-medium text-txt-secondary font-display">Drip</span>
@@ -112,22 +111,16 @@ export default function Sidebar({ onNavigate, currentView, collapsed, onToggle }
       )}
 
       {/* Navigation Menu */}
-      <nav className="flex-1 p-3">
+      <nav className="p-3">
         <ul className="space-y-0.5">
           {menuItems.map((item) => (
             <li key={item.id}>
               <button
                 onClick={() => onNavigate(item.id)}
                 title={collapsed ? item.label : undefined}
-                className={`
-                  w-full flex items-center ${collapsed ? 'justify-center' : ''} gap-2.5 px-3 py-2 rounded-md
-                  transition-all duration-200
-                  ${
-                    currentView === item.id
-                      ? 'bg-white/[0.08] text-focus'
-                      : 'text-txt-secondary hover:bg-white/[0.05] hover:text-txt-primary'
-                  }
-                `}
+                className={`w-full flex items-center ${collapsed ? 'justify-center' : ''} gap-2.5 px-3 py-2 rounded-md transition-all duration-200 ${
+                  currentView === item.id ? 'bg-white/[0.08] text-focus' : 'text-txt-secondary hover:bg-white/[0.05] hover:text-txt-primary'
+                }`}
               >
                 <span className="shrink-0">{item.icon}</span>
                 {!collapsed && <span className="font-normal font-display text-[13px] whitespace-nowrap">{item.label}</span>}
@@ -136,6 +129,103 @@ export default function Sidebar({ onNavigate, currentView, collapsed, onToggle }
           ))}
         </ul>
       </nav>
+
+      {/* Lists Section */}
+      <div className="mx-3 border-t border-glass-border" />
+      <div className="flex-1 overflow-y-auto p-3 pt-2">
+        {!collapsed && (
+          <div className="flex items-center justify-between mb-1.5 px-3">
+            <span className="text-xs uppercase tracking-wider text-txt-muted font-medium">Lists</span>
+            <button
+              onClick={() => onCreateList()}
+              className="w-5 h-5 flex items-center justify-center rounded-full text-txt-muted hover:text-txt-secondary hover:bg-glass-hover transition-colors"
+              title="Create list"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <line x1="6" y1="2" x2="6" y2="10" />
+                <line x1="2" y1="6" x2="10" y2="6" />
+              </svg>
+            </button>
+          </div>
+        )}
+        {collapsed && (
+          <div className="flex justify-center mb-1.5">
+            <button onClick={() => onCreateList()} className="w-5 h-5 flex items-center justify-center rounded-full text-txt-muted hover:text-txt-secondary hover:bg-glass-hover transition-colors" title="Create list">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <line x1="6" y1="2" x2="6" y2="10" />
+                <line x1="2" y1="6" x2="10" y2="6" />
+              </svg>
+            </button>
+          </div>
+        )}
+        <ul className="space-y-0.5">
+          {/* All Tasks entry */}
+          <li>
+            <button
+              onClick={handleAllTasksClick}
+              title={collapsed ? 'All Tasks' : undefined}
+              className={`w-full flex items-center ${collapsed ? 'justify-center' : ''} gap-2.5 px-3 py-2 rounded-md transition-all duration-200 ${
+                currentView === 'all-lists' ? 'bg-white/[0.08] text-txt-primary' : 'text-txt-secondary hover:bg-white/[0.05] hover:text-txt-primary'
+              }`}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="shrink-0">
+                <rect x="1" y="1" width="5" height="5" rx="1" />
+                <rect x="8" y="1" width="5" height="5" rx="1" />
+                <rect x="1" y="8" width="5" height="5" rx="1" />
+                <rect x="8" y="8" width="5" height="5" rx="1" />
+              </svg>
+              {!collapsed && <span className="font-normal font-display text-[13px] whitespace-nowrap">All Tasks</span>}
+            </button>
+          </li>
+
+          {/* Active lists */}
+          {lists.map((list) => (
+            <li key={list.id}>
+              <button
+                onClick={() => handleListClick(list.id)}
+                title={collapsed ? list.name : undefined}
+                className={`w-full flex items-center ${collapsed ? 'justify-center' : ''} gap-2.5 px-3 py-2 rounded-md transition-all duration-200 ${
+                  currentView === 'lists' && selectedListId === list.id
+                    ? 'bg-white/[0.08] text-txt-primary'
+                    : 'text-txt-secondary hover:bg-white/[0.05] hover:text-txt-primary'
+                }`}
+              >
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: list.color }} />
+                {!collapsed && <span className="font-normal font-display text-[13px] whitespace-nowrap truncate">{list.name}</span>}
+              </button>
+            </li>
+          ))}
+
+          {/* Archived lists toggle */}
+          {archivedLists.length > 0 && !collapsed && (
+            <>
+              <li>
+                <button
+                  onClick={toggleShowArchivedLists}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-txt-dim hover:text-txt-muted transition-colors"
+                >
+                  {showArchivedLists ? 'Hide archived' : `Show archived (${archivedLists.length})`}
+                </button>
+              </li>
+              {showArchivedLists && archivedLists.map((list) => (
+                <li key={list.id} className="group">
+                  <div className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-txt-dim opacity-60">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-txt-dim" />
+                    <span className="font-normal font-display text-[13px] whitespace-nowrap truncate italic flex-1">{list.name}</span>
+                    <button
+                      onClick={() => unarchiveList(list.id)}
+                      className="text-xs text-txt-muted hover:text-txt-secondary opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      Restore
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </>
+          )}
+        </ul>
+      </div>
+
     </div>
   );
 }

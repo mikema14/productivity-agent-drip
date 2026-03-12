@@ -7,6 +7,7 @@ import TaskIdInput from '../shared/TaskIdInput';
 import CompletionPromptModal from './CompletionPromptModal';
 import DailyIntentionBanner from '../shared/DailyIntentionBanner';
 import BoundaryConfirmDialog from './BoundaryConfirmDialog';
+import TimerTaskList from '../Lists/TimerTaskList';
 import type { PomodoroSession, CalendarProposal, AdhocEntry } from '../../types';
 
 export default function Timer() {
@@ -43,6 +44,7 @@ export default function Timer() {
   const [workdayEndTime, setWorkdayEndTime] = useState('18:00');
   const [enableBoundaryCheck, setEnableBoundaryCheck] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+  const [rightPanel, setRightPanel] = useState<'timeline' | 'tasks'>('timeline');
 
   // Track session start time for time range display
   useEffect(() => {
@@ -446,9 +448,49 @@ export default function Timer() {
         </div>
       </div>
 
-      {/* RIGHT PANEL: Day Timeline */}
-      <div className="w-1/2 relative overflow-hidden">
-        <TimerDayTimeline sessions={sessions} calendarProposals={calendarProposals} adhocEntries={adhocEntries} onRefresh={loadSessions} />
+      {/* RIGHT PANEL: Day Timeline or Task List */}
+      <div className="w-1/2 relative overflow-hidden flex flex-col">
+        {/* Panel toggle */}
+        <div className="px-4 pt-3 pb-1 flex justify-end">
+          <div className="inline-flex rounded-xl border border-glass-border bg-glass-bg/30 backdrop-blur-sm p-1">
+            <button
+              onClick={() => setRightPanel('timeline')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                rightPanel === 'timeline'
+                  ? 'bg-focus/15 text-focus border border-focus/30'
+                  : 'text-txt-secondary hover:text-txt-primary hover:bg-glass-hover'
+              }`}
+            >
+              Timeline
+            </button>
+            <button
+              onClick={() => setRightPanel('tasks')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                rightPanel === 'tasks'
+                  ? 'bg-focus/15 text-focus border border-focus/30'
+                  : 'text-txt-secondary hover:text-txt-primary hover:bg-glass-hover'
+              }`}
+            >
+              Tasks
+            </button>
+          </div>
+        </div>
+
+        {rightPanel === 'timeline' ? (
+          <div className="flex-1 relative overflow-hidden">
+            <TimerDayTimeline sessions={sessions} calendarProposals={calendarProposals} adhocEntries={adhocEntries} onRefresh={loadSessions} />
+          </div>
+        ) : (
+          <TimerTaskList
+            onSelectTask={(taskId, intention) => {
+              if (taskId) {
+                setTaskInput(taskId);
+                handleTaskSelect(taskId, intention);
+              }
+              setIntention(intention);
+            }}
+          />
+        )}
       </div>
 
       {/* Completion Prompt Modal */}

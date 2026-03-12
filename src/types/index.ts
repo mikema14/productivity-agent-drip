@@ -371,7 +371,59 @@ declare global {
     logAPI: LogAPI;
     dashboardAPI: DashboardAPI;
     aiAPI: AIAPI;
+    listsAPI: ListsAPI;
   }
+}
+
+// Lists types
+export type ListItemColumn = 'backlog' | 'this_week' | 'today';
+
+export interface TaskList {
+  id: string;
+  name: string;
+  color: string;
+  icon_path: string | null;
+  task_id: string | null;
+  order: number;
+  archived: 0 | 1;
+  created_at: string;
+}
+
+export interface ListItem {
+  id: string;
+  list_id: string;
+  title: string;
+  task_id: string | null;
+  column: ListItemColumn;
+  order: number;
+  completed: 0 | 1;
+  archived: 0 | 1;
+  completed_at: string | null;
+  description: string | null;
+  subtasks: string; // JSON: Subtask[]
+  created_at: string;
+}
+
+export interface Subtask {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+export interface ListsAPI {
+  getLists: () => Promise<TaskList[]>;
+  getArchivedLists: () => Promise<TaskList[]>;
+  createList: (list: Omit<TaskList, 'id' | 'created_at'>) => Promise<string>;
+  updateList: (id: string, updates: Partial<TaskList>) => Promise<void>;
+  deleteList: (id: string) => Promise<void>;
+  archiveList: (id: string) => Promise<void>;
+  unarchiveList: (id: string) => Promise<void>;
+  getListItems: (listId: string) => Promise<ListItem[]>;
+  getAllListItems: () => Promise<ListItem[]>;
+  createListItem: (item: Omit<ListItem, 'id' | 'created_at'>) => Promise<string>;
+  updateListItem: (id: string, updates: Partial<ListItem>) => Promise<void>;
+  deleteListItem: (id: string) => Promise<void>;
+  archiveOldCompleted: () => Promise<number>;
 }
 
 // Component props

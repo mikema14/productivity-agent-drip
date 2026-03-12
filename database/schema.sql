@@ -125,6 +125,28 @@ CREATE TABLE IF NOT EXISTS shutdown_rituals (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS lists (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT '#10b981',
+  icon_path TEXT,
+  task_id TEXT,
+  "order" INTEGER NOT NULL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS list_items (
+  id TEXT PRIMARY KEY,
+  list_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  task_id TEXT,
+  "column" TEXT NOT NULL DEFAULT 'backlog' CHECK("column" IN ('backlog','this_week','today')),
+  "order" INTEGER NOT NULL DEFAULT 0,
+  completed INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_sessions_date ON pomodoro_sessions(date(start_at));
 CREATE INDEX IF NOT EXISTS idx_sessions_logged ON pomodoro_sessions(logged);

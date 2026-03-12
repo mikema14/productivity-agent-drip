@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { app } from 'electron';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import type { PomodoroSession, Setting, TaskPreference, Milestone, Goal, DailyIntentions, ShutdownRitual } from '../types';
+import type { PomodoroSession, Setting, TaskPreference, Milestone, Goal, DailyIntentions, ShutdownRitual, TaskList, ListItem } from '../types';
 
 let db: Database.Database | null = null;
 
@@ -143,6 +143,28 @@ export function initDB(): Database.Database {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS lists (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#10b981',
+      icon_path TEXT,
+      task_id TEXT,
+      "order" INTEGER NOT NULL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS list_items (
+      id TEXT PRIMARY KEY,
+      list_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      task_id TEXT,
+      "column" TEXT NOT NULL DEFAULT 'backlog' CHECK("column" IN ('backlog','this_week','today')),
+      "order" INTEGER NOT NULL DEFAULT 0,
+      completed INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_sessions_date ON pomodoro_sessions(date(start_at));
     CREATE INDEX IF NOT EXISTS idx_sessions_logged ON pomodoro_sessions(logged);
     CREATE INDEX IF NOT EXISTS idx_adhoc_date ON adhoc_entries(date);
@@ -151,6 +173,8 @@ export function initDB(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_milestones_completed ON milestones(completed);
     CREATE INDEX IF NOT EXISTS idx_task_prefs_tracked ON task_preferences(tracked);
     CREATE INDEX IF NOT EXISTS idx_goals_active ON goals(active);
+    CREATE INDEX IF NOT EXISTS idx_list_items_list ON list_items(list_id);
+    CREATE INDEX IF NOT EXISTS idx_list_items_column ON list_items("column");
   `;
 
   // Execute schema statements
@@ -513,6 +537,32 @@ function runMigrations(database: Database.Database) {
     }
   } catch (error) {
     console.error('Migration error (shutdown_rituals table):', error);
+  }
+
+  // Migration: Add archived, completed_at, description, subtasks to list_items
+  try {
+    const listItemsInfo = database.pragma('table_info(list_items)') as any[];
+    if (listItemsInfo.length > 0) {
+      if (!listItemsInfo.some((c: any) => c.name === 'archived'))
+        database.exec('ALTER TABLE list_items ADD COLUMN archived INTEGER DEFAULT 0');
+      if (!listItemsInfo.some((c: any) => c.name === 'completed_at'))
+        database.exec('ALTER TABLE list_items ADD COLUMN completed_at DATETIME');
+      if (!listItemsInfo.some((c: any) => c.name === 'description'))
+        database.exec('ALTER TABLE list_items ADD COLUMN description TEXT');
+      if (!listItemsInfo.some((c: any) => c.name === 'subtasks'))
+        database.exec("ALTER TABLE list_items ADD COLUMN subtasks TEXT DEFAULT '[]'");
+    }
+  } catch (error) {
+    console.error('Migration error (list_items extensions):', error);
+  }
+
+  // Migration: Add archived to lists
+  try {
+    const listsInfo = database.pragma('table_info(lists)') as any[];
+    if (listsInfo.length > 0 && !listsInfo.some((c: any) => c.name === 'archived'))
+      database.exec('ALTER TABLE lists ADD COLUMN archived INTEGER DEFAULT 0');
+  } catch (error) {
+    console.error('Migration error (lists archived):', error);
   }
 }
 
@@ -1403,4 +1453,125 @@ export function isDayLocked(date: string): boolean {
   const database = getDB();
   const row = database.prepare('SELECT locked FROM shutdown_rituals WHERE date = ?').get(date) as any;
   return row ? row.locked === 1 : false;
+}
+
+// ==================== LISTS ====================
+
+export function getLists(): TaskList[] {
+  const database = getDB();
+  return database.prepare('SELECT * FROM lists WHERE archived = 0 ORDER BY "order" ASC, created_at ASC').all() as TaskList[];
+}
+
+export function getArchivedLists(): TaskList[] {
+  const database = getDB();
+  return database.prepare('SELECT * FROM lists WHERE archived = 1 ORDER BY "order" ASC').all() as TaskList[];
+}
+
+export function archiveList(id: string): void {
+  const database = getDB();
+  database.prepare('UPDATE lists SET archived = 1 WHERE id = ?').run(id);
+}
+
+export function unarchiveList(id: string): void {
+  const database = getDB();
+  database.prepare('UPDATE lists SET archived = 0 WHERE id = ?').run(id);
+}
+
+export function archiveOldCompleted(): number {
+  const database = getDB();
+  const result = database.prepare(
+    "UPDATE list_items SET archived = 1 WHERE completed = 1 AND completed_at IS NOT NULL AND completed_at < datetime('now', '-7 days') AND archived = 0"
+  ).run();
+  return result.changes;
+}
+
+export function reorderItemsInColumn(listId: string, column: string): void {
+  const database = getDB();
+  const items = database.prepare(
+    'SELECT id FROM list_items WHERE list_id = ? AND "column" = ? ORDER BY "order" ASC'
+  ).all(listId, column) as Array<{ id: string }>;
+  const stmt = database.prepare('UPDATE list_items SET "order" = ? WHERE id = ?');
+  items.forEach((item, i) => stmt.run(i, item.id));
+}
+
+export function createList(list: Omit<TaskList, 'id' | 'created_at'>): string {
+  const database = getDB();
+  const id = uuidv4();
+  database.prepare(
+    'INSERT INTO lists (id, name, color, icon_path, task_id, "order") VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(id, list.name, list.color, list.icon_path, list.task_id, list.order);
+  return id;
+}
+
+export function updateList(id: string, updates: Partial<TaskList>): void {
+  const database = getDB();
+  const allowed = ['name', 'color', 'icon_path', 'task_id', 'order', 'archived'] as const;
+  const sets: string[] = [];
+  const values: any[] = [];
+  for (const key of allowed) {
+    if (key in updates) {
+      sets.push(key === 'order' ? `"order" = ?` : `${key} = ?`);
+      values.push(updates[key as keyof TaskList]);
+    }
+  }
+  if (sets.length === 0) return;
+  values.push(id);
+  database.prepare(`UPDATE lists SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+}
+
+export function deleteList(id: string): void {
+  const database = getDB();
+  database.prepare('DELETE FROM list_items WHERE list_id = ?').run(id);
+  database.prepare('DELETE FROM lists WHERE id = ?').run(id);
+}
+
+export function getListItems(listId: string): ListItem[] {
+  const database = getDB();
+  return database.prepare(
+    'SELECT * FROM list_items WHERE list_id = ? ORDER BY "column" ASC, "order" ASC'
+  ).all(listId) as ListItem[];
+}
+
+export function getAllListItems(): ListItem[] {
+  const database = getDB();
+  return database.prepare('SELECT * FROM list_items ORDER BY "order" ASC').all() as ListItem[];
+}
+
+export function createListItem(item: Omit<ListItem, 'id' | 'created_at'>): string {
+  const database = getDB();
+  const id = uuidv4();
+  database.prepare(
+    'INSERT INTO list_items (id, list_id, title, task_id, "column", "order", completed) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(id, item.list_id, item.title, item.task_id, item.column, item.order, item.completed);
+  return id;
+}
+
+export function updateListItem(id: string, updates: Partial<ListItem>): void {
+  const database = getDB();
+  // Auto-set completed_at when toggling completed
+  if ('completed' in updates) {
+    if (updates.completed === 1 && !('completed_at' in updates)) {
+      updates.completed_at = new Date().toISOString();
+    } else if (updates.completed === 0) {
+      updates.completed_at = null;
+      updates.archived = 0;
+    }
+  }
+  const allowed = ['title', 'task_id', 'column', 'order', 'completed', 'archived', 'completed_at', 'description', 'subtasks'] as const;
+  const sets: string[] = [];
+  const values: any[] = [];
+  for (const key of allowed) {
+    if (key in updates) {
+      sets.push(key === 'order' || key === 'column' ? `"${key}" = ?` : `${key} = ?`);
+      values.push(updates[key as keyof ListItem]);
+    }
+  }
+  if (sets.length === 0) return;
+  values.push(id);
+  database.prepare(`UPDATE list_items SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+}
+
+export function deleteListItem(id: string): void {
+  const database = getDB();
+  database.prepare('DELETE FROM list_items WHERE id = ?').run(id);
 }

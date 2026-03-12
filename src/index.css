@@ -22,7 +22,7 @@
   }
 
   .glass-surface-elevated {
-    @apply bg-drip-elevated/80 backdrop-blur-xl border border-glass-border rounded-2xl shadow-glass;
+    @apply bg-drip-bg/95 backdrop-blur-2xl border border-glass-border rounded-2xl shadow-glass;
   }
 
   .glass-button {

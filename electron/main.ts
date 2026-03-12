@@ -56,7 +56,21 @@ import {
   computeWeeklySummary,
   getTaskTotalMinutes,
   getShutdownReflectionsInRange,
-  getSessionsByTimeOfDay
+  getSessionsByTimeOfDay,
+  getLists,
+  createList,
+  updateList,
+  deleteList,
+  getListItems,
+  getAllListItems,
+  createListItem,
+  updateListItem,
+  deleteListItem,
+  getArchivedLists,
+  archiveList,
+  unarchiveList,
+  archiveOldCompleted,
+  reorderItemsInColumn
 } from '../src/services/db';
 import { createTray, updateTray, destroyTray } from './tray';
 import {
@@ -1007,6 +1021,125 @@ ipcMain.handle('extend-main-timer', async (_event, additionalSeconds: number) =>
     return { success: true };
   } catch (error) {
     console.error('Failed to extend main timer:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// ==================== LISTS ====================
+
+ipcMain.handle('get-lists', async () => {
+  try {
+    const lists = getLists();
+    return { success: true, lists };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('create-list', async (_event, list) => {
+  try {
+    const id = createList(list);
+    return { success: true, id };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('update-list', async (_event, id: string, updates) => {
+  try {
+    updateList(id, updates);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('delete-list', async (_event, id: string) => {
+  try {
+    deleteList(id);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('get-list-items', async (_event, listId: string) => {
+  try {
+    const items = getListItems(listId);
+    return { success: true, items };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('get-all-list-items', async () => {
+  try {
+    const items = getAllListItems();
+    return { success: true, items };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('create-list-item', async (_event, item) => {
+  try {
+    const id = createListItem(item);
+    return { success: true, id };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('update-list-item', async (_event, id: string, updates) => {
+  try {
+    updateListItem(id, updates);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('delete-list-item', async (_event, id: string) => {
+  try {
+    deleteListItem(id);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('archive-list', async (_event, id: string) => {
+  try {
+    archiveList(id);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('unarchive-list', async (_event, id: string) => {
+  try {
+    unarchiveList(id);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('get-archived-lists', async () => {
+  try {
+    const lists = getArchivedLists();
+    return { success: true, lists };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('archive-old-completed', async () => {
+  try {
+    const count = archiveOldCompleted();
+    return { success: true, count };
+  } catch (error) {
     return { success: false, error: (error as Error).message };
   }
 });

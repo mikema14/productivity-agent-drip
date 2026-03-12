@@ -5,12 +5,17 @@ import Timer from './components/Timer/Timer';
 import DailyLog from './components/DailyLog/DailyLog';
 import Settings from './components/Settings/Settings';
 import ProgressPage from './components/Progress/ProgressPage';
+import ListPlanningView from './components/Lists/ListPlanningView';
+import AllListsOverview from './components/Lists/AllListsOverview';
+import CreateListModal from './components/Lists/CreateListModal';
+import { useListsStore } from './stores/listsStore';
 import { loadSessionCount, checkTimerHydration, cleanupTimerIntervals, setupMainTimerListeners } from './stores/timerStore';
 import { useLogStore } from './stores/logStore';
 
 function App() {
   const [currentView, setCurrentView] = useState('timer');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showCreateList, setShowCreateList] = useState(false);
 
   // Load session count and check for stuck timer states on mount
   useEffect(() => {
@@ -65,6 +70,10 @@ function App() {
         return <ProgressPage />;
       case 'settings':
         return <Settings />;
+      case 'lists':
+        return <ListPlanningView />;
+      case 'all-lists':
+        return <AllListsOverview />;
       default:
         return <Timer />;
     }
@@ -72,8 +81,11 @@ function App() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar onNavigate={setCurrentView} currentView={currentView} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(c => !c)} />
+      <Sidebar onNavigate={setCurrentView} currentView={currentView} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(c => !c)} onCreateList={() => setShowCreateList(true)} />
       <MainContent>{renderView()}</MainContent>
+      {showCreateList && (
+        <CreateListModal onClose={() => { setShowCreateList(false); useListsStore.getState().loadLists(); }} />
+      )}
     </div>
   );
 }
