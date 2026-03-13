@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useListsStore } from '../../stores/listsStore';
 import { useTaskName, resolveTaskNames } from '../../hooks/useTaskName';
+import TaskIdBadge from '../shared/TaskIdBadge';
 import AddItemInline from './AddItemInline';
 import DraggableItem from './DraggableItem';
 import TaskDetailInline from './TaskDetailInline';
@@ -166,9 +167,7 @@ export default function ListPlanningView() {
         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedList.color }} />
         <h1 className="text-xl font-display font-semibold text-txt-primary">{selectedList.name}</h1>
         {selectedList.task_id && (
-          <span className="font-mono text-sm text-focus bg-focus-muted px-2.5 py-0.5 rounded-full cursor-help" title={listTaskName || ''}>
-            #{selectedList.task_id}
-          </span>
+          <TaskIdBadge taskId={selectedList.task_id} taskName={listTaskName} className="text-sm text-focus bg-focus-muted px-2.5 py-0.5 rounded-full" />
         )}
         <span className="text-sm text-txt-muted ml-auto">
           {items.filter(i => i.list_id === selectedListId && !i.archived).length === 0
@@ -265,7 +264,7 @@ export default function ListPlanningView() {
                                 {item.title}
                               </button>
                               {item.task_id && (
-                                <span className="ml-1.5 font-mono text-xs text-focus cursor-help" title={taskNames[item.task_id] || ''}>#{item.task_id}</span>
+                                <TaskIdBadge taskId={item.task_id} taskName={taskNames[item.task_id] || null} className="ml-1.5 text-xs text-focus" />
                               )}
                               {subtaskCount && (
                                 <button

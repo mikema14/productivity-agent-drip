@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useListsStore } from '../../stores/listsStore';
 import { resolveTaskNames } from '../../hooks/useTaskName';
+import TaskIdBadge from '../shared/TaskIdBadge';
 import type { ListItemColumn, ListItem, TaskList } from '../../types';
 
 interface TimerTaskListProps {
@@ -210,14 +211,10 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
                       />
                       <span className="flex-1 text-sm text-txt-primary truncate">{item.title}</span>
                       {(item.task_id && !list.task_id) && (
-                        <span className="font-mono text-[10px] text-focus/70 bg-focus/5 px-1.5 py-0.5 rounded cursor-help" title={taskNames[item.task_id] || ''}>
-                          #{item.task_id}
-                        </span>
+                        <TaskIdBadge taskId={item.task_id} taskName={taskNames[item.task_id] || null} className="text-[10px] text-focus/70 bg-focus/5 px-1.5 py-0.5 rounded" />
                       )}
                       {list.task_id && (
-                        <span className="font-mono text-[10px] text-focus/50 cursor-help" title={taskNames[list.task_id] || ''}>
-                          #{list.task_id}
-                        </span>
+                        <TaskIdBadge taskId={list.task_id} taskName={taskNames[list.task_id] || null} className="text-[10px] text-focus/50" />
                       )}
                     </div>
                   </button>
