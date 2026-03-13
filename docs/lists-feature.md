@@ -78,8 +78,9 @@ src/components/Lists/
   DraggableItem.tsx       — @dnd-kit sortable wrapper
   AddItemInline.tsx       — Inline task creation input
 
+src/components/shared/TaskIdBadge.tsx — Reusable task ID badge with hover tooltip
 src/stores/listsStore.ts  — Zustand store (CRUD, archive, column filtering)
-src/hooks/useTaskName.ts  — Resolves task ID to cached EP task name
+src/hooks/useTaskName.ts  — Resolves task ID to EP task name (cache + API fallback)
 src/utils/listColors.ts   — 8-color preset palette
 ```
 
@@ -100,6 +101,15 @@ src/utils/listColors.ts   — 8-color preset palette
 | `updateListItem(id, updates)` | void | Update task (auto-sets completed_at) |
 | `deleteListItem(id)` | void | Delete task |
 | `archiveOldCompleted()` | `number` | Auto-archive items completed 7+ days ago |
+
+### Task ID Tooltips
+
+Hovering over any `#taskId` badge shows a floating popup with the full Easy Project task name. The resolution uses a two-step approach:
+
+1. **Local cache** — checks `task_cache` table via `getCachedTask()`
+2. **API fallback** — if not cached, fetches from Easy Project via `getIssue()` (also populates cache)
+
+Results are stored in a shared in-memory cache (`useTaskName.ts`) to avoid duplicate API calls across components and re-renders. The tooltip (`TaskIdBadge.tsx`) uses fixed viewport positioning with `clamp()` to stay visible near window edges, and wraps long names at 280px.
 
 ### Navigation
 
