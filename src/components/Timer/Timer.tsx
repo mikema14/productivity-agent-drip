@@ -222,7 +222,7 @@ export default function Timer() {
       ? 'text-focus bg-focus-muted'
       : status === 'break'
       ? 'text-break bg-break-muted'
-      : 'text-idle bg-glass-bg';
+      : 'text-idle bg-focus/5';
 
   // Time range display
   const formatTimeRange = (date: Date) => {
@@ -251,10 +251,9 @@ export default function Timer() {
             <div>
               <button
                 onClick={handleContinuePrevious}
-                className="w-full px-4 py-3 glass-button
-                         text-txt-secondary rounded-xl font-display
-                         flex items-center justify-center gap-2
-                         hover:border-focus/20"
+                className="w-full px-4 py-3 bg-focus/10 border border-focus/20
+                         text-txt-secondary rounded-xl font-display hover:bg-focus/15
+                         flex items-center justify-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -360,7 +359,7 @@ export default function Timer() {
               {/* Time Range Display */}
               {status !== 'idle' && sessionStartTime && estimatedEnd && (
                 <div className="flex justify-center">
-                  <div className="text-sm text-txt-muted font-mono bg-glass-bg border border-glass-border rounded-full px-4 py-1 inline-block">
+                  <div className="text-sm text-txt-muted font-mono bg-focus/5 border border-focus/20 rounded-full px-4 py-1 inline-block">
                     {formatTimeRange(sessionStartTime)} &rarr; {formatTimeRange(estimatedEnd)}
                   </div>
                 </div>
@@ -394,7 +393,7 @@ export default function Timer() {
                       value={intention}
                       onChange={e => setIntention(e.target.value)}
                       placeholder="What will you accomplish?"
-                      className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl
+                      className="w-full px-4 py-2.5 bg-transparent border border-focus/30 rounded-xl
                                text-txt-primary placeholder-txt-dim
                                focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
                     />
@@ -423,7 +422,7 @@ export default function Timer() {
                 <div className="pt-1">
                   <button
                     onClick={() => extendSession(5)}
-                    className="glass-button rounded-full text-xs text-txt-muted"
+                    className="px-4 py-2 bg-focus/10 border border-focus/20 text-txt-muted rounded-full text-xs hover:bg-focus/15 hover:text-focus transition-all"
                   >
                     +5 min
                   </button>
@@ -452,13 +451,13 @@ export default function Timer() {
       <div className="w-1/2 relative overflow-hidden flex flex-col">
         {/* Panel toggle */}
         <div className="px-4 pt-3 pb-1 flex justify-end">
-          <div className="inline-flex rounded-xl border border-glass-border bg-glass-bg/30 backdrop-blur-sm p-1">
+          <div className="inline-flex rounded-xl border border-focus/30 bg-transparent p-1">
             <button
               onClick={() => setRightPanel('timeline')}
               className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
                 rightPanel === 'timeline'
                   ? 'bg-focus/15 text-focus border border-focus/30'
-                  : 'text-txt-secondary hover:text-txt-primary hover:bg-glass-hover'
+                  : 'text-txt-secondary hover:text-txt-primary hover:bg-focus/5'
               }`}
             >
               Timeline
@@ -468,7 +467,7 @@ export default function Timer() {
               className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
                 rightPanel === 'tasks'
                   ? 'bg-focus/15 text-focus border border-focus/30'
-                  : 'text-txt-secondary hover:text-txt-primary hover:bg-glass-hover'
+                  : 'text-txt-secondary hover:text-txt-primary hover:bg-focus/5'
               }`}
             >
               Tasks
@@ -485,7 +484,7 @@ export default function Timer() {
             onSelectTask={(taskId, intention) => {
               if (taskId) {
                 setTaskInput(taskId);
-                handleTaskSelect(taskId, intention);
+                setTaskTitle(intention);
               }
               setIntention(intention);
             }}

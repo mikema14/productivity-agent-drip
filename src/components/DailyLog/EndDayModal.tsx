@@ -135,7 +135,7 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
   if (isLoading) {
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="glass-surface-elevated p-8">
+        <div className="bg-drip-bg/95 backdrop-blur-2xl border border-focus/30 rounded-2xl shadow-glass p-8">
           <div className="text-txt-muted">Loading day summary...</div>
         </div>
       </div>
@@ -144,9 +144,9 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="glass-surface-elevated max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-4">
+      <div className="bg-drip-bg/95 backdrop-blur-2xl border border-focus/30 rounded-2xl shadow-glass max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-4">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-glass-border">
+        <div className="px-6 py-4 border-b border-focus/20">
           <h2 className="text-2xl font-display font-semibold text-txt-primary">End Day - {date}</h2>
           <p className="text-sm text-txt-secondary mt-1">Review your day and set intentions for tomorrow</p>
         </div>
@@ -160,7 +160,7 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
                 <span>⚡</span>
                 <span>Today's Plan</span>
               </h3>
-              <div className="bg-glass-bg border border-glass-border rounded-xl p-4">
+              <div className="bg-focus/5 border border-focus/20 rounded-xl p-4">
                 <div className="text-sm text-txt-muted mb-2">What you set out to do today:</div>
                 <div className="space-y-2">
                   {todayIntentions.map((intention, index) => (
@@ -180,7 +180,7 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
               <span>📊</span>
               <span>Review</span>
             </h3>
-            <div className="bg-glass-bg border border-glass-border rounded-xl p-4 space-y-3">
+            <div className="bg-focus/5 border border-focus/20 rounded-xl p-4 space-y-3">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-sm text-txt-muted">Total Work</div>
@@ -203,7 +203,7 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
                   <div className="text-sm text-txt-muted mb-1">Tasks Worked On:</div>
                   <div className="flex flex-wrap gap-2">
                     {tasksWorked.map(taskId => (
-                      <span key={taskId} className="px-2 py-1 bg-drip-elevated border border-glass-border text-txt-secondary rounded-full text-sm font-mono">
+                      <span key={taskId} className="px-2 py-1 bg-focus/5 border border-focus/20 text-txt-secondary rounded-full text-sm font-mono">
                         #{taskId}
                       </span>
                     ))}
@@ -224,7 +224,7 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
               value={reflection}
               onChange={(e) => setReflection(e.target.value)}
               placeholder="What moved forward today? What did you learn?"
-              className="w-full px-4 py-3 bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30 resize-none"
+              className="w-full px-4 py-3 bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30 resize-none"
               rows={3}
             />
           </div>
@@ -240,7 +240,7 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Blockers, links, reminders for tomorrow..."
-              className="w-full px-4 py-3 bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30 resize-none"
+              className="w-full px-4 py-3 bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30 resize-none"
               rows={3}
             />
           </div>
@@ -258,32 +258,32 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
                 value={tomorrowIntention1}
                 onChange={(e) => setTomorrowIntention1(e.target.value)}
                 placeholder="First intention..."
-                className="w-full px-4 py-2 bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                className="w-full px-4 py-2 bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
               />
               <input
                 type="text"
                 value={tomorrowIntention2}
                 onChange={(e) => setTomorrowIntention2(e.target.value)}
                 placeholder="Second intention (optional)"
-                className="w-full px-4 py-2 bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                className="w-full px-4 py-2 bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
               />
               <input
                 type="text"
                 value={tomorrowIntention3}
                 onChange={(e) => setTomorrowIntention3(e.target.value)}
                 placeholder="Third intention (optional)"
-                className="w-full px-4 py-2 bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                className="w-full px-4 py-2 bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
               />
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-glass-border flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-focus/20 flex justify-end gap-3">
           <button
             onClick={onClose}
             disabled={isSaving}
-            className="glass-button text-txt-muted px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="px-4 py-2 bg-transparent border border-focus/20 text-txt-muted text-sm font-medium rounded-xl hover:bg-focus/5 transition-all disabled:opacity-50"
           >
             Cancel
           </button>

@@ -80,7 +80,7 @@ export const useTimerStore = create<TimerStore>()(
 
     // Start timer in main process (won't be throttled when window is hidden)
     try {
-      await window.timerAPI.startMainTimer(FOCUS_DURATION, 'focus', nextBreakDuration);
+      await window.timerAPI.startMainTimer(FOCUS_DURATION, 'focus', nextBreakDuration, taskId || undefined);
     } catch (error) {
       console.error('[Timer] Failed to start main process timer:', error);
       return;
@@ -623,5 +623,42 @@ export function setupMainTimerListeners() {
       remainingSeconds: newRemaining,
       totalDuration: state.totalDuration + extended,
     });
+  });
+
+  // Listen for URL scheme events (drip:// from Raycast)
+  window.timerAPI.onUrlStartFocus((data) => {
+    console.log('[Timer] URL start-focus received:', data);
+    const state = useTimerStore.getState();
+    if (state.status === 'idle') {
+      if (data.intention) {
+        state.setIntention(data.intention);
+      }
+      state.startFocus(data.taskId);
+    }
+  });
+
+  window.timerAPI.onUrlTimerAction((action, data) => {
+    console.log('[Timer] URL timer action received:', action, data);
+    const state = useTimerStore.getState();
+    switch (action) {
+      case 'pause': state.pause(); break;
+      case 'resume': state.resume(); break;
+      case 'stop': state.reset(); break;
+      case 'finish-early': state.finishEarly(); break;
+      case 'start-break': {
+        if (state.showCompletionModal) {
+          state.startBreakFromModal();
+        } else {
+          state.startBreak(data?.isLong ?? false);
+        }
+        break;
+      }
+      case 'skip-break': {
+        if (state.showCompletionModal) {
+          state.dismissCompletionModal();
+        }
+        break;
+      }
+    }
   });
 }

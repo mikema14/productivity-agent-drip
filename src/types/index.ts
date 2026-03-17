@@ -103,6 +103,7 @@ export interface AppSettings {
   sessionsUntilLongBreak: number;
   defaultBillable: boolean;
   roundingMode: 'none' | '5min' | '15min';
+  showTrayIcon: boolean;
 }
 
 // API types
@@ -183,7 +184,7 @@ export interface TimerAPI {
   getDaysSinceLastLog?: () => Promise<number | null>;
   openExternal?: (url: string) => Promise<void>;
   // Main process timer control
-  startMainTimer: (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10) => Promise<void>;
+  startMainTimer: (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string) => Promise<void>;
   pauseMainTimer: () => Promise<void>;
   resumeMainTimer: () => Promise<void>;
   stopMainTimer: () => Promise<void>;
@@ -196,6 +197,9 @@ export interface TimerAPI {
   onTimerTick: (callback: (remainingSeconds: number) => void) => void;
   onTimerComplete: (callback: (timerType: 'focus' | 'break') => void) => void;
   onTimerExtended: (callback: (newRemaining: number) => void) => void;
+  onUrlStartFocus: (callback: (data: { taskId?: string; intention?: string }) => void) => void;
+  onUrlTimerAction: (callback: (action: 'pause' | 'resume' | 'stop' | 'finish-early' | 'start-break' | 'skip-break', data?: any) => void) => void;
+  toggleTray: (show: boolean) => Promise<void>;
 }
 
 export interface LogAPI {

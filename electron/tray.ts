@@ -4,6 +4,9 @@ import { join } from 'path';
 let tray: Tray | null = null;
 
 export function createTray(mainWindow: BrowserWindow | null) {
+  // Don't create duplicate tray icons
+  if (tray) return;
+
   // Create a simple icon (you can replace this with an actual icon file)
   const icon = createTrayIcon();
 

@@ -209,13 +209,13 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
   return (
     <div className="flex flex-col h-full">
       {/* WEEK HEADER */}
-      <div className="flex-none border-b border-glass-border p-4">
+      <div className="flex-none border-b border-focus/20 p-4">
         {/* Date nav */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigateDate(-1)}
-              className="glass-button text-txt-muted text-sm px-2 py-1"
+              className="px-2 py-1 bg-transparent border border-focus/20 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary transition-all"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -223,13 +223,13 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
             </button>
             <button
               onClick={goToToday}
-              className={`glass-button text-sm px-3 py-1 ${isToday ? 'text-focus border-focus/30' : 'text-txt-secondary'}`}
+              className={`px-3 py-1 text-sm rounded-xl border transition-all ${isToday ? 'bg-focus/15 text-focus border-focus/30' : 'bg-transparent border-focus/20 text-txt-secondary hover:bg-focus/5'}`}
             >
               Today
             </button>
             <button
               onClick={() => navigateDate(1)}
-              className="glass-button text-txt-muted text-sm px-2 py-1"
+              className="px-2 py-1 bg-transparent border border-focus/20 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary transition-all"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -254,8 +254,8 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
                   ${isSelected
                     ? 'bg-focus/10 border border-focus/30 text-focus'
                     : isDayToday
-                      ? 'text-focus hover:bg-glass-hover'
-                      : 'text-txt-muted hover:bg-glass-hover'
+                      ? 'text-focus hover:bg-focus/5'
+                      : 'text-txt-muted hover:bg-focus/5'
                   }`}
               >
                 <span className="font-medium">{formatDayName(date)}</span>
@@ -295,7 +295,7 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
                   <span className="w-12 text-right pr-2 text-xs text-txt-dim font-mono -mt-2">
                     {hour.toString().padStart(2, '0')}:00
                   </span>
-                  <div className="flex-1 border-t border-dashed border-glass-border" />
+                  <div className="flex-1 border-t border-dashed border-focus/10" />
                 </div>
               </div>
             );
@@ -431,8 +431,8 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
                     key={entry.id}
                     className={`absolute left-14 right-4 rounded-lg border overflow-hidden
                       ${isLogged
-                        ? 'bg-glass-bg/20 border-glass-border'
-                        : 'bg-glass-bg/10 border-glass-border border-dashed'
+                        ? 'bg-focus/10 border-focus/20'
+                        : 'bg-focus/5 border-focus/15 border-dashed'
                       }`}
                     style={{ top, height }}
                   >
@@ -523,11 +523,11 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
 
       {/* Unscheduled adhoc entries (no start_time) */}
       {dateAdhocEntries.filter(e => !e.start_time).length > 0 && (
-        <div className="flex-none border-t border-glass-border px-4 py-2">
+        <div className="flex-none border-t border-focus/20 px-4 py-2">
           <p className="text-xs text-txt-dim mb-1">Unscheduled</p>
           <div className="space-y-1">
             {dateAdhocEntries.filter(e => !e.start_time).map(entry => (
-              <div key={entry.id} className="flex items-center gap-2 px-2 py-1 rounded bg-glass-bg/10 border border-glass-border border-dashed">
+              <div key={entry.id} className="flex items-center gap-2 px-2 py-1 rounded bg-focus/5 border border-focus/15 border-dashed">
                 <span className="text-xs font-mono text-txt-secondary">{entry.duration_minutes}m</span>
                 <span className="text-xs text-txt-muted truncate">{entry.title}</span>
                 {entry.task_id && (

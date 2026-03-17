@@ -60,6 +60,12 @@
         "dmg"
       ]
     },
+    "protocols": [
+      {
+        "name": "Drip",
+        "schemes": ["drip"]
+      }
+    ],
     "files": [
       "dist/**/*",
       "dist-electron/**/*"

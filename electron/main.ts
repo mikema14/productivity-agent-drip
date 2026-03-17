@@ -124,6 +124,101 @@ function createWindow() {
   });
 }
 
+// Register drip:// URL scheme for Raycast integration
+app.setAsDefaultProtocolClient('drip');
+
+function handleDripUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    const command = parsed.hostname;
+    const params = parsed.searchParams;
+
+    console.log(`[Drip URL] Handling: ${command}`, Object.fromEntries(params));
+
+    switch (command) {
+      case 'start-focus': {
+        const taskId = params.get('taskId') || undefined;
+        const intention = params.get('intention') || '';
+        // Send to renderer to start focus via the store (handles session count, break logic, etc.)
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('url-start-focus', { taskId, intention });
+          mainWindow.show();
+        }
+        break;
+      }
+      case 'pause':
+        pauseTimer();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('url-timer-action', 'pause');
+        }
+        break;
+      case 'resume':
+        resumeTimer();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('url-timer-action', 'resume');
+        }
+        break;
+      case 'stop':
+        stopTimer();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('url-timer-action', 'stop');
+        }
+        break;
+      case 'finish-early':
+        stopTimer();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('url-timer-action', 'finish-early');
+        }
+        break;
+      case 'start-break': {
+        const duration = parseInt(params.get('duration') || '5', 10);
+        startTimer(duration * 60, 'break');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('url-timer-action', 'start-break', { isLong: duration === 10 });
+        }
+        break;
+      }
+      case 'skip-break':
+        stopTimer();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('url-timer-action', 'skip-break');
+        }
+        break;
+      default:
+        console.log(`[Drip URL] Unknown command: ${command}`);
+    }
+  } catch (error) {
+    console.error('[Drip URL] Failed to parse URL:', url, error);
+  }
+}
+
+// Handle URL on macOS when app is already running
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  handleDripUrl(url);
+});
+
+// Handle second-instance for URL forwarding (single instance lock)
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, commandLine) => {
+    // On macOS, the URL is passed via open-url event, not commandLine
+    // On Windows/Linux, the URL is in commandLine
+    const url = commandLine.find(arg => arg.startsWith('drip://'));
+    if (url) {
+      handleDripUrl(url);
+    }
+    // Focus the window
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 // Initialize app
 app.whenReady().then(() => {
   // Initialize database
@@ -140,8 +235,11 @@ app.whenReady().then(() => {
   // Pass window reference to timer module
   setMainWindowReference(mainWindow);
 
-  // Create tray icon
-  createTray(mainWindow);
+  // Create tray icon only if setting is enabled (default: off)
+  const showTray = getSetting('show_tray_icon');
+  if (showTray === 'true') {
+    createTray(mainWindow);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -281,6 +379,21 @@ ipcMain.on('show-window', () => {
     }
     mainWindow.show();
     mainWindow.focus();
+  }
+});
+
+// Toggle tray icon visibility
+ipcMain.handle('toggle-tray', async (_event, show: boolean) => {
+  try {
+    if (show) {
+      createTray(mainWindow);
+    } else {
+      destroyTray();
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to toggle tray:', error);
+    return { success: false, error: (error as Error).message };
   }
 });
 
@@ -965,9 +1078,9 @@ ipcMain.handle('call-openrouter', async (_event, apiKey: string, model: string, 
 
 // ==================== MAIN PROCESS TIMER ====================
 
-ipcMain.handle('start-main-timer', async (_event, duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10) => {
+ipcMain.handle('start-main-timer', async (_event, duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string) => {
   try {
-    startTimer(duration, timerType, nextBreakDuration);
+    startTimer(duration, timerType, nextBreakDuration, taskId);
     return { success: true };
   } catch (error) {
     console.error('Failed to start main timer:', error);

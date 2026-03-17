@@ -134,13 +134,13 @@ export default function TaskIdInput({ value, onChange, onTaskSelect, placeholder
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl
+        className="w-full px-4 py-2.5 bg-transparent border border-focus/30 rounded-xl
                    text-txt-primary placeholder-txt-dim
                    focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
       />
 
       {isOpen && filteredTasks.length > 0 && (
-        <div className="absolute z-10 min-w-80 w-max max-w-lg mt-1 bg-drip-elevated border border-glass-border rounded-xl shadow-glass max-h-64 overflow-auto">
+        <div className="absolute z-10 min-w-80 w-max max-w-lg mt-1 bg-drip-elevated border border-focus/30 rounded-xl shadow-glass max-h-64 overflow-auto">
           {filteredTasks.map((task) => (
             <div
               key={task.task_id}
@@ -148,7 +148,7 @@ export default function TaskIdInput({ value, onChange, onTaskSelect, placeholder
                 e.preventDefault();
                 handleSelectTask(task);
               }}
-              className="px-3 py-2.5 hover:bg-glass-hover cursor-pointer transition-colors first:rounded-t-xl last:rounded-b-xl"
+              className="px-3 py-2.5 hover:bg-focus/5 cursor-pointer transition-colors first:rounded-t-xl last:rounded-b-xl"
             >
               <div className="flex items-center gap-3">
                 <span className="text-focus font-mono shrink-0 w-20">

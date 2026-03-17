@@ -66,11 +66,11 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
       case 'break':
         return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
       case 'adhoc':
-        return 'bg-glass-bg text-txt-secondary border border-glass-border';
+        return 'bg-focus/5 text-txt-secondary border border-focus/20';
       case 'calendar':
         return 'bg-purple-500/10 text-purple-400 border border-purple-500/20';
       default:
-        return 'bg-glass-bg text-txt-secondary border border-glass-border';
+        return 'bg-focus/5 text-txt-secondary border border-focus/20';
     }
   };
 
@@ -81,7 +81,7 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
   if (isEditing) {
     const editContainerClass = inTimeline
       ? 'py-2 bg-focus/5 border border-focus/20 rounded-xl'
-      : 'px-6 py-4 border-b border-glass-border bg-focus/5 border border-focus/20 rounded-xl';
+      : 'px-6 py-4 bg-focus/5 border border-focus/20 rounded-xl';
     return (
       <div className={editContainerClass}>
         <div className="space-y-3">
@@ -100,7 +100,7 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
               value={editedEntry.title}
               onChange={(e) => setEditedEntry({ ...editedEntry, title: e.target.value })}
               placeholder="Title"
-              className="flex-1 px-3 py-2 text-sm bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+              className="flex-1 px-3 py-2 text-sm bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
             />
             <input
               type="number"
@@ -108,7 +108,7 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
               onChange={(e) => setEditedEntry({ ...editedEntry, durationMinutes: parseInt(e.target.value) || 0 })}
               min="1"
               placeholder="Duration"
-              className="w-24 px-3 py-2 text-sm bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+              className="w-24 px-3 py-2 text-sm bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
             />
           </div>
 
@@ -118,7 +118,7 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
             value={editedEntry.comment || ''}
             onChange={(e) => setEditedEntry({ ...editedEntry, comment: e.target.value })}
             placeholder="Comment"
-            className="w-full px-3 py-2 text-sm bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+            className="w-full px-3 py-2 text-sm bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
           />
 
           {/* Row 3: Billable and Actions */}
@@ -141,7 +141,7 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
               </button>
               <button
                 onClick={handleCancel}
-                className="px-4 py-2 text-sm glass-button text-txt-muted"
+                className="px-4 py-2 text-sm bg-transparent border border-focus/20 text-txt-muted rounded-xl hover:bg-focus/5 transition-all"
               >
                 Cancel
               </button>
@@ -154,8 +154,8 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
 
   // Card layout for non-edit mode
   const containerClass = inTimeline
-    ? `py-2 hover:bg-glass-hover rounded ${entry.logged ? 'bg-emerald-500/5' : ''} ${isBreak ? 'bg-emerald-500/5' : ''}`
-    : `px-6 py-4 border-b border-glass-border hover:bg-glass-hover ${entry.logged ? 'bg-emerald-500/5' : ''} ${isBreak ? 'bg-emerald-500/5' : ''}`;
+    ? `py-2 hover:bg-focus/5 rounded ${entry.logged ? 'bg-emerald-500/5' : ''} ${isBreak ? 'bg-emerald-500/5' : ''}`
+    : `px-6 py-4 border-b border-focus/20 hover:bg-focus/5 ${entry.logged ? 'bg-emerald-500/5' : ''} ${isBreak ? 'bg-emerald-500/5' : ''}`;
 
   return (
     <div className={containerClass}>
@@ -242,7 +242,7 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
                   </button>
                   <button
                     onClick={() => onDismiss(entry.id)}
-                    className="px-3 py-1 text-sm glass-button text-txt-muted"
+                    className="px-3 py-1 text-sm bg-transparent border border-focus/20 text-txt-muted rounded-xl hover:bg-focus/5 transition-all"
                   >
                     Dismiss
                   </button>

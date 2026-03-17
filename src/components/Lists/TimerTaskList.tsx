@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useListsStore } from '../../stores/listsStore';
 import { resolveTaskNames } from '../../hooks/useTaskName';
 import TaskIdBadge from '../shared/TaskIdBadge';
-import type { ListItemColumn, ListItem, TaskList } from '../../types';
+import type { ListItemColumn, ListItem, TaskList, Subtask } from '../../types';
 
 interface TimerTaskListProps {
   onSelectTask: (taskId: string | null, intention: string) => void;
@@ -22,7 +22,16 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [taskNames, setTaskNames] = useState<Record<string, string>>({});
+
+  const getSubtaskCount = (item: ListItem): { done: number; total: number } | null => {
+    try {
+      const subtasks: Subtask[] = JSON.parse(item.subtasks || '[]');
+      if (subtasks.length === 0) return null;
+      return { done: subtasks.filter(s => s.completed).length, total: subtasks.length };
+    } catch { return null; }
+  };
 
   useEffect(() => {
     loadLists();
@@ -86,15 +95,15 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
       {/* Filters area */}
       <div className="px-4 pt-4 pb-3 space-y-3">
         {/* Segmented control for column filter */}
-        <div className="bg-drip-surface/80 rounded-xl p-0.5 border border-glass-border flex">
+        <div className="bg-transparent rounded-xl p-0.5 border border-focus/30 flex">
           {COLUMN_FILTERS.map(f => (
             <button
               key={f.key}
               onClick={() => setColumnFilter(f.key)}
               className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                 columnFilter === f.key
-                  ? 'bg-white/[0.08] text-txt-primary shadow-sm'
-                  : 'text-txt-muted hover:text-txt-secondary'
+                  ? 'bg-focus/15 text-focus'
+                  : 'text-txt-muted hover:text-txt-secondary hover:bg-focus/5'
               }`}
             >
               {f.label}
@@ -112,7 +121,7 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search tasks..."
-            className="w-full pl-9 pr-3 py-2 bg-glass-bg/40 border border-glass-border rounded-xl text-sm text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-1 focus:ring-focus/20 transition-all"
+            className="w-full pl-9 pr-3 py-2 bg-transparent border border-focus/30 rounded-xl text-sm text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-1 focus:ring-focus/30 transition-all"
           />
         </div>
 
@@ -122,7 +131,7 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
             <button
               onClick={() => setListFilter(null)}
               className={`px-2.5 py-1 text-xs rounded-lg whitespace-nowrap transition-all ${
-                !listFilter ? 'bg-white/[0.08] text-txt-primary' : 'text-txt-muted hover:text-txt-secondary hover:bg-glass-hover'
+                !listFilter ? 'bg-focus/15 text-focus' : 'text-txt-muted hover:text-txt-secondary hover:bg-focus/5'
               }`}
             >
               All Lists
@@ -132,7 +141,7 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
                 key={list.id}
                 onClick={() => setListFilter(listFilter === list.id ? null : list.id)}
                 className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg whitespace-nowrap transition-all ${
-                  listFilter === list.id ? 'bg-white/[0.08] text-txt-primary' : 'text-txt-muted hover:text-txt-secondary hover:bg-glass-hover'
+                  listFilter === list.id ? 'bg-focus/15 text-focus' : 'text-txt-muted hover:text-txt-secondary hover:bg-focus/5'
                 }`}
               >
                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: list.color }} />
@@ -182,43 +191,104 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
                 <span className="text-xs text-txt-dim">{active.length}</span>
               </div>
               {groupTotal > 0 && (
-                <div className="h-0.5 rounded-full bg-glass-bg overflow-hidden mb-2 ml-3">
+                <div className="h-0.5 rounded-full bg-focus/10 overflow-hidden mb-2 ml-3">
                   <div className="h-full rounded-full transition-all duration-300" style={{ width: `${progressPct}%`, backgroundColor: list.color }} />
                 </div>
               )}
 
               {/* Active items */}
               <div className="space-y-1.5">
-                {active.map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => handleItemClick(item, list)}
-                    className={`
-                      w-full text-left rounded-xl p-3 transition-all duration-200
-                      border
-                      ${selectedItemId === item.id
-                        ? 'bg-focus/5 border-focus/20'
-                        : 'bg-glass-bg/40 border-glass-border hover:bg-glass-hover hover:border-glass-hover'
-                      }
-                      active:scale-[0.98]
-                    `}
-                    style={selectedItemId === item.id ? { borderLeftWidth: '3px', borderLeftColor: list.color } : undefined}
-                  >
-                    <div className="flex items-center gap-2.5">
+                {active.map(item => {
+                  const subtaskCount = getSubtaskCount(item);
+                  const isExpanded = expandedItemId === item.id;
+                  let subtasks: Subtask[] = [];
+                  if (isExpanded) {
+                    try { subtasks = JSON.parse(item.subtasks || '[]'); } catch { /* ignore */ }
+                  }
+
+                  return (
+                    <div key={item.id}>
                       <button
-                        onClick={(e) => handleToggleComplete(e, item)}
-                        className="w-4 h-4 rounded border border-glass-border hover:border-focus/50 flex-shrink-0 transition-colors"
-                      />
-                      <span className="flex-1 text-sm text-txt-primary truncate">{item.title}</span>
-                      {(item.task_id && !list.task_id) && (
-                        <TaskIdBadge taskId={item.task_id} taskName={taskNames[item.task_id] || null} className="text-[10px] text-focus/70 bg-focus/5 px-1.5 py-0.5 rounded" />
-                      )}
-                      {list.task_id && (
-                        <TaskIdBadge taskId={list.task_id} taskName={taskNames[list.task_id] || null} className="text-[10px] text-focus/50" />
+                        onClick={() => handleItemClick(item, list)}
+                        className={`
+                          w-full text-left rounded-xl p-3 transition-all duration-200
+                          border
+                          ${selectedItemId === item.id
+                            ? 'bg-focus/5 border-focus/20'
+                            : 'border-transparent hover:bg-focus/5'
+                          }
+                          active:scale-[0.98]
+                        `}
+                        style={selectedItemId === item.id ? { borderLeftWidth: '3px', borderLeftColor: list.color } : undefined}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <button
+                            onClick={(e) => handleToggleComplete(e, item)}
+                            className="w-4 h-4 rounded border border-focus/20 hover:border-focus/50 flex-shrink-0 transition-colors"
+                          />
+                          <span className="flex-1 text-sm text-txt-primary truncate">{item.title}</span>
+                          {(item.task_id && !list.task_id) && (
+                            <TaskIdBadge taskId={item.task_id} taskName={taskNames[item.task_id] || null} className="text-[10px] text-focus/70 bg-focus/5 px-1.5 py-0.5 rounded" />
+                          )}
+                          {list.task_id && (
+                            <TaskIdBadge taskId={list.task_id} taskName={taskNames[list.task_id] || null} className="text-[10px] text-focus/50" />
+                          )}
+                          {subtaskCount && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedItemId(isExpanded ? null : item.id);
+                              }}
+                              className="flex items-center gap-1 text-[10px] text-txt-muted hover:text-txt-secondary transition-colors flex-shrink-0"
+                            >
+                              <span>{subtaskCount.done}/{subtaskCount.total}</span>
+                              <svg
+                                width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+                                className={`transition-transform duration-150 ${isExpanded ? 'rotate-180' : ''}`}
+                              >
+                                <path d="M2 3.5l3 3 3-3" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Expanded subtask list */}
+                      {isExpanded && subtasks.length > 0 && (
+                        <div className="ml-4 mt-1 space-y-0.5">
+                          {subtasks.map(subtask => (
+                            <button
+                              key={subtask.id}
+                              onClick={() => {
+                                const taskId = list.task_id || item.task_id || null;
+                                setSelectedItemId(item.id);
+                                onSelectTask(taskId, subtask.title);
+                              }}
+                              className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg transition-all
+                                ${subtask.completed
+                                  ? 'opacity-40 cursor-default'
+                                  : 'hover:bg-focus/5 active:scale-[0.98]'
+                                }`}
+                            >
+                              <div className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center ${subtask.completed ? 'border-transparent' : 'border-focus/20'}`}
+                                style={subtask.completed ? { backgroundColor: list.color } : undefined}
+                              >
+                                {subtask.completed && (
+                                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round">
+                                    <path d="M1.5 4l2 2 3-3" />
+                                  </svg>
+                                )}
+                              </div>
+                              <span className={`text-xs flex-1 truncate ${subtask.completed ? 'line-through text-txt-muted' : 'text-txt-secondary'}`}>
+                                {subtask.title}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
                       )}
                     </div>
-                  </button>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Completed items */}

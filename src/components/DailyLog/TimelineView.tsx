@@ -135,7 +135,7 @@ export default function TimelineView({ entries }: TimelineViewProps) {
                   <span className="w-12 text-right pr-2 text-xs text-txt-dim font-mono -mt-2">
                     {hour.toString().padStart(2, '0')}:00
                   </span>
-                  <div className="flex-1 border-t border-dashed border-glass-border" />
+                  <div className="flex-1 border-t border-dashed border-focus/10" />
                 </div>
               </div>
             );
@@ -271,7 +271,7 @@ export default function TimelineView({ entries }: TimelineViewProps) {
 
       {/* Unscheduled entries */}
       {unscheduledEntries.length > 0 && (
-        <div className="flex-none border-t border-glass-border p-4">
+        <div className="flex-none border-t border-focus/20 p-4">
           <h3 className="text-sm font-semibold text-txt-secondary mb-2">
             Unscheduled
           </h3>

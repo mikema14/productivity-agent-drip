@@ -100,8 +100,8 @@ const timerAPI: TimerAPI = {
   },
 
   // Main process timer control
-  startMainTimer: async (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10): Promise<void> => {
-    const result = await ipcRenderer.invoke('start-main-timer', duration, timerType, nextBreakDuration);
+  startMainTimer: async (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string): Promise<void> => {
+    const result = await ipcRenderer.invoke('start-main-timer', duration, timerType, nextBreakDuration, taskId);
     if (!result.success) {
       throw new Error(result.error || 'Failed to start main timer');
     }
@@ -158,6 +158,21 @@ const timerAPI: TimerAPI = {
 
   onTimerExtended: (callback: (newRemaining: number) => void) => {
     ipcRenderer.on('timer-extended', (_event, newRemaining) => callback(newRemaining));
+  },
+
+  onUrlStartFocus: (callback: (data: { taskId?: string; intention?: string }) => void) => {
+    ipcRenderer.on('url-start-focus', (_event, data) => callback(data));
+  },
+
+  onUrlTimerAction: (callback: (action: 'pause' | 'resume' | 'stop' | 'finish-early' | 'start-break' | 'skip-break', data?: any) => void) => {
+    ipcRenderer.on('url-timer-action', (_event, action, data) => callback(action, data));
+  },
+
+  toggleTray: async (show: boolean): Promise<void> => {
+    const result = await ipcRenderer.invoke('toggle-tray', show);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to toggle tray');
+    }
   }
 };
 

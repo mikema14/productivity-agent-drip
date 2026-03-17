@@ -32,7 +32,7 @@ export default function TaskIdBadge({ taskId, taskName, className = '' }: TaskId
       <span className="font-mono">#{taskId}</span>
       {tooltipPos && taskName && (
         <span
-          className="fixed px-2.5 py-1.5 text-xs text-txt-primary bg-drip-elevated border border-glass-border rounded-lg shadow-lg z-[9999] pointer-events-none animate-fade-in max-w-[280px] break-words"
+          className="fixed px-2.5 py-1.5 text-xs text-txt-primary bg-drip-elevated border border-focus/30 rounded-lg shadow-lg z-[9999] pointer-events-none animate-fade-in max-w-[280px] break-words"
           style={{
             left: `clamp(8px, ${tooltipPos.x}px, calc(100vw - 288px))`,
             top: `clamp(8px, ${tooltipPos.y}px, calc(100vh - 40px))`,

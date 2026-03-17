@@ -49,7 +49,7 @@ export default function TimerControls({
       ) : (
         <button
           onClick={onPause}
-          className="glass-button text-txt-secondary font-display font-medium"
+          className="px-8 py-3 bg-focus/10 border border-focus/20 text-txt-secondary font-display font-medium rounded-xl transition-all duration-200 hover:bg-focus/15"
         >
           Pause
         </button>
@@ -70,7 +70,7 @@ export default function TimerControls({
       {/* Skip Button */}
       <button
         onClick={onSkip}
-        className="glass-button text-txt-muted font-display font-medium"
+        className="px-4 py-2 bg-transparent border border-focus/20 text-txt-muted font-display font-medium rounded-xl transition-all duration-200 hover:bg-focus/5 hover:text-txt-secondary"
       >
         Skip
       </button>

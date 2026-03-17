@@ -88,7 +88,7 @@ export default function TemplateManagerModal({ isOpen, onClose, onTemplatesChang
   return (
     <>
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="glass-surface-elevated w-full max-w-2xl p-6">
+        <div className="bg-drip-bg/95 backdrop-blur-2xl border border-focus/30 rounded-2xl shadow-glass w-full max-w-2xl p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-display font-semibold text-txt-primary">
               Manage Templates
@@ -119,7 +119,7 @@ export default function TemplateManagerModal({ isOpen, onClose, onTemplatesChang
               templates.map((template) => (
                 <div
                   key={template.id}
-                  className="flex items-center justify-between p-3 bg-glass-bg border border-glass-border rounded-xl"
+                  className="flex items-center justify-between p-3 bg-focus/5 border border-focus/20 rounded-xl"
                 >
                   <div className="flex-1">
                     <div className="font-medium text-txt-primary">
@@ -155,7 +155,7 @@ export default function TemplateManagerModal({ isOpen, onClose, onTemplatesChang
           <div className="mt-6">
             <button
               onClick={onClose}
-              className="w-full glass-button text-txt-muted px-4 py-2"
+              className="w-full px-4 py-2 bg-transparent border border-focus/20 text-txt-muted rounded-xl hover:bg-focus/5 transition-all"
             >
               Close
             </button>
@@ -248,11 +248,11 @@ function EditTemplateModal({ isOpen, onClose, onSave, template }: EditTemplateMo
     }
   };
 
-  const inputClass = "w-full px-3 py-2 bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30";
+  const inputClass = "w-full px-3 py-2 bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-xl focus:ring-2 focus:ring-focus/30 focus:border-focus/30";
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]">
-      <div className="glass-surface-elevated w-full max-w-md p-6">
+      <div className="bg-drip-bg/95 backdrop-blur-2xl border border-focus/30 rounded-2xl shadow-glass w-full max-w-md p-6">
         <h2 className="text-xl font-display font-semibold mb-4 text-txt-primary">
           {template ? 'Edit Template' : 'Add Quick Log Template'}
         </h2>
@@ -333,7 +333,7 @@ function EditTemplateModal({ isOpen, onClose, onSave, template }: EditTemplateMo
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="flex-1 glass-button text-txt-muted px-4 py-2 disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-transparent border border-focus/20 text-txt-muted rounded-xl hover:bg-focus/5 transition-all disabled:opacity-50"
             >
               Cancel
             </button>

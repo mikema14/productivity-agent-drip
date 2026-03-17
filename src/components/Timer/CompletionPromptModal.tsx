@@ -15,8 +15,8 @@ export default function CompletionPromptModal({
 }: CompletionPromptModalProps) {
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="glass-surface-elevated max-w-md w-full mx-4 animate-scale-in">
-        <div className="px-6 py-4 border-b border-glass-border flex items-center justify-between">
+      <div className="bg-drip-bg/95 backdrop-blur-2xl border border-focus/30 rounded-2xl shadow-glass max-w-md w-full mx-4 animate-scale-in">
+        <div className="px-6 py-4 border-b border-focus/20 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-display font-semibold text-txt-primary">Session Complete!</h2>
             <p className="text-sm text-txt-muted mt-1">What would you like to do next?</p>
@@ -35,7 +35,7 @@ export default function CompletionPromptModal({
         <div className="px-6 py-6">
           {/* Show context of completed session */}
           {(taskId || intention) && (
-            <div className="mb-6 p-4 bg-glass-bg rounded-xl border border-glass-border">
+            <div className="mb-6 p-4 bg-focus/5 rounded-xl border border-focus/20">
               <p className="text-sm font-medium text-txt-secondary mb-2">Just completed:</p>
               {taskId && (
                 <p className="text-sm text-focus font-mono">Task #{taskId}</p>

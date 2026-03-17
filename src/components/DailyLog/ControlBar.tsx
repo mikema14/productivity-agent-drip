@@ -27,7 +27,7 @@ interface ControlBarProps {
 
 export default function ControlBar(props: ControlBarProps) {
   return (
-    <div className="glass-surface p-3 mb-4">
+    <div className="p-3 mb-4">
       {/* Row 1: View Toggle + Primary Action */}
       <div className="flex items-center justify-between mb-3">
         {/* Left: View Toggle */}
@@ -47,11 +47,11 @@ export default function ControlBar(props: ControlBarProps) {
       </div>
 
       {/* Row 2: Secondary Actions */}
-      <div className="flex items-center gap-2 border-t border-glass-border pt-3">
+      <div className="flex items-center gap-2 pt-2">
         {/* Add Entry */}
         <button
           onClick={props.onAddEntry}
-          className="glass-button text-txt-secondary text-sm px-3 py-1.5 flex items-center gap-1.5"
+          className="px-3 py-1.5 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary flex items-center gap-1.5 transition-all"
         >
           <span>+</span>
           <span>Add</span>
@@ -60,7 +60,7 @@ export default function ControlBar(props: ControlBarProps) {
         {/* Templates */}
         <button
           onClick={props.onManageTemplates}
-          className="glass-button text-txt-secondary text-sm px-3 py-1.5 flex items-center gap-1.5"
+          className="px-3 py-1.5 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary flex items-center gap-1.5 transition-all"
         >
           <span>Templates</span>
         </button>
@@ -69,7 +69,7 @@ export default function ControlBar(props: ControlBarProps) {
         {props.toggleableCount > 0 && (
           <button
             onClick={props.onSelectToggle}
-            className="glass-button text-txt-secondary text-sm px-3 py-1.5 flex items-center gap-1.5"
+            className="px-3 py-1.5 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary flex items-center gap-1.5 transition-all"
           >
             <span>⋮</span>
             <span>{props.allSelected ? 'Unselect' : 'Select'} All</span>
@@ -94,12 +94,13 @@ export default function ControlBar(props: ControlBarProps) {
         {props.showGroupToggle && (
           <button
             onClick={props.onGroupByTaskToggle}
-            className="px-2 py-1 text-xs text-txt-muted hover:bg-glass-hover rounded transition-colors"
+            className="px-2 py-1 text-xs text-txt-muted hover:bg-focus/5 rounded transition-colors"
           >
             {props.groupByTask ? '⊟ Show Flat' : '⊞ Group by Task'}
           </button>
         )}
       </div>
+      <div className="mx-3 mt-3 border-t border-focus/20" />
     </div>
   );
 }

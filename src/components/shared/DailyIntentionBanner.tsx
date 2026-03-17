@@ -49,7 +49,7 @@ export default function DailyIntentionBanner() {
 
   if (intentions.length === 0 && !isEditing) {
     return (
-      <div className="mb-4 p-3 bg-glass-bg border border-glass-border rounded-xl">
+      <div className="mb-4 p-3 bg-transparent border border-focus/30 rounded-xl">
         <div className="flex items-center justify-between">
           <span className="text-sm text-txt-muted italic">No intentions set for today</span>
           <button
@@ -64,7 +64,7 @@ export default function DailyIntentionBanner() {
   }
 
   return (
-    <div className="mb-4 p-3 bg-glass-bg border border-glass-border rounded-xl">
+    <div className="mb-4 p-3 bg-transparent border border-focus/30 rounded-xl">
       <div className="flex items-start gap-2">
         <span className="text-focus text-lg flex-shrink-0 mt-0.5">⚡</span>
 
@@ -74,7 +74,7 @@ export default function DailyIntentionBanner() {
               {intentions.map((intention, index) => (
                 <div
                   key={index}
-                  className="group inline-flex items-center gap-1.5 px-3 py-1 bg-drip-elevated text-txt-secondary rounded-full text-sm border border-glass-border hover:border-glass-hover transition-colors"
+                  className="group inline-flex items-center gap-1.5 px-3 py-1 bg-focus/5 text-txt-secondary rounded-full text-sm border border-focus/20 hover:border-focus/30 transition-colors"
                 >
                   <span>{intention}</span>
                   <button
@@ -93,14 +93,14 @@ export default function DailyIntentionBanner() {
             <div className="mb-2">
               <button
                 onClick={() => setShowYesterdayNotes(!showYesterdayNotes)}
-                className="inline-flex items-center gap-1.5 px-3 py-1 bg-drip-elevated text-txt-muted rounded-full text-xs border border-glass-border hover:border-glass-hover transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1 bg-focus/5 text-txt-muted rounded-full text-xs border border-focus/20 hover:border-focus/30 transition-colors"
               >
                 <span>📝</span>
                 <span>Yesterday's notes</span>
                 <span className="text-txt-dim">{showYesterdayNotes ? '▼' : '▶'}</span>
               </button>
               {showYesterdayNotes && (
-                <div className="mt-2 p-3 bg-drip-elevated border border-glass-border rounded-xl text-sm text-txt-secondary whitespace-pre-wrap">
+                <div className="mt-2 p-3 bg-focus/5 border border-focus/20 rounded-xl text-sm text-txt-secondary whitespace-pre-wrap">
                   {yesterdayRitual.notes}
                 </div>
               )}
@@ -119,7 +119,7 @@ export default function DailyIntentionBanner() {
                 }
               }}
               placeholder="What will you focus on today?"
-              className="w-full px-3 py-1.5 bg-glass-bg border border-glass-border rounded-xl text-sm text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30"
+              className="w-full px-3 py-1.5 bg-transparent border border-focus/30 rounded-xl text-sm text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30"
               autoFocus
             />
           )}

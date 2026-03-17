@@ -48,7 +48,7 @@ export default function QuickLogBar({ currentDate, onOpenTemplateManager }: Quic
   }
 
   return (
-    <div className="mb-4 p-3 bg-glass-bg/30 border border-glass-border backdrop-blur-sm rounded-xl">
+    <div className="mb-4 p-3 bg-transparent border border-focus/30 backdrop-blur-sm rounded-xl">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm font-medium text-txt-muted">Quick Log:</span>
         {templates.map((template) => (
@@ -63,7 +63,7 @@ export default function QuickLogBar({ currentDate, onOpenTemplateManager }: Quic
         ))}
         <button
           onClick={onOpenTemplateManager}
-          className="glass-button text-txt-muted px-3 py-1.5 text-sm font-medium"
+          className="px-3 py-1.5 bg-transparent border border-focus/20 text-txt-muted text-sm font-medium rounded-xl hover:bg-focus/5 transition-all"
         >
           + Manage
         </button>

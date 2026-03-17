@@ -16,6 +16,7 @@ export default function Settings() {
     enableBoundaryCheck: false,
     openRouterApiKey: '',
     openRouterModel: 'anthropic/claude-4.5-sonnet-20250929',
+    showTrayIcon: false,
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -41,6 +42,7 @@ export default function Settings() {
       const enableBoundaryCheck = (await window.timerAPI.getSettings('enableBoundaryCheck') || 'false') === 'true';
       const openRouterApiKey = await window.timerAPI.getSettings('openRouterApiKey') || '';
       const openRouterModel = await window.timerAPI.getSettings('openRouterModel') || 'anthropic/claude-4.5-sonnet-20250929';
+      const showTrayIcon = (await window.timerAPI.getSettings('show_tray_icon') || 'false') === 'true';
 
       setSettings({
         apiBaseUrl,
@@ -56,6 +58,7 @@ export default function Settings() {
         enableBoundaryCheck,
         openRouterApiKey,
         openRouterModel,
+        showTrayIcon,
       });
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -80,6 +83,8 @@ export default function Settings() {
       await window.timerAPI.saveSettings('enableBoundaryCheck', settings.enableBoundaryCheck.toString());
       await window.timerAPI.saveSettings('openRouterApiKey', settings.openRouterApiKey);
       await window.timerAPI.saveSettings('openRouterModel', settings.openRouterModel);
+      await window.timerAPI.saveSettings('show_tray_icon', settings.showTrayIcon.toString());
+      await window.timerAPI.toggleTray(settings.showTrayIcon);
 
       setSaveMessage({ type: 'success', text: 'Settings saved successfully!' });
       setTimeout(() => setSaveMessage(null), 3000);
@@ -379,6 +384,28 @@ export default function Settings() {
                   OpenRouter model identifier (e.g., anthropic/claude-4.5-sonnet-20250929)
                 </p>
               </div>
+            </div>
+          </section>
+
+          {/* Menu Bar */}
+          <section>
+            <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Menu Bar</h2>
+            <div className="space-y-4 glass-surface p-6">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="showTrayIcon"
+                  checked={settings.showTrayIcon}
+                  onChange={(e) => setSettings({ ...settings, showTrayIcon: e.target.checked })}
+                  className="w-4 h-4 text-focus border-glass-border bg-glass-bg rounded focus:ring-focus/30"
+                />
+                <label htmlFor="showTrayIcon" className="ml-2 text-sm font-medium text-txt-secondary">
+                  Show Electron menu bar icon
+                </label>
+              </div>
+              <p className="text-xs text-txt-dim">
+                Enable this if you want the native Electron tray icon in addition to the Raycast menu bar
+              </p>
             </div>
           </section>
 

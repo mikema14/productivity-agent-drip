@@ -266,7 +266,7 @@ export default function DailyLog() {
   return (
     <div className="flex flex-col h-full">
       {/* Header - Simplified single row */}
-      <div className="flex-none px-6 py-4 border-b border-glass-border bg-drip-surface/60 backdrop-blur-xl">
+      <div className="flex-none px-6 py-4 border-b border-focus/20">
         <div className="flex items-center justify-between">
           {/* Left: Title + Date Navigation */}
           <div className="flex items-center gap-4">
@@ -274,13 +274,13 @@ export default function DailyLog() {
             <div className="flex items-center gap-1">
               <button
                 onClick={() => handleDateChange(-1)}
-                className="glass-button text-txt-muted text-sm px-2 py-1"
+                className="px-2 py-1 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary transition-all"
               >
                 ←
               </button>
               <button
                 onClick={goToToday}
-                className="glass-button text-txt-secondary text-sm px-3 py-1 flex items-center gap-1.5"
+                className="px-3 py-1 text-txt-secondary text-sm rounded-xl hover:bg-focus/5 flex items-center gap-1.5 transition-all"
               >
                 <span>{formatDate(selectedDate)}</span>
                 <button
@@ -297,7 +297,7 @@ export default function DailyLog() {
               </button>
               <button
                 onClick={() => handleDateChange(1)}
-                className="glass-button text-txt-muted text-sm px-2 py-1"
+                className="px-2 py-1 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary transition-all"
               >
                 →
               </button>
@@ -371,7 +371,7 @@ export default function DailyLog() {
               {viewMode === 'timeline' ? (
                 <TimelineView entries={entries} />
               ) : (
-                <div className="glass-surface overflow-hidden p-4">
+                <div className="overflow-hidden">
                   {workEntries.map((entry, index) => (
                     <TimelineItem
                       key={entry.id}
