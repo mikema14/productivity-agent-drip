@@ -19,26 +19,20 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
 
   useEffect(() => {
     async function loadTaskTitles() {
-      const sessionsWithTitlesTemp: SessionWithTitle[] = [];
-
-      for (const session of sessions) {
-        let taskTitle: string | undefined;
-
-        if (session.task_id && window.logAPI) {
-          try {
-            const cachedTask = await window.logAPI.getCachedTask(session.task_id);
-            taskTitle = cachedTask?.title;
-          } catch (error) {
-            console.error(`Failed to load task title for ${session.task_id}:`, error);
+      const sessionsWithTitlesTemp = await Promise.all(
+        sessions.map(async (session) => {
+          let taskTitle: string | undefined;
+          if (session.task_id && window.logAPI) {
+            try {
+              const cachedTask = await window.logAPI.getCachedTask(session.task_id);
+              taskTitle = cachedTask?.title;
+            } catch (error) {
+              console.error(`Failed to load task title for ${session.task_id}:`, error);
+            }
           }
-        }
-
-        sessionsWithTitlesTemp.push({
-          ...session,
-          taskTitle,
-        });
-      }
-
+          return { ...session, taskTitle };
+        })
+      );
       setSessionsWithTitles(sessionsWithTitlesTemp);
     }
 
@@ -107,7 +101,7 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
 
   if (sessions.length === 0) {
     return (
-      <div className="glass-surface p-6">
+      <div className="bg-transparent border border-focus/30 rounded-xl p-6">
         <h2 className="text-xl font-display font-semibold text-txt-primary mb-4">
           Today's Sessions
         </h2>
@@ -119,14 +113,14 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
   }
 
   return (
-    <div className="glass-surface p-6">
+    <div className="bg-transparent border border-focus/30 rounded-xl p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-display font-semibold text-txt-primary">
           Today's Sessions ({sessions.length})
         </h2>
         <button
           onClick={() => setSessionViewMode(isGrouped ? 'flat' : 'grouped')}
-          className="glass-button text-xs text-txt-muted"
+          className="bg-transparent border border-focus/20 text-txt-muted rounded-xl px-4 py-2 text-xs hover:bg-focus/5 transition-all"
         >
           {isGrouped ? '⊟ Show Flat' : '⊞ Group by Task'}
         </button>
@@ -142,7 +136,7 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
             isMerged={session.isMerged}
             sourceCount={session.sourceCount}
           >
-            <div className="p-4 bg-glass-bg rounded-xl border border-glass-border hover:border-glass-hover transition-colors">
+            <div className="p-4 bg-focus/5 rounded-xl border border-focus/20 hover:border-focus/30 transition-colors">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   {/* Duration Badge */}
@@ -153,7 +147,7 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
                   {/* Task ID and Title */}
                   {session.task_id && (
                     <div className="flex flex-col gap-1">
-                      <div className="px-3 py-1 bg-glass-bg border border-glass-border text-txt-secondary text-sm font-mono font-medium rounded-full">
+                      <div className="px-3 py-1 bg-focus/5 border border-focus/20 text-txt-secondary text-sm font-mono font-medium rounded-full">
                         #{session.task_id}
                       </div>
                       {session.taskTitle && (
@@ -187,7 +181,7 @@ export default function SessionHistory({ sessions }: SessionHistoryProps) {
       </div>
 
       {/* Summary */}
-      <div className="mt-6 pt-4 border-t border-glass-border">
+      <div className="mt-6 pt-4 border-t border-focus/20">
         <div className="flex justify-between text-sm">
           <span className="text-txt-secondary">Total focus time:</span>
           <span className="font-display font-semibold text-txt-primary">

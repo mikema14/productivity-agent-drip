@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import type { LogEntry } from '../../stores/logStore';
 import type { MergedEntry } from '../../utils/mergeEntries';
 import TaskIdInput from '../shared/TaskIdInput';
@@ -14,7 +14,7 @@ interface EntryRowProps {
   inTimeline?: boolean;  // Adjusts styling when in timeline
 }
 
-export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAccept, onDismiss, inTimeline = false }: EntryRowProps) {
+function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAccept, onDismiss, inTimeline = false }: EntryRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedEntry, setEditedEntry] = useState(entry);
 
@@ -282,3 +282,17 @@ export default function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAcc
     </div>
   );
 }
+
+export default memo(EntryRow, (prev, next) =>
+  prev.entry.id              === next.entry.id &&
+  prev.entry.source          === next.entry.source &&
+  prev.entry.type            === next.entry.type &&
+  prev.entry.title           === next.entry.title &&
+  prev.entry.taskId          === next.entry.taskId &&
+  prev.entry.durationMinutes === next.entry.durationMinutes &&
+  prev.entry.comment         === next.entry.comment &&
+  prev.entry.billable        === next.entry.billable &&
+  prev.entry.markedToLog     === next.entry.markedToLog &&
+  prev.entry.logged          === next.entry.logged &&
+  prev.entry.isProposal      === next.entry.isProposal
+);

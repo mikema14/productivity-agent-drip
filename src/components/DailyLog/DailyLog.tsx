@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useLogStore } from '../../stores/logStore';
 import { useShutdownStore } from '../../stores/shutdownStore';
 import EntryRow from './EntryRow';
@@ -11,6 +11,12 @@ import TimelineItem from '../shared/TimelineItem';
 import EndDayModal from './EndDayModal';
 import { mergeEntriesByTaskId } from '../../utils/mergeEntries';
 import { forceSyncCalendar, getLastSyncTime } from '../../services/calendar';
+
+const formatTotalTime = (minutes: number) => {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours}h ${mins}m`;
+};
 
 export default function DailyLog() {
   const {
@@ -176,6 +182,24 @@ export default function DailyLog() {
     deleteEntry(entryId);
   };
 
+  // Stable refs — always point to the latest handler without changing identity
+  const handleUpdateMergedRef    = useRef(handleUpdateMerged);
+  const handleDeleteMergedRef    = useRef(handleDeleteMerged);
+  const handleToggleLogMergedRef = useRef(handleToggleLogMerged);
+  const handleAcceptProposalRef  = useRef(handleAcceptProposal);
+  const handleDismissProposalRef = useRef(handleDismissProposal);
+  handleUpdateMergedRef.current    = handleUpdateMerged;
+  handleDeleteMergedRef.current    = handleDeleteMerged;
+  handleToggleLogMergedRef.current = handleToggleLogMerged;
+  handleAcceptProposalRef.current  = handleAcceptProposal;
+  handleDismissProposalRef.current = handleDismissProposal;
+
+  const stableUpdate  = useCallback((id: string, changes: any) => handleUpdateMergedRef.current(id, changes), []);
+  const stableDelete  = useCallback((id: string)               => handleDeleteMergedRef.current(id),          []);
+  const stableToggle  = useCallback((id: string)               => handleToggleLogMergedRef.current(id),       []);
+  const stableAccept  = useCallback((id: string)               => handleAcceptProposalRef.current(id),        []);
+  const stableDismiss = useCallback((id: string)               => handleDismissProposalRef.current(id),       []);
+
   const handleLogSelected = async () => {
     setIsLogging(true);
     try {
@@ -248,85 +272,83 @@ export default function DailyLog() {
     });
   };
 
-  const workEntries = mergedEntries.filter(e => e.source !== 'break');
-  const breakEntries = mergedEntries.filter(e => e.source === 'break');
-  const totalDuration = workEntries.reduce((sum, entry) => sum + entry.durationMinutes, 0);
-  const totalBreakMinutes = breakEntries.reduce((sum, entry) => sum + entry.durationMinutes, 0);
-  const markedCount = mergedEntries.filter(e => e.markedToLog && !e.logged).length;
-  const loggedCount = mergedEntries.filter(e => e.logged).length;
-  const toggleableCount = mergedEntries.filter(e => !e.logged && !e.isProposal && e.source !== 'break').length;
-  const allSelected = toggleableCount > 0 && markedCount === toggleableCount;
-
-  const formatTotalTime = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
-  };
+  const {
+    workEntries, breakEntries, totalDuration, totalBreakMinutes,
+    markedCount, loggedCount, toggleableCount, allSelected
+  } = useMemo(() => {
+    const workEntries = mergedEntries.filter(e => e.source !== 'break');
+    const breakEntries = mergedEntries.filter(e => e.source === 'break');
+    const totalDuration = workEntries.reduce((sum, e) => sum + e.durationMinutes, 0);
+    const totalBreakMinutes = breakEntries.reduce((sum, e) => sum + e.durationMinutes, 0);
+    const markedCount = mergedEntries.filter(e => e.markedToLog && !e.logged).length;
+    const loggedCount = mergedEntries.filter(e => e.logged).length;
+    const toggleableCount = mergedEntries.filter(e => !e.logged && !e.isProposal && e.source !== 'break').length;
+    const allSelected = toggleableCount > 0 && markedCount === toggleableCount;
+    return { workEntries, breakEntries, totalDuration, totalBreakMinutes, markedCount, loggedCount, toggleableCount, allSelected };
+  }, [mergedEntries]);
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header - Simplified single row */}
-      <div className="flex-none px-6 py-4 border-b border-focus/20">
-        <div className="flex items-center justify-between">
-          {/* Left: Title + Date Navigation */}
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-display font-semibold text-txt-primary">Daily Log</h1>
-            <div className="flex items-center gap-1">
+      {/* Header */}
+      <div className="px-8 pt-8 pb-6">
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-2xl font-display font-bold text-txt-primary tracking-tight">Daily Log</h1>
+          <div className="h-px flex-1 bg-gradient-to-r from-focus/20 to-transparent" />
+          {/* Date navigation */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => handleDateChange(-1)}
+              className="px-2 py-1 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary transition-all"
+            >
+              ←
+            </button>
+            <button
+              onClick={goToToday}
+              className="px-3 py-1 text-txt-secondary text-sm rounded-xl hover:bg-focus/5 flex items-center gap-1.5 transition-all"
+            >
+              <span>{formatDate(selectedDate)}</span>
               <button
-                onClick={() => handleDateChange(-1)}
-                className="px-2 py-1 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary transition-all"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSyncCalendar();
+                }}
+                disabled={isSyncing}
+                className="text-txt-muted hover:text-txt-primary disabled:opacity-50"
+                title={isSyncing ? 'Syncing calendar...' : 'Sync calendar'}
               >
-                ←
+                <span className={isSyncing ? 'animate-spin' : ''}>🔄</span>
               </button>
-              <button
-                onClick={goToToday}
-                className="px-3 py-1 text-txt-secondary text-sm rounded-xl hover:bg-focus/5 flex items-center gap-1.5 transition-all"
-              >
-                <span>{formatDate(selectedDate)}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSyncCalendar();
-                  }}
-                  disabled={isSyncing}
-                  className="text-txt-muted hover:text-txt-primary disabled:opacity-50"
-                  title={isSyncing ? 'Syncing calendar...' : 'Sync calendar'}
-                >
-                  <span className={isSyncing ? 'animate-spin' : ''}>🔄</span>
-                </button>
-              </button>
-              <button
-                onClick={() => handleDateChange(1)}
-                className="px-2 py-1 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary transition-all"
-              >
-                →
-              </button>
-            </div>
-          </div>
-
-          {/* Right: Stats as plain text */}
-          <div className="flex items-center gap-2 text-sm text-txt-muted">
-            <span className="font-medium">Total: {formatTotalTime(totalDuration)}</span>
-            {totalBreakMinutes > 0 && (
-              <>
-                <span>·</span>
-                <span className="text-emerald-400">{totalBreakMinutes}m break</span>
-              </>
-            )}
-            {markedCount > 0 && (
-              <>
-                <span>·</span>
-                <span className="text-focus">{markedCount} to log</span>
-              </>
-            )}
-            {loggedCount > 0 && (
-              <>
-                <span>·</span>
-                <span className="text-emerald-400">{loggedCount} logged</span>
-              </>
-            )}
+            </button>
+            <button
+              onClick={() => handleDateChange(1)}
+              className="px-2 py-1 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary transition-all"
+            >
+              →
+            </button>
           </div>
         </div>
+        {/* Stats subtitle */}
+        <p className="text-txt-dim text-sm mt-1 font-display flex items-center gap-2">
+          <span>Total: {formatTotalTime(totalDuration)}</span>
+          {totalBreakMinutes > 0 && (
+            <>
+              <span>·</span>
+              <span className="text-emerald-400">{totalBreakMinutes}m break</span>
+            </>
+          )}
+          {markedCount > 0 && (
+            <>
+              <span>·</span>
+              <span className="text-focus">{markedCount} to log</span>
+            </>
+          )}
+          {loggedCount > 0 && (
+            <>
+              <span>·</span>
+              <span className="text-emerald-400">{loggedCount} logged</span>
+            </>
+          )}
+        </p>
       </div>
 
       {/* Content */}
@@ -384,11 +406,11 @@ export default function DailyLog() {
                       <EntryRow
                         entry={entry}
                         inTimeline={true}
-                        onUpdate={handleUpdateMerged}
-                        onDelete={handleDeleteMerged}
-                        onToggleLog={handleToggleLogMerged}
-                        onAccept={handleAcceptProposal}
-                        onDismiss={handleDismissProposal}
+                        onUpdate={stableUpdate}
+                        onDelete={stableDelete}
+                        onToggleLog={stableToggle}
+                        onAccept={stableAccept}
+                        onDismiss={stableDismiss}
                       />
                     </TimelineItem>
                   ))}
