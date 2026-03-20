@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useTimerStore } from '../../stores/timerStore';
 import { formatTime } from '../../utils/time';
+import { useTaskName } from '../../hooks/useTaskName';
 import TimerControls from './TimerControls';
 import TimerDayTimeline from './TimerDayTimeline';
 import TaskIdInput from '../shared/TaskIdInput';
@@ -9,6 +10,9 @@ import DailyIntentionBanner from '../shared/DailyIntentionBanner';
 import BoundaryConfirmDialog from './BoundaryConfirmDialog';
 import TimerTaskList from '../Lists/TimerTaskList';
 import type { PomodoroSession, CalendarProposal, AdhocEntry } from '../../types';
+
+const formatTimeRange = (date: Date) =>
+  `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
 
 export default function Timer() {
   const {
@@ -45,6 +49,9 @@ export default function Timer() {
   const [enableBoundaryCheck, setEnableBoundaryCheck] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [rightPanel, setRightPanel] = useState<'timeline' | 'tasks'>('timeline');
+
+  // Resolve task name from cache/API for running state display
+  const resolvedTaskName = useTaskName(status !== 'idle' ? currentTaskId : null);
 
   // Track session start time for time range display
   useEffect(() => {
@@ -183,6 +190,10 @@ export default function Timer() {
 
     if (lastSession.task_id) {
       setTaskInput(lastSession.task_id);
+      // Resolve task name from cache
+      window.logAPI.getCachedTask(lastSession.task_id).then(task => {
+        if (task?.title) setTaskTitle(task.title);
+      });
     }
     if (lastSession.comment) {
       setIntention(lastSession.comment);
@@ -191,43 +202,54 @@ export default function Timer() {
     startFocus(lastSession.task_id || undefined);
   };
 
-  // Progress ring calculations
-  const ringSize = 280;
-  const ringRadius = 130;
+  // Progress ring calculations — enlarged
+  const ringSize = 360;
+  const ringRadius = 166;
   const cx = ringSize / 2;
   const cy = ringSize / 2;
   const circumference = 2 * Math.PI * ringRadius;
+
+  const tickMarks = useMemo(() =>
+    Array.from({ length: 60 }).map((_, i) => {
+      const angle = (i * 6 - 90) * (Math.PI / 180);
+      const isHour = i % 5 === 0;
+      const inner = ringRadius - (isHour ? 15 : 8);
+      const outer = ringRadius - 3;
+      return (
+        <line
+          key={i}
+          x1={cx + inner * Math.cos(angle)}
+          y1={cy + inner * Math.sin(angle)}
+          x2={cx + outer * Math.cos(angle)}
+          y2={cy + outer * Math.sin(angle)}
+          stroke={isHour ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)'}
+          strokeWidth={isHour ? 2 : 1}
+          strokeLinecap="round"
+        />
+      );
+    })
+  , []);
   const progress = totalDuration > 0 ? remainingSeconds / totalDuration : 0;
   const strokeDashoffset = circumference * (1 - progress);
 
-  const ringStroke =
-    status === 'focus' ? '#f59e0b'
-    : status === 'break' ? '#34d399'
-    : '#f59e0b';
-
-  const glowColor =
-    status === 'focus' ? 'rgba(245, 158, 11, 0.25)'
-    : status === 'break' ? 'rgba(52, 211, 153, 0.25)'
-    : 'rgba(100, 116, 139, 0.1)';
-
-  const statusDisplay =
-    status === 'focus'
-      ? 'Focusing'
-      : status === 'break'
-      ? 'Break'
-      : 'Ready';
-
-  const statusColor =
-    status === 'focus'
-      ? 'text-focus bg-focus-muted'
-      : status === 'break'
-      ? 'text-break bg-break-muted'
-      : 'text-idle bg-focus/5';
-
-  // Time range display
-  const formatTimeRange = (date: Date) => {
-    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-  };
+  const { ringStroke, glowColor, statusDisplay, statusColor } = useMemo(() => ({
+    ringStroke:
+      status === 'focus' ? '#f59e0b'
+      : status === 'break' ? '#34d399'
+      : '#f59e0b',
+    glowColor:
+      status === 'focus' ? 'rgba(245, 158, 11, 0.25)'
+      : status === 'break' ? 'rgba(52, 211, 153, 0.25)'
+      : 'rgba(100, 116, 139, 0.1)',
+    statusDisplay:
+      status === 'focus' ? 'Focusing'
+      : status === 'break' ? 'Break'
+      : 'Ready',
+    statusColor:
+      status === 'focus' ? 'text-focus bg-focus-muted'
+      : status === 'break' ? 'text-break bg-break-muted'
+      : 'text-idle bg-focus/5',
+  }), [status]);
 
   const estimatedEnd = sessionStartTime
     ? new Date(sessionStartTime.getTime() + totalDuration * 1000)
@@ -237,50 +259,60 @@ export default function Timer() {
     <div className="flex h-full animate-fade-in">
       {/* LEFT PANEL: Timer */}
       <div className="w-1/2 flex flex-col overflow-y-auto">
-        <div className="max-w-lg mx-auto w-full px-6 py-4 space-y-6">
+        <div className="max-w-xl mx-auto w-full px-6 pt-4 pb-4 space-y-4">
           {/* Header */}
-          <div>
-            <h1 className="text-2xl font-display font-semibold text-txt-primary">What's your focus?</h1>
+          <div className="pb-2">
+            <div className="flex items-baseline gap-3">
+              <h1 className="text-2xl font-display font-bold text-txt-primary tracking-tight">
+                {status === 'focus' ? 'Deep work' : status === 'break' ? 'Break' : 'Focus'}
+              </h1>
+              <div className="h-px flex-1 bg-gradient-to-r from-focus/20 to-transparent" />
+            </div>
+            {status === 'idle' && (
+              <p className="text-txt-dim text-sm mt-1 font-display">Start your session</p>
+            )}
           </div>
 
           {/* Daily Intention Banner */}
           <DailyIntentionBanner />
 
-          {/* Continue Previous Session Button */}
-          {status === 'idle' && lastSession && (
-            <div>
+          {/* Continue Previous Session Button — fixed height slot to prevent layout jump */}
+          {status === 'idle' && (
+          <div className="h-[44px]">
+            {lastSession && (
               <button
                 onClick={handleContinuePrevious}
-                className="w-full px-4 py-3 bg-focus/10 border border-focus/20
-                         text-txt-secondary rounded-xl font-display hover:bg-focus/15
-                         flex items-center justify-center gap-2"
+                className="w-full px-4 py-2 bg-focus/5 border border-focus/15
+                         text-txt-muted rounded-xl font-display text-sm hover:bg-focus/10 hover:text-txt-secondary
+                         flex items-center justify-center gap-2 transition-all duration-150"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                <span>Continue Previous Session</span>
+                <span>Continue</span>
                 {lastSession.task_id && (
-                  <span className="text-focus font-mono text-sm">#{lastSession.task_id}</span>
+                  <span className="text-focus font-mono text-xs">{lastSession.task_id}</span>
                 )}
                 {lastSession.comment && (
-                  <span className="text-sm text-txt-muted italic truncate max-w-xs">
-                    "{lastSession.comment}"
+                  <span className="text-xs text-txt-dim italic truncate max-w-[180px]">
+                    {lastSession.comment}
                   </span>
                 )}
               </button>
-            </div>
+            )}
+          </div>
           )}
 
           {/* Timer Display Card */}
-          <div className="relative py-8">
+          <div className="relative py-6">
             {/* Ambient glow */}
             <div
-              className="ambient-glow w-64 h-64 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 animate-glow-breathe"
+              className="ambient-glow w-80 h-80 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 animate-glow-breathe"
               style={{ backgroundColor: glowColor }}
             />
 
-            <div className="text-center space-y-6 relative z-10">
+            <div className="text-center space-y-4 relative z-10">
               {/* Status Badge */}
               <div className="flex items-center justify-center">
                 <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${statusColor}`}>
@@ -298,24 +330,7 @@ export default function Timer() {
               <div className="relative inline-flex items-center justify-center">
                 <svg width={ringSize} height={ringSize} className="transform">
                   {/* Tick marks */}
-                  {Array.from({ length: 60 }).map((_, i) => {
-                    const angle = (i * 6 - 90) * (Math.PI / 180);
-                    const isHour = i % 5 === 0;
-                    const inner = ringRadius - (isHour ? 15 : 8);
-                    const outer = ringRadius - 3;
-                    return (
-                      <line
-                        key={i}
-                        x1={cx + inner * Math.cos(angle)}
-                        y1={cy + inner * Math.sin(angle)}
-                        x2={cx + outer * Math.cos(angle)}
-                        y2={cy + outer * Math.sin(angle)}
-                        stroke={isHour ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)'}
-                        strokeWidth={isHour ? 2 : 1}
-                        strokeLinecap="round"
-                      />
-                    );
-                  })}
+                  {tickMarks}
                   {/* Background track */}
                   <circle
                     cx={cx}
@@ -323,7 +338,7 @@ export default function Timer() {
                     r={ringRadius}
                     fill="none"
                     stroke="rgba(255, 255, 255, 0.04)"
-                    strokeWidth="4"
+                    strokeWidth="6"
                   />
                   {/* Foreground arc */}
                   <circle
@@ -332,7 +347,7 @@ export default function Timer() {
                     r={ringRadius}
                     fill="none"
                     stroke={ringStroke}
-                    strokeWidth="4"
+                    strokeWidth="6"
                     strokeLinecap="round"
                     strokeDasharray={circumference}
                     strokeDashoffset={strokeDashoffset}
@@ -340,9 +355,26 @@ export default function Timer() {
                     style={{ opacity: status === 'idle' ? 0.2 : 0.8 }}
                   />
                 </svg>
-                {/* Time digits inside ring */}
+                {/* Content inside ring */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="text-7xl font-mono font-semibold text-txt-primary timer-digit">
+                  {/* +5 min pill */}
+                  {status === 'focus' && !isPaused && (
+                    <button
+                      onClick={() => extendSession(5)}
+                      className="text-[10px] font-mono text-txt-dim border border-focus/15 rounded-full px-2.5 py-0.5 mb-1
+                               hover:text-focus hover:border-focus/30 hover:bg-focus/5 transition-all duration-150"
+                    >
+                      +5 min
+                    </button>
+                  )}
+                  {/* Time range inside ring */}
+                  {status !== 'idle' && sessionStartTime && estimatedEnd && (
+                    <span className="font-mono text-xs text-txt-dim mb-1">
+                      {formatTimeRange(sessionStartTime)} → {formatTimeRange(estimatedEnd)}
+                    </span>
+                  )}
+                  {/* Countdown digits */}
+                  <div className="text-[5.5rem] leading-none font-mono font-semibold text-txt-primary timer-digit">
                     {formatTime(remainingSeconds)}
                   </div>
                   {/* Session counter dots */}
@@ -356,82 +388,53 @@ export default function Timer() {
                 </div>
               </div>
 
-              {/* Time Range Display */}
-              {status !== 'idle' && sessionStartTime && estimatedEnd && (
-                <div className="flex justify-center">
-                  <div className="text-sm text-txt-muted font-mono bg-focus/5 border border-focus/20 rounded-full px-4 py-1 inline-block">
-                    {formatTimeRange(sessionStartTime)} &rarr; {formatTimeRange(estimatedEnd)}
+              {/* Below-ring zone — fixed height to prevent layout shift */}
+              <div className="min-h-[160px] flex flex-col items-center justify-start">
+                {/* Task info (when running) — framed card matching idle style */}
+                {status !== 'idle' && (currentTaskId || intention) && (
+                  <div className="max-w-sm mx-auto w-full px-4 py-3 bg-focus/5 border border-focus/20 rounded-xl space-y-1">
+                    {currentTaskId && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-focus text-base shrink-0">{currentTaskId}</span>
+                        {resolvedTaskName && (
+                          <span className="text-txt-secondary text-base truncate">{resolvedTaskName}</span>
+                        )}
+                      </div>
+                    )}
+                    {intention && (
+                      <span className="text-txt-secondary text-sm truncate block">{intention}</span>
+                    )}
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Task ID Input (only when idle) */}
-              {status === 'idle' && (
-                <div className="max-w-sm mx-auto space-y-4">
-                  <div>
-                    <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2 text-left">
-                      Task ID
-                    </label>
+                {/* Task ID Input (only when idle) */}
+                {status === 'idle' && (
+                  <div className="max-w-sm mx-auto space-y-2.5 w-full">
                     <TaskIdInput
                       value={taskInput}
                       onChange={setTaskInput}
                       onTaskSelect={handleTaskSelect}
-                      placeholder="e.g., 643749"
+                      placeholder="Task ID"
                     />
                     {taskTitle && (
-                      <p className="text-sm text-txt-secondary mt-1 text-left">
+                      <p className="text-sm text-txt-secondary text-left">
                         {taskTitle}
                       </p>
                     )}
-                  </div>
-
-                  <div>
-                    <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2 text-left">
-                      Intention
-                    </label>
                     <input
                       value={intention}
                       onChange={e => setIntention(e.target.value)}
-                      placeholder="What will you accomplish?"
-                      className="w-full px-4 py-2.5 bg-transparent border border-focus/30 rounded-xl
-                               text-txt-primary placeholder-txt-dim
+                      placeholder="Session note"
+                      className="w-full px-3 py-2 bg-transparent border border-focus/30 rounded-xl
+                               text-txt-primary text-sm placeholder-txt-dim
                                focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
                     />
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Current Task Display (when running) */}
-              {status !== 'idle' && currentTaskId && (
-                <div className="flex items-center justify-center gap-2">
-                  <span className="font-mono text-focus bg-focus-muted px-3 py-1 rounded-full text-sm">
-                    #{currentTaskId}
-                  </span>
-                </div>
-              )}
-
-              {/* Intention Display (when running) */}
-              {status !== 'idle' && intention && (
-                <div className="text-sm text-txt-secondary">
-                  {intention}
-                </div>
-              )}
-
-              {/* Extend Session Button (when in focus) */}
-              {status === 'focus' && !isPaused && (
-                <div className="pt-1">
-                  <button
-                    onClick={() => extendSession(5)}
-                    className="px-4 py-2 bg-focus/10 border border-focus/20 text-txt-muted rounded-full text-xs hover:bg-focus/15 hover:text-focus transition-all"
-                  >
-                    +5 min
-                  </button>
-                </div>
-              )}
-
-              {/* Timer Controls */}
-              <div className="pt-4">
-                <TimerControls
+                {/* Timer Controls */}
+                <div className="pt-4">
+                  <TimerControls
                   status={status}
                   isPaused={isPaused}
                   onStart={handleStart}
@@ -439,8 +442,9 @@ export default function Timer() {
                   onResume={handleResume}
                   onSkip={handleSkip}
                   onCancel={handleCancel}
-                  onFinishEarly={handleFinishEarly}
-                />
+                    onFinishEarly={handleFinishEarly}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -481,12 +485,15 @@ export default function Timer() {
           </div>
         ) : (
           <TimerTaskList
-            onSelectTask={(taskId, intention) => {
+            onSelectTask={(taskId, itemTitle) => {
               if (taskId) {
                 setTaskInput(taskId);
-                setTaskTitle(intention);
+                // Resolve real task name from cache, don't use item title
+                window.logAPI.getCachedTask(taskId).then(task => {
+                  if (task?.title) setTaskTitle(task.title);
+                });
               }
-              setIntention(intention);
+              setIntention(itemTitle);
             }}
           />
         )}

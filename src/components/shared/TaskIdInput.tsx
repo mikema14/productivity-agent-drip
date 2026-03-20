@@ -134,8 +134,8 @@ export default function TaskIdInput({ value, onChange, onTaskSelect, placeholder
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="w-full px-4 py-2.5 bg-transparent border border-focus/30 rounded-xl
-                   text-txt-primary placeholder-txt-dim
+        className="w-full px-3 py-2 bg-transparent border border-focus/30 rounded-xl
+                   text-txt-primary text-sm placeholder-txt-dim
                    focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
       />
 
