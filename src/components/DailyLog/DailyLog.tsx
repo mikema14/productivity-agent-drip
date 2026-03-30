@@ -9,6 +9,7 @@ import ViewToggle from './ViewToggle';
 import TimelineView from './TimelineView';
 import TimelineItem from '../shared/TimelineItem';
 import EndDayModal from './EndDayModal';
+import CalendarPopover from './CalendarPopover';
 import { mergeEntriesByTaskId } from '../../utils/mergeEntries';
 import { forceSyncCalendar, getLastSyncTime } from '../../services/calendar';
 
@@ -47,6 +48,7 @@ export default function DailyLog() {
   const [successCount, setSuccessCount] = useState(0);
   const [isGrouped, setIsGrouped] = useState(false);
   const [dayLocked, setDayLocked] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   // Auto-dismiss toast after 10 seconds
   useEffect(() => {
@@ -96,10 +98,6 @@ export default function DailyLog() {
     const date = new Date(selectedDate);
     date.setDate(date.getDate() + days);
     setSelectedDate(date.toISOString().split('T')[0]);
-  };
-
-  const goToToday = () => {
-    setSelectedDate(new Date().toISOString().split('T')[0]);
   };
 
   const handleAddEntry = async (entry: any) => {
@@ -302,22 +300,41 @@ export default function DailyLog() {
             >
               ←
             </button>
-            <button
-              onClick={goToToday}
-              className="px-3 py-1 text-txt-secondary text-sm rounded-xl hover:bg-focus/5 flex items-center gap-1.5 transition-all"
-            >
-              <span>{formatDate(selectedDate)}</span>
+            <div className="relative">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSyncCalendar();
-                }}
-                disabled={isSyncing}
-                className="text-txt-muted hover:text-txt-primary disabled:opacity-50"
-                title={isSyncing ? 'Syncing calendar...' : 'Sync calendar'}
+                onClick={() => setShowCalendar(!showCalendar)}
+                className="px-3 py-1 text-txt-secondary text-sm rounded-xl hover:bg-focus/5 flex items-center gap-1.5 transition-all"
               >
-                <span className={isSyncing ? 'animate-spin' : ''}>🔄</span>
+                <span>{formatDate(selectedDate)}</span>
+                <svg
+                  width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"
+                  strokeWidth="1.5" strokeLinecap="round"
+                  className={`text-txt-dim transition-transform ${showCalendar ? 'rotate-180' : ''}`}
+                >
+                  <path d="M2 4L5 7L8 4" />
+                </svg>
               </button>
+              {showCalendar && (
+                <CalendarPopover
+                  selectedDate={selectedDate}
+                  onSelectDate={(date) => {
+                    setSelectedDate(date);
+                    setShowCalendar(false);
+                  }}
+                  onClose={() => setShowCalendar(false)}
+                />
+              )}
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSyncCalendar();
+              }}
+              disabled={isSyncing}
+              className="px-1.5 py-1 text-txt-muted hover:text-txt-primary hover:bg-focus/5 rounded-xl disabled:opacity-50 transition-all"
+              title={isSyncing ? 'Syncing calendar...' : 'Sync calendar'}
+            >
+              <span className={`text-sm ${isSyncing ? 'animate-spin inline-block' : ''}`}>🔄</span>
             </button>
             <button
               onClick={() => handleDateChange(1)}
