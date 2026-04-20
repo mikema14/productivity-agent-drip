@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useListsStore } from '../../stores/listsStore';
 import DraggableItem from './DraggableItem';
 import TaskDetailInline from './TaskDetailInline';
+import TaskIdBadge from '../shared/TaskIdBadge';
+import { resolveTaskNames } from '../../hooks/useTaskName';
 import type { ListItemColumn, ListItem, Subtask } from '../../types';
 import {
   DndContext,
@@ -43,6 +45,10 @@ export default function AllListsOverview() {
   const [activeListFilters, setActiveListFilters] = useState<Set<string>>(new Set());
   const [groupByList, setGroupByList] = useState<boolean>(false);
   const [openListPickerId, setOpenListPickerId] = useState<string | null>(null);
+  const [taskNames, setTaskNames] = useState<Record<string, string>>({});
+  const [showTaskIds, setShowTaskIds] = useState<boolean>(() =>
+    localStorage.getItem('allListsOverview_showTaskIds') === 'true'
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -52,6 +58,14 @@ export default function AllListsOverview() {
     loadLists();
     loadItems();
   }, []);
+
+  useEffect(() => {
+    const ids = items.filter(i => i.task_id && !taskNames[i.task_id]).map(i => i.task_id!);
+    if (ids.length === 0) return;
+    resolveTaskNames([...new Set(ids)]).then(names => {
+      if (Object.keys(names).length > 0) setTaskNames(prev => ({ ...prev, ...names }));
+    });
+  }, [items]);
 
   // Close list picker on outside click
   useEffect(() => {
@@ -115,6 +129,14 @@ export default function AllListsOverview() {
     setShowDone(prev => {
       const next = !prev;
       localStorage.setItem('allListsOverview_showDone', String(next));
+      return next;
+    });
+  };
+
+  const handleToggleTaskIds = () => {
+    setShowTaskIds(prev => {
+      const next = !prev;
+      localStorage.setItem('allListsOverview_showTaskIds', String(next));
       return next;
     });
   };
@@ -196,6 +218,13 @@ export default function AllListsOverview() {
             >
               {item.title}
             </button>
+            {showTaskIds && item.task_id && (
+              <TaskIdBadge
+                taskId={item.task_id}
+                taskName={taskNames[item.task_id] || null}
+                className="ml-1 text-xs text-focus/70 bg-focus/5 px-1.5 py-0.5 rounded"
+              />
+            )}
 
             {/* List tag — only in flat view */}
             {!groupByList && list && (
@@ -373,6 +402,20 @@ export default function AllListsOverview() {
               <path d="M3.5 6l1.5 1.5L8.5 4" />
             </svg>
             Done
+          </button>
+          {/* Task IDs toggle */}
+          <button
+            onClick={handleToggleTaskIds}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-display transition-colors shrink-0 ${
+              showTaskIds
+                ? 'bg-focus/15 text-txt-primary border border-focus/30'
+                : 'bg-drip-surface text-txt-muted hover:text-txt-secondary hover:bg-focus/5'
+            }`}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M4 1v10M8 1v10M1 4h10M1 8h10" />
+            </svg>
+            IDs
           </button>
         </div>
 
