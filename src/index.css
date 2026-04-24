@@ -4,10 +4,6 @@
 
 /* Base styles */
 @layer base {
-  * {
-    @apply border-glass-border;
-  }
-
   body {
     @apply bg-drip-bg text-txt-primary font-display;
     -webkit-font-smoothing: antialiased;
@@ -17,23 +13,25 @@
 
 /* Component classes */
 @layer components {
-  .glass-surface {
-    @apply bg-drip-surface/60 backdrop-blur-xl border border-glass-border rounded-2xl shadow-glass;
-  }
-
-  .glass-surface-elevated {
-    @apply bg-drip-bg/95 backdrop-blur-2xl border border-glass-border rounded-2xl shadow-glass;
-  }
-
-  .glass-button {
-    @apply px-4 py-2 bg-glass-bg border border-glass-border rounded-xl
-           hover:bg-glass-hover transition-all duration-200
-           backdrop-blur-sm;
-  }
-
   .timer-digit {
     @apply font-mono tabular-nums;
     transition: color 0.3s ease;
+  }
+
+  /* Focus panel large timer display */
+  .focus-timer-display {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    font-size: 86px;
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    color: #f0f0f2;
+  }
+
+  /* Running LED indicator */
+  .led-running {
+    animation: led-pulse 1.6s ease-in-out infinite;
   }
 
   .ambient-glow {
@@ -115,6 +113,32 @@ textarea:focus-visible {
 button {
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* Picker list — thin scrollbar */
+.picker-list {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(1 0 0 / 0.15) transparent;
+}
+.picker-list::-webkit-scrollbar { width: 4px; }
+.picker-list::-webkit-scrollbar-thumb {
+  background: oklch(1 0 0 / 0.15);
+  border-radius: 4px;
+}
+
+/* Colon blink while timer is running */
+@keyframes colon-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.colon-blink {
+  animation: colon-blink 1s step-end infinite;
+}
+
+/* LED pulse for Focusing pill */
+@keyframes led-pulse {
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(245, 158, 11, 0.7); }
+  50% { box-shadow: 0 0 10px 2px rgba(245, 158, 11, 0.3); }
 }
 
 /* Custom animations */
