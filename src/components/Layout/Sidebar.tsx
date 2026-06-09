@@ -1,5 +1,7 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useListsStore } from '../../stores/listsStore';
+import { useIntentionsStore } from '../../stores/intentionsStore';
+import SetIntentionModal from '../shared/SetIntentionModal';
 
 interface SidebarProps {
   onNavigate: (view: string) => void;
@@ -79,8 +81,13 @@ export default function Sidebar({ onNavigate, currentView, collapsed, onToggle, 
   ];
 
   const { lists, archivedLists, loadLists, selectedListId, selectList, showArchivedLists, toggleShowArchivedLists, unarchiveList } = useListsStore();
+  const today = new Date().toISOString().split('T')[0];
+  const { getIntentions, loadDay, addIntention, removeIntention } = useIntentionsStore();
+  const intentions = getIntentions(today);
+  const [showIntentionModal, setShowIntentionModal] = useState(false);
 
   useEffect(() => { loadLists(); }, []);
+  useEffect(() => { loadDay(today); }, [today]);
 
   const handleListClick = (listId: string) => {
     selectList(listId);
@@ -93,7 +100,8 @@ export default function Sidebar({ onNavigate, currentView, collapsed, onToggle, 
   };
 
   return (
-    <div className={`${collapsed ? 'w-[76px]' : 'w-64'} bg-drip-surface/60 backdrop-blur-xl border-r border-glass-border text-txt-primary h-screen flex flex-col overflow-hidden transition-all duration-200`}>
+    <>
+    <div className={`${collapsed ? 'w-[76px]' : 'w-64'} bg-drip-bg/80 backdrop-blur-xl border-r border-focus/20 text-txt-primary h-screen flex flex-col overflow-hidden transition-all duration-200`}>
       {/* Titlebar header */}
       {collapsed ? (
         <div className="h-[68px] flex items-end pb-2 shrink-0 pl-[33px]" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
@@ -130,15 +138,44 @@ export default function Sidebar({ onNavigate, currentView, collapsed, onToggle, 
         </ul>
       </nav>
 
+      {/* Set Intention button */}
+      {!collapsed && (
+        <div className="px-3 pb-2">
+          <button
+            onClick={() => setShowIntentionModal(true)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-txt-muted hover:text-txt-secondary hover:bg-white/[0.05] transition-all duration-200"
+          >
+            <span className="text-sm shrink-0">🎯</span>
+            <span className="font-normal font-display text-[13px] whitespace-nowrap truncate flex-1 text-left">
+              {intentions.length > 0 ? intentions[0] : 'Set intention'}
+            </span>
+            {intentions.length > 0 && (
+              <span className="text-xs text-focus shrink-0">Edit</span>
+            )}
+          </button>
+        </div>
+      )}
+      {collapsed && (
+        <div className="px-3 pb-2 flex justify-center">
+          <button
+            onClick={() => setShowIntentionModal(true)}
+            title="Set intention"
+            className="w-9 h-9 flex items-center justify-center rounded-md text-txt-muted hover:text-txt-secondary hover:bg-white/[0.05] transition-colors text-sm"
+          >
+            🎯
+          </button>
+        </div>
+      )}
+
       {/* Lists Section */}
-      <div className="mx-3 border-t border-glass-border" />
+      <div className="mx-3 border-t border-focus/20" />
       <div className="flex-1 overflow-y-auto p-3 pt-2">
         {!collapsed && (
           <div className="flex items-center justify-between mb-1.5 px-3">
             <span className="text-xs uppercase tracking-wider text-txt-muted font-medium">Lists</span>
             <button
               onClick={() => onCreateList()}
-              className="w-5 h-5 flex items-center justify-center rounded-full text-txt-muted hover:text-txt-secondary hover:bg-glass-hover transition-colors"
+              className="w-5 h-5 flex items-center justify-center rounded-full text-txt-muted hover:text-txt-secondary hover:bg-focus/5 transition-colors"
               title="Create list"
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -150,7 +187,7 @@ export default function Sidebar({ onNavigate, currentView, collapsed, onToggle, 
         )}
         {collapsed && (
           <div className="flex justify-center mb-1.5">
-            <button onClick={() => onCreateList()} className="w-5 h-5 flex items-center justify-center rounded-full text-txt-muted hover:text-txt-secondary hover:bg-glass-hover transition-colors" title="Create list">
+            <button onClick={() => onCreateList()} className="w-5 h-5 flex items-center justify-center rounded-full text-txt-muted hover:text-txt-secondary hover:bg-focus/5 transition-colors" title="Create list">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <line x1="6" y1="2" x2="6" y2="10" />
                 <line x1="2" y1="6" x2="10" y2="6" />
@@ -227,5 +264,15 @@ export default function Sidebar({ onNavigate, currentView, collapsed, onToggle, 
       </div>
 
     </div>
+
+      {showIntentionModal && (
+        <SetIntentionModal
+          intentions={intentions}
+          onAdd={(text) => addIntention(today, text)}
+          onRemove={(i) => removeIntention(today, i)}
+          onClose={() => setShowIntentionModal(false)}
+        />
+      )}
+    </>
   );
 }

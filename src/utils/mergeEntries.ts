@@ -61,7 +61,7 @@ export function mergeEntriesByTaskId(entries: LogEntry[]): MergedEntry[] {
       id: `merged-${taskId}`, // Virtual ID
       durationMinutes: totalMinutes,
       comment: comments || group[0].comment,
-      billable: group.some(e => e.billable), // Billable if any source is billable
+      billable: group.every(e => e.billable), // Billable only if every source is billable
       logged: group.every(e => e.logged), // Logged only if ALL sources are logged
       markedToLog: group.some(e => e.markedToLog), // Marked if any source is marked
       isMerged: true,
@@ -121,7 +121,7 @@ export function groupSessionsByTaskId(sessions: PomodoroSession[]): GroupedSessi
       id: `merged-${taskId}`, // Virtual ID
       duration_minutes: totalMinutes,
       comment: comments || group[0].comment,
-      billable: group.some(s => s.billable) ? 1 : 0, // Billable if any source is billable
+      billable: group.every(s => s.billable) ? 1 : 0, // Billable only if every source is billable
       logged: group.every(s => s.logged) ? 1 : 0, // Logged only if ALL sources are logged
       isMerged: true,
       sourceCount: group.length,

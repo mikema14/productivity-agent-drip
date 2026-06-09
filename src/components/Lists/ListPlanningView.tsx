@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useListsStore } from '../../stores/listsStore';
 import { useTaskName, resolveTaskNames } from '../../hooks/useTaskName';
 import TaskIdBadge from '../shared/TaskIdBadge';
+import BillableToggle from '../shared/BillableToggle';
 import AddItemInline from './AddItemInline';
 import DraggableItem from './DraggableItem';
 import TaskDetailInline from './TaskDetailInline';
@@ -39,6 +40,7 @@ export default function ListPlanningView() {
     selectList,
     createItem,
     updateItem,
+    updateList,
     deleteItem,
     moveItem,
     getItemsByColumn,
@@ -70,9 +72,11 @@ export default function ListPlanningView() {
     });
   }, [items]);
 
-  const handleAddItem = async (column: ListItemColumn, title: string, taskId: string | null) => {
+  const handleAddItem = async (column: ListItemColumn, title: string, taskId: string | null, billable?: boolean) => {
     if (!selectedListId) return;
     const columnItems = getItemsByColumn(selectedListId, column);
+    // Inherit the list's billable default unless the add form overrode it.
+    const resolvedBillable = billable ?? (selectedList?.billable !== 0);
     await createItem({
       list_id: selectedListId,
       title,
@@ -84,6 +88,7 @@ export default function ListPlanningView() {
       completed_at: null,
       description: null,
       subtasks: '[]',
+      billable: resolvedBillable ? 1 : 0,
     });
   };
 
@@ -163,28 +168,36 @@ export default function ListPlanningView() {
   return (
     <div className="flex flex-col h-full animate-fade-in">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-glass-border flex items-center gap-3">
-        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedList.color }} />
-        <h1 className="text-xl font-display font-semibold text-txt-primary">{selectedList.name}</h1>
-        {selectedList.task_id && (
-          <TaskIdBadge taskId={selectedList.task_id} taskName={listTaskName} className="text-sm text-focus bg-focus-muted px-2.5 py-0.5 rounded-full" />
-        )}
-        <span className="text-sm text-txt-muted ml-auto">
-          {items.filter(i => i.list_id === selectedListId && !i.archived).length === 0
-            ? 'This list has no tasks'
-            : `${items.filter(i => i.list_id === selectedListId && !i.completed && !i.archived).length} remaining`}
-        </span>
-        <button
-          onClick={handleArchiveList}
-          className="p-1.5 text-txt-muted hover:text-txt-secondary transition-colors rounded-lg hover:bg-glass-hover"
-          title="Archive list"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="1" y="2" width="14" height="4" rx="1" />
-            <path d="M2 6v7a1 1 0 001 1h10a1 1 0 001-1V6" />
-            <path d="M6 9h4" />
-          </svg>
-        </button>
+      <div className="px-8 pt-8 pb-6">
+        <div className="flex items-baseline gap-3">
+          <div className="w-2.5 h-2.5 rounded-full self-center" style={{ backgroundColor: selectedList.color }} />
+          <h1 className="text-2xl font-display font-bold text-txt-primary tracking-tight">{selectedList.name}</h1>
+          {selectedList.task_id && (
+            <TaskIdBadge taskId={selectedList.task_id} taskName={listTaskName} className="text-sm text-focus bg-focus-muted px-2.5 py-0.5 rounded-full" />
+          )}
+          <BillableToggle
+            checked={selectedList.billable !== 0}
+            onChange={(v) => updateList(selectedList.id, { billable: v ? 1 : 0 })}
+            label={selectedList.task_id ? 'Billable' : 'Billable default'}
+          />
+          <div className="h-px flex-1 bg-gradient-to-r from-focus/20 to-transparent" />
+          <span className="text-sm text-txt-muted">
+            {items.filter(i => i.list_id === selectedListId && !i.archived).length === 0
+              ? 'This list has no tasks'
+              : `${items.filter(i => i.list_id === selectedListId && !i.completed && !i.archived).length} remaining`}
+          </span>
+          <button
+            onClick={handleArchiveList}
+            className="p-1.5 text-txt-muted hover:text-txt-secondary transition-colors rounded-lg hover:bg-focus/5"
+            title="Archive list"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="1" y="2" width="14" height="4" rx="1" />
+              <path d="M2 6v7a1 1 0 001 1h10a1 1 0 001-1V6" />
+              <path d="M6 9h4" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Columns with DnD */}
@@ -204,7 +217,7 @@ export default function ListPlanningView() {
             const progressPct = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
 
             return (
-              <div key={key} className="flex-1 min-w-[240px] bg-drip-surface rounded-2xl border border-glass-border flex flex-col">
+              <div key={key} className="flex-1 min-w-[240px] bg-drip-surface rounded-2xl border border-focus/30 flex flex-col">
                 {/* Column header */}
                 <div className="p-4 pb-2">
                   <div className="flex items-center justify-between mb-2">
@@ -214,7 +227,7 @@ export default function ListPlanningView() {
                     )}
                   </div>
                   {totalCount > 0 && (
-                    <div className="h-1 rounded-full bg-glass-bg overflow-hidden">
+                    <div className="h-1 rounded-full bg-focus/10 overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-300"
                         style={{ width: `${progressPct}%`, backgroundColor: selectedList.color }}
@@ -239,7 +252,8 @@ export default function ListPlanningView() {
                       listId={selectedListId!}
                       column={key}
                       showTaskId={isFolderList}
-                      onAdd={(title, taskId) => handleAddItem(key, title, taskId)}
+                      defaultBillable={selectedList.billable !== 0}
+                      onAdd={(title, taskId, billable) => handleAddItem(key, title, taskId, billable)}
                       onCancel={() => setAddingColumn(null)}
                     />
                   </div>
@@ -251,10 +265,10 @@ export default function ListPlanningView() {
                       const subtaskCount = getSubtaskCount(item);
                       return (
                         <DraggableItem key={item.id} id={item.id}>
-                          <div className="group flex items-start gap-2 px-3 py-2 rounded-xl hover:bg-glass-hover transition-colors">
+                          <div className="group flex items-start gap-2 px-3 py-2 rounded-xl hover:bg-focus/5 transition-colors">
                             <button
                               onClick={(e) => { e.stopPropagation(); handleToggleComplete(item); }}
-                              className="mt-0.5 w-4 h-4 rounded border border-glass-border hover:border-focus/50 flex-shrink-0 transition-colors"
+                              className="mt-0.5 w-4 h-4 rounded border border-focus/20 hover:border-focus/50 flex-shrink-0 transition-colors"
                             />
                             <div className="flex-1 min-w-0">
                               <button
@@ -322,7 +336,7 @@ export default function ListPlanningView() {
                                           updateItem(item.id, { subtasks: JSON.stringify(updated) });
                                         }}
                                         className={`w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
-                                          s.completed ? 'border-transparent' : 'border-glass-border'
+                                          s.completed ? 'border-transparent' : 'border-focus/20'
                                         }`}
                                         style={s.completed ? { backgroundColor: selectedList.color } : undefined}
                                       >
@@ -342,7 +356,7 @@ export default function ListPlanningView() {
                     })}
 
                     {completedItems.map(item => (
-                      <div key={item.id} className="group flex items-start gap-2 px-3 py-2 rounded-xl hover:bg-glass-hover transition-colors opacity-50">
+                      <div key={item.id} className="group flex items-start gap-2 px-3 py-2 rounded-xl hover:bg-focus/5 transition-colors opacity-50">
                         <button
                           onClick={() => handleToggleComplete(item)}
                           className="mt-0.5 w-4 h-4 rounded flex-shrink-0 flex items-center justify-center"
@@ -374,7 +388,7 @@ export default function ListPlanningView() {
 
         <DragOverlay>
           {activeItem && (
-            <div className="px-3 py-2 rounded-xl bg-drip-elevated border border-glass-border shadow-lg scale-[1.02] opacity-90">
+            <div className="px-3 py-2 rounded-xl bg-drip-elevated border border-focus/30 shadow-lg scale-[1.02] opacity-90">
               <span className="text-sm text-txt-primary">{activeItem.title}</span>
             </div>
           )}

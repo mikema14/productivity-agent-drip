@@ -70,7 +70,8 @@ import {
   archiveList,
   unarchiveList,
   archiveOldCompleted,
-  reorderItemsInColumn
+  reorderItemsInColumn,
+  getBillableDefaultForTask
 } from '../src/services/db';
 import { createTray, updateTray, destroyTray } from './tray';
 import {
@@ -86,7 +87,7 @@ import {
 
 let mainWindow: BrowserWindow | null = null;
 
-const isDev = process.env.NODE_ENV === 'development';
+const isDev = !app.isPackaged;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -1216,6 +1217,15 @@ ipcMain.handle('delete-list-item', async (_event, id: string) => {
   try {
     deleteListItem(id);
     return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('get-billable-for-task', async (_event, taskId: string | null) => {
+  try {
+    const billable = getBillableDefaultForTask(taskId);
+    return { success: true, billable };
   } catch (error) {
     return { success: false, error: (error as Error).message };
   }

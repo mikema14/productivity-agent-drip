@@ -1,0 +1,13 @@
+This is a placeholder file for the app icon.
+Replace this with an actual PNG icon (512x512 recommended) before building for production.
+
+For now, you can:
+1. Create a simple icon using any graphic design tool
+2. Use an online icon generator
+3. Or use a temporary emoji/symbol as the app icon
+
+The icon will be used for:
+- Application window
+- macOS dock
+- Menu bar tray
+- DMG installer

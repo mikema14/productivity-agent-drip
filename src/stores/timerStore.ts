@@ -15,22 +15,28 @@ interface TimerStore extends TimerState {
   sessionViewMode: 'flat' | 'grouped';
   lastTaskId: string | null;
   lastTaskTitle: string | null;
+  durationMinutes: number;
   setTimerMode: (mode: 'pomodoro' | 'stopwatch') => void;
   setSessionViewMode: (mode: 'flat' | 'grouped') => void;
+  setDurationMinutes: (minutes: number) => void;
 }
 
-const FOCUS_DURATION = 25 * 60; // 25 minutes in seconds
-const SHORT_BREAK_DURATION = 5 * 60; // 5 minutes in seconds
-const LONG_BREAK_DURATION = 10 * 60; // 10 minutes in seconds
+const DEFAULT_DURATION_MINUTES = 25;
 const SESSIONS_UNTIL_LONG_BREAK = 3;
+
+function getBreakSeconds(durationMinutes: number, isLong: boolean): number {
+  const shortSecs = Math.max(60, Math.round((durationMinutes / 5) * 60));
+  return isLong ? shortSecs * 2 : shortSecs;
+}
 
 export const useTimerStore = create<TimerStore>()(
   persist(
     (set, get) => ({
       status: 'idle',
-      remainingSeconds: FOCUS_DURATION,
-      totalDuration: FOCUS_DURATION,
+      remainingSeconds: DEFAULT_DURATION_MINUTES * 60,
+      totalDuration: DEFAULT_DURATION_MINUTES * 60,
       currentTaskId: null,
+      currentBillable: true,
       sessionCount: 0,
       isPaused: false,
       intervalId: null,
@@ -41,6 +47,7 @@ export const useTimerStore = create<TimerStore>()(
       sessionViewMode: 'flat',
       lastTaskId: null,
       lastTaskTitle: null,
+      durationMinutes: DEFAULT_DURATION_MINUTES,
 
       setIntention: (intention: string) => {
         set({ intention });
@@ -58,29 +65,42 @@ export const useTimerStore = create<TimerStore>()(
         set({ sessionViewMode: mode });
       },
 
-  startFocus: async (taskId?: string) => {
+      setDurationMinutes: (minutes: number) => {
+        const secs = minutes * 60;
+        set({ durationMinutes: minutes, remainingSeconds: secs, totalDuration: secs });
+      },
+
+      setCurrentBillable: (billable: boolean) => {
+        set({ currentBillable: billable });
+      },
+
+  startFocus: async (taskId?: string, billable?: boolean) => {
     const state = get();
 
-    // CRITICAL: Always clear existing interval before creating new one
     if (state.intervalId) {
-      console.log('[Timer] Clearing existing focus interval:', state.intervalId);
       clearInterval(state.intervalId);
       set({ intervalId: null });
     }
 
-    const now = new Date();
+    // Resolve the billable default for this task unless the caller passed an explicit value.
+    let resolvedBillable = billable ?? state.currentBillable;
+    if (billable === undefined && window.listsAPI?.getBillableForTask) {
+      try {
+        resolvedBillable = await window.listsAPI.getBillableForTask(taskId || null);
+      } catch (error) {
+        console.error('[Timer] Failed to resolve billable default:', error);
+      }
+    }
 
-    // Calculate next break duration based on session count
+    const now = new Date();
+    const focusSecs = state.durationMinutes * 60;
     const nextSessionCount = state.sessionCount + 1;
     const isLongBreak = nextSessionCount % SESSIONS_UNTIL_LONG_BREAK === 0;
-    const nextBreakDuration = isLongBreak ? 10 : 5;
+    const nextBreakSecs = getBreakSeconds(state.durationMinutes, isLongBreak);
+    const nextBreakMins = Math.round(nextBreakSecs / 60) as 5 | 10;
 
-    console.log('[Timer] Starting focus session via main process for task:', taskId || 'none');
-    console.log('[Timer] Next break will be:', nextBreakDuration, 'minutes', isLongBreak ? '(long break)' : '(short break)');
-
-    // Start timer in main process (won't be throttled when window is hidden)
     try {
-      await window.timerAPI.startMainTimer(FOCUS_DURATION, 'focus', nextBreakDuration, taskId || undefined);
+      await window.timerAPI.startMainTimer(focusSecs, 'focus', nextBreakMins, taskId || undefined);
     } catch (error) {
       console.error('[Timer] Failed to start main process timer:', error);
       return;
@@ -88,11 +108,12 @@ export const useTimerStore = create<TimerStore>()(
 
     set({
       status: 'focus',
-      remainingSeconds: FOCUS_DURATION,
-      totalDuration: FOCUS_DURATION,
+      remainingSeconds: focusSecs,
+      totalDuration: focusSecs,
       currentTaskId: taskId || null,
+      currentBillable: resolvedBillable,
       isPaused: false,
-      intervalId: 999999, // Dummy ID to indicate timer is running (actual timer in main process)
+      intervalId: 999999,
       sessionStartTime: now
     });
   },
@@ -100,18 +121,13 @@ export const useTimerStore = create<TimerStore>()(
   startBreak: async (isLong: boolean) => {
     const state = get();
 
-    // CRITICAL: Always clear existing interval before creating new one
     if (state.intervalId) {
-      console.log('[Timer] Clearing existing break interval:', state.intervalId);
       clearInterval(state.intervalId);
       set({ intervalId: null });
     }
 
-    const duration = isLong ? LONG_BREAK_DURATION : SHORT_BREAK_DURATION;
+    const duration = getBreakSeconds(state.durationMinutes, isLong);
 
-    console.log('[Timer] Starting', isLong ? 'long' : 'short', 'break via main process');
-
-    // Start timer in main process
     try {
       await window.timerAPI.startMainTimer(duration, 'break');
     } catch (error) {
@@ -124,7 +140,7 @@ export const useTimerStore = create<TimerStore>()(
       remainingSeconds: duration,
       totalDuration: duration,
       isPaused: false,
-      intervalId: 999999, // Dummy ID
+      intervalId: 999999,
       sessionStartTime: new Date()
     });
 
@@ -176,13 +192,14 @@ export const useTimerStore = create<TimerStore>()(
       await window.timerAPI.saveSession({
         start_at: formatDateTime(state.sessionStartTime),
         end_at: formatDateTime(endTime),
-        duration_minutes: 25,
+        duration_minutes: state.durationMinutes,
         task_id: state.currentTaskId,
         source: 'pomodoro',
         comment,
         logged: 0,
         log_sent_at: null,
-        server_entry_id: null
+        server_entry_id: null,
+        billable: state.currentBillable ? 1 : 0
       });
     }
 
@@ -203,16 +220,16 @@ export const useTimerStore = create<TimerStore>()(
       }
     }
 
-    // Update state - keep taskId and intention for modal
+    const focusSecs = state.durationMinutes * 60;
     set({
       sessionCount: newSessionCount,
       intervalId: null,
       sessionStartTime: null,
       status: 'idle',
-      remainingSeconds: FOCUS_DURATION,
-      totalDuration: FOCUS_DURATION,
+      remainingSeconds: focusSecs,
+      totalDuration: focusSecs,
       isPaused: false,
-      showCompletionModal: true, // SHOW MODAL instead of auto-starting break
+      showCompletionModal: true,
       lastTaskId: state.currentTaskId,
       lastTaskTitle: taskTitle,
     });
@@ -275,11 +292,11 @@ export const useTimerStore = create<TimerStore>()(
     // Show notification
     notifyBreakComplete();
 
-    // Reset to idle
+    const focusSecs = get().durationMinutes * 60;
     set({
       status: 'idle',
-      remainingSeconds: FOCUS_DURATION,
-      totalDuration: FOCUS_DURATION,
+      remainingSeconds: focusSecs,
+      totalDuration: focusSecs,
       intervalId: null,
       isPaused: false,
       sessionStartTime: null
@@ -335,7 +352,7 @@ export const useTimerStore = create<TimerStore>()(
   },
 
   finishEarly: async () => {
-    const { status, sessionStartTime, currentTaskId, sessionCount, intervalId, intention } = get();
+    const { status, sessionStartTime, currentTaskId, currentBillable, sessionCount, intervalId, intention } = get();
 
     if (status !== 'focus') {
       console.warn('[Timer] Can only finish early during focus session');
@@ -389,7 +406,7 @@ export const useTimerStore = create<TimerStore>()(
       source: 'pomodoro' as const,
       comment,
       logged: 0 as 0 | 1,
-      billable: 1 as 0 | 1, // Default, user can edit later
+      billable: (currentBillable ? 1 : 0) as 0 | 1,
     };
 
     try {
@@ -405,11 +422,11 @@ export const useTimerStore = create<TimerStore>()(
       const newCount = sessionCount + 1;
       const isLongBreak = newCount % SESSIONS_UNTIL_LONG_BREAK === 0;
 
-      // Update state and clear intention
+      const focusSecs2 = get().durationMinutes * 60;
       set({
         status: 'idle',
-        remainingSeconds: FOCUS_DURATION,
-        totalDuration: FOCUS_DURATION,
+        remainingSeconds: focusSecs2,
+        totalDuration: focusSecs2,
         sessionCount: newCount,
         intention: '',
         isPaused: false,
@@ -449,10 +466,11 @@ export const useTimerStore = create<TimerStore>()(
       clearInterval(state.intervalId);
     }
 
+    const focusSecs3 = get().durationMinutes * 60;
     set({
       status: 'idle',
-      remainingSeconds: FOCUS_DURATION,
-      totalDuration: FOCUS_DURATION,
+      remainingSeconds: focusSecs3,
+      totalDuration: focusSecs3,
       currentTaskId: null,
       isPaused: false,
       intervalId: null,
@@ -468,12 +486,13 @@ export const useTimerStore = create<TimerStore>()(
   },
 
   dismissCompletionModal: () => {
+    const focusSecs4 = get().durationMinutes * 60;
     set({
       showCompletionModal: false,
       intention: '',
       status: 'idle',
-      remainingSeconds: FOCUS_DURATION,
-      totalDuration: FOCUS_DURATION,
+      remainingSeconds: focusSecs4,
+      totalDuration: focusSecs4,
       currentTaskId: null,
       isPaused: false,
       intervalId: null,
@@ -513,6 +532,7 @@ export const useTimerStore = create<TimerStore>()(
         lastTaskId: state.lastTaskId,
         lastTaskTitle: state.lastTaskTitle,
         intention: state.intention,
+        durationMinutes: state.durationMinutes,
       }),
     }
   )
@@ -564,10 +584,11 @@ export function checkTimerHydration() {
   // it means the app was closed/restarted while timer was active
   if ((state.status === 'focus' || state.status === 'break') && !state.intervalId) {
     console.warn('Timer was in running state without interval - resetting to idle');
+    const hydrateSecs = (state.durationMinutes || DEFAULT_DURATION_MINUTES) * 60;
     useTimerStore.setState({
       status: 'idle',
-      remainingSeconds: FOCUS_DURATION,
-      totalDuration: FOCUS_DURATION,
+      remainingSeconds: hydrateSecs,
+      totalDuration: hydrateSecs,
       isPaused: false,
       intervalId: null,
       sessionStartTime: null,

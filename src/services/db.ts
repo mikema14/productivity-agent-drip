@@ -150,6 +150,7 @@ export function initDB(): Database.Database {
       icon_path TEXT,
       task_id TEXT,
       "order" INTEGER NOT NULL DEFAULT 0,
+      billable INTEGER NOT NULL DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -161,14 +162,18 @@ export function initDB(): Database.Database {
       "column" TEXT NOT NULL DEFAULT 'backlog' CHECK("column" IN ('backlog','this_week','today')),
       "order" INTEGER NOT NULL DEFAULT 0,
       completed INTEGER DEFAULT 0,
+      billable INTEGER NOT NULL DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
     );
 
     CREATE INDEX IF NOT EXISTS idx_sessions_date ON pomodoro_sessions(date(start_at));
     CREATE INDEX IF NOT EXISTS idx_sessions_logged ON pomodoro_sessions(logged);
+    CREATE INDEX IF NOT EXISTS idx_sessions_task_id ON pomodoro_sessions(task_id);
     CREATE INDEX IF NOT EXISTS idx_adhoc_date ON adhoc_entries(date);
+    CREATE INDEX IF NOT EXISTS idx_adhoc_task_id ON adhoc_entries(task_id);
     CREATE INDEX IF NOT EXISTS idx_calendar_date ON calendar_proposals(date);
+    CREATE INDEX IF NOT EXISTS idx_task_cache_last_seen ON task_cache(last_seen_at DESC);
     CREATE INDEX IF NOT EXISTS idx_milestones_parent ON milestones(parent_type, parent_id);
     CREATE INDEX IF NOT EXISTS idx_milestones_completed ON milestones(completed);
     CREATE INDEX IF NOT EXISTS idx_task_prefs_tracked ON task_preferences(tracked);
@@ -551,18 +556,24 @@ function runMigrations(database: Database.Database) {
         database.exec('ALTER TABLE list_items ADD COLUMN description TEXT');
       if (!listItemsInfo.some((c: any) => c.name === 'subtasks'))
         database.exec("ALTER TABLE list_items ADD COLUMN subtasks TEXT DEFAULT '[]'");
+      if (!listItemsInfo.some((c: any) => c.name === 'billable'))
+        database.exec('ALTER TABLE list_items ADD COLUMN billable INTEGER NOT NULL DEFAULT 1');
     }
   } catch (error) {
     console.error('Migration error (list_items extensions):', error);
   }
 
-  // Migration: Add archived to lists
+  // Migration: Add archived + billable to lists
   try {
     const listsInfo = database.pragma('table_info(lists)') as any[];
-    if (listsInfo.length > 0 && !listsInfo.some((c: any) => c.name === 'archived'))
-      database.exec('ALTER TABLE lists ADD COLUMN archived INTEGER DEFAULT 0');
+    if (listsInfo.length > 0) {
+      if (!listsInfo.some((c: any) => c.name === 'archived'))
+        database.exec('ALTER TABLE lists ADD COLUMN archived INTEGER DEFAULT 0');
+      if (!listsInfo.some((c: any) => c.name === 'billable'))
+        database.exec('ALTER TABLE lists ADD COLUMN billable INTEGER NOT NULL DEFAULT 1');
+    }
   } catch (error) {
-    console.error('Migration error (lists archived):', error);
+    console.error('Migration error (lists archived/billable):', error);
   }
 }
 
@@ -1498,14 +1509,14 @@ export function createList(list: Omit<TaskList, 'id' | 'created_at'>): string {
   const database = getDB();
   const id = uuidv4();
   database.prepare(
-    'INSERT INTO lists (id, name, color, icon_path, task_id, "order") VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(id, list.name, list.color, list.icon_path, list.task_id, list.order);
+    'INSERT INTO lists (id, name, color, icon_path, task_id, "order", billable) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(id, list.name, list.color, list.icon_path, list.task_id, list.order, list.billable ?? 1);
   return id;
 }
 
 export function updateList(id: string, updates: Partial<TaskList>): void {
   const database = getDB();
-  const allowed = ['name', 'color', 'icon_path', 'task_id', 'order', 'archived'] as const;
+  const allowed = ['name', 'color', 'icon_path', 'task_id', 'order', 'archived', 'billable'] as const;
   const sets: string[] = [];
   const values: any[] = [];
   for (const key of allowed) {
@@ -1541,8 +1552,8 @@ export function createListItem(item: Omit<ListItem, 'id' | 'created_at'>): strin
   const database = getDB();
   const id = uuidv4();
   database.prepare(
-    'INSERT INTO list_items (id, list_id, title, task_id, "column", "order", completed) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).run(id, item.list_id, item.title, item.task_id, item.column, item.order, item.completed);
+    'INSERT INTO list_items (id, list_id, title, task_id, "column", "order", completed, billable) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(id, item.list_id, item.title, item.task_id, item.column, item.order, item.completed, item.billable ?? 1);
   return id;
 }
 
@@ -1557,7 +1568,7 @@ export function updateListItem(id: string, updates: Partial<ListItem>): void {
       updates.archived = 0;
     }
   }
-  const allowed = ['title', 'task_id', 'column', 'order', 'completed', 'archived', 'completed_at', 'description', 'subtasks'] as const;
+  const allowed = ['title', 'task_id', 'column', 'order', 'completed', 'archived', 'completed_at', 'description', 'subtasks', 'billable'] as const;
   const sets: string[] = [];
   const values: any[] = [];
   for (const key of allowed) {
@@ -1574,4 +1585,28 @@ export function updateListItem(id: string, updates: Partial<ListItem>): void {
 export function deleteListItem(id: string): void {
   const database = getDB();
   database.prepare('DELETE FROM list_items WHERE id = ?').run(id);
+}
+
+/**
+ * Resolve the billable default for a Task ID. Most specific wins:
+ *   list item (most recent match) -> parent list -> global `defaultBillable` setting.
+ * Returns true when no match and no setting (matching the historic default).
+ */
+export function getBillableDefaultForTask(taskId: string | null | undefined): boolean {
+  if (!taskId) {
+    return getSetting('defaultBillable') !== 'false';
+  }
+  const database = getDB();
+
+  const item = database.prepare(
+    'SELECT billable FROM list_items WHERE task_id = ? ORDER BY created_at DESC LIMIT 1'
+  ).get(taskId) as { billable: number } | undefined;
+  if (item) return item.billable !== 0;
+
+  const list = database.prepare(
+    'SELECT billable FROM lists WHERE task_id = ? ORDER BY created_at DESC LIMIT 1'
+  ).get(taskId) as { billable: number } | undefined;
+  if (list) return list.billable !== 0;
+
+  return getSetting('defaultBillable') !== 'false';
 }

@@ -81,6 +81,14 @@ export default function AddTemplateModal({ isOpen, onClose, onSave }: AddTemplat
                 type="text"
                 value={taskId}
                 onChange={(e) => setTaskId(e.target.value)}
+                onBlur={() => {
+                  // Seed billable from the task's default (list item > list > global).
+                  if (taskId.trim()) {
+                    window.listsAPI?.getBillableForTask?.(taskId.trim())
+                      .then(setBillable)
+                      .catch(() => {});
+                  }
+                }}
                 placeholder="e.g., 229602"
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 required

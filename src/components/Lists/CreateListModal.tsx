@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { LIST_COLORS, DEFAULT_LIST_COLOR } from '../../utils/listColors';
 import { useListsStore } from '../../stores/listsStore';
 import TaskIdInput from '../shared/TaskIdInput';
+import BillableToggle from '../shared/BillableToggle';
 
 interface CreateListModalProps {
   onClose: () => void;
@@ -11,6 +12,7 @@ export default function CreateListModal({ onClose }: CreateListModalProps) {
   const [name, setName] = useState('');
   const [color, setColor] = useState(DEFAULT_LIST_COLOR);
   const [taskId, setTaskId] = useState('');
+  const [billable, setBillable] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const createList = useListsStore(s => s.createList);
   const lists = useListsStore(s => s.lists);
@@ -31,6 +33,7 @@ export default function CreateListModal({ onClose }: CreateListModalProps) {
         task_id: taskId.trim() || null,
         order: lists.length,
         archived: 0,
+        billable: billable ? 1 : 0,
       });
       onClose();
     } catch (error) {
@@ -42,7 +45,7 @@ export default function CreateListModal({ onClose }: CreateListModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="glass-surface-elevated w-full max-w-md mx-4">
+      <div className="bg-drip-bg/95 backdrop-blur-2xl border border-focus/30 rounded-2xl shadow-glass w-full max-w-md mx-4">
         {/* Header */}
         <div className="px-6 pt-6 pb-2 flex items-center justify-between">
           <h2 className="text-xl font-display font-semibold text-txt-primary">Create a new list</h2>
@@ -91,7 +94,7 @@ export default function CreateListModal({ onClose }: CreateListModalProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="List name"
-              className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all font-display"
+              className="w-full px-4 py-2.5 bg-transparent border border-focus/20 text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all font-display"
               autoFocus
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             />
@@ -114,13 +117,22 @@ export default function CreateListModal({ onClose }: CreateListModalProps) {
               </p>
             )}
           </div>
+
+          {/* Billable default */}
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm text-txt-secondary">Billable by default</span>
+              <p className="text-xs text-txt-muted mt-0.5">Applies to new tasks added to this list.</p>
+            </div>
+            <BillableToggle checked={billable} onChange={setBillable} />
+          </div>
         </div>
 
         {/* Actions */}
-        <div className="px-6 py-4 border-t border-glass-border flex gap-3">
+        <div className="px-6 py-4 border-t border-focus/20 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 glass-button text-txt-secondary rounded-full py-2.5"
+            className="flex-1 bg-transparent border border-focus/20 text-txt-muted rounded-full py-2.5 hover:bg-focus/5 transition-all"
             disabled={isSubmitting}
           >
             Cancel
@@ -128,8 +140,8 @@ export default function CreateListModal({ onClose }: CreateListModalProps) {
           <button
             onClick={handleCreate}
             disabled={!name.trim() || isSubmitting}
-            className="flex-1 py-2.5 text-sm font-medium rounded-full transition-colors disabled:opacity-40"
-            style={{ backgroundColor: color, color: '#fff' }}
+            className="flex-1 py-2.5 text-sm font-medium rounded-full transition-colors disabled:opacity-40 text-white"
+            style={{ backgroundColor: color }}
           >
             {isSubmitting ? 'Creating...' : 'Create'}
           </button>

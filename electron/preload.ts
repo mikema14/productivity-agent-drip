@@ -492,6 +492,11 @@ const listsAPI = {
     if (result.success) return result.count;
     throw new Error(result.error || 'Failed to archive old completed');
   },
+  getBillableForTask: async (taskId: string | null) => {
+    const result = await ipcRenderer.invoke('get-billable-for-task', taskId);
+    if (result.success) return result.billable as boolean;
+    throw new Error(result.error || 'Failed to resolve billable default');
+  },
 };
 
 // Expose the APIs to the renderer process

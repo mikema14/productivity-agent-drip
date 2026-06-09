@@ -48,7 +48,7 @@ export default function TimelineItem({
             )}
           </div>
         </div>
-        {!isLast && <div className="w-px flex-1 bg-glass-border min-h-[60px]" />}
+        {!isLast && <div className="w-px flex-1 bg-focus/20 min-h-[60px]" />}
       </div>
 
       {/* Content */}

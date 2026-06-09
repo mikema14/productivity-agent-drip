@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { ListItem, Subtask } from '../../types';
+import BillableToggle from '../shared/BillableToggle';
 
 interface TaskDetailInlineProps {
   item: ListItem;
@@ -55,7 +56,7 @@ export default function TaskDetailInline({ item, listColor, onUpdate, onClose }:
   const doneCount = subtasks.filter(s => s.completed).length;
 
   return (
-    <div className="mx-1 mb-2 p-3 rounded-xl bg-drip-bg/90 backdrop-blur-xl border border-glass-border space-y-3 animate-fade-in">
+    <div className="mx-1 mb-2 p-3 rounded-xl bg-drip-bg/90 backdrop-blur-xl border border-focus/30 space-y-3 animate-fade-in">
       {/* Title */}
       <div className="flex items-center gap-2">
         <input
@@ -63,7 +64,7 @@ export default function TaskDetailInline({ item, listColor, onUpdate, onClose }:
           onChange={e => setTitle(e.target.value)}
           onBlur={saveTitle}
           onKeyDown={e => e.key === 'Enter' && saveTitle()}
-          className="flex-1 bg-transparent text-sm font-medium text-txt-primary border-b border-transparent focus:border-glass-border outline-none transition-colors"
+          className="flex-1 bg-transparent text-sm font-medium text-txt-primary border-b border-transparent focus:border-focus/30 outline-none transition-colors"
         />
         <button onClick={onClose} className="text-txt-muted hover:text-txt-secondary p-0.5">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
@@ -80,7 +81,17 @@ export default function TaskDetailInline({ item, listColor, onUpdate, onClose }:
           onBlur={saveDescription}
           placeholder="Add a description..."
           rows={3}
-          className="w-full bg-drip-surface/60 border border-glass-border rounded-lg px-3 py-2 text-sm text-txt-primary placeholder-txt-dim resize-y outline-none focus:ring-1 focus:ring-focus/20 transition-all"
+          className="w-full bg-transparent border border-focus/20 rounded-lg px-3 py-2 text-sm text-txt-primary placeholder-txt-dim resize-y outline-none focus:ring-1 focus:ring-focus/20 transition-all"
+        />
+      </div>
+
+      {/* Billable */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-txt-muted font-medium">Billable</span>
+        <BillableToggle
+          checked={item.billable !== 0}
+          onChange={(v) => onUpdate(item.id, { billable: v ? 1 : 0 })}
+          size="sm"
         />
       </div>
 
@@ -97,7 +108,7 @@ export default function TaskDetailInline({ item, listColor, onUpdate, onClose }:
             {subtasks.length > 0 ? `${doneCount}/${subtasks.length} Subtasks` : 'Subtasks'}
           </span>
           {subtasks.length > 0 && (
-            <div className="flex-1 h-1 rounded-full bg-glass-bg overflow-hidden ml-2">
+            <div className="flex-1 h-1 rounded-full bg-focus/10 overflow-hidden ml-2">
               <div
                 className="h-full rounded-full transition-all duration-300"
                 style={{ width: `${subtasks.length > 0 ? (doneCount / subtasks.length) * 100 : 0}%`, backgroundColor: listColor }}
@@ -108,13 +119,13 @@ export default function TaskDetailInline({ item, listColor, onUpdate, onClose }:
 
         <div className="space-y-0.5">
           {subtasks.map(subtask => (
-            <div key={subtask.id} className="group flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-glass-hover transition-colors">
+            <div key={subtask.id} className="group flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-focus/5 transition-colors">
               <button
                 onClick={() => toggleSubtask(subtask.id)}
                 className={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
                   subtask.completed
                     ? 'border-transparent'
-                    : 'border-glass-border hover:border-focus/50'
+                    : 'border-focus/20 hover:border-focus/50'
                 }`}
                 style={subtask.completed ? { backgroundColor: listColor } : undefined}
               >

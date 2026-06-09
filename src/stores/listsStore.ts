@@ -102,26 +102,43 @@ export const useListsStore = create<ListsState>((set, get) => ({
   },
 
   createItem: async (item) => {
-    await window.listsAPI.createListItem(item);
-    await get().loadItems(item.list_id);
+    const tempId = `temp-${Date.now()}`;
+    const optimisticItem = { ...item, id: tempId, created_at: new Date().toISOString() } as ListItem;
+    set(s => ({ items: [...s.items, optimisticItem] }));
+    try {
+      await window.listsAPI.createListItem(item);
+      await get().loadItems(item.list_id);
+    } catch {
+      set(s => ({ items: s.items.filter(i => i.id !== tempId) }));
+    }
   },
 
   updateItem: async (id, updates) => {
-    await window.listsAPI.updateListItem(id, updates);
-    const { selectedListId } = get();
-    await get().loadItems(selectedListId || undefined);
+    set(s => ({ items: s.items.map(i => i.id === id ? { ...i, ...updates } : i) }));
+    try {
+      await window.listsAPI.updateListItem(id, updates);
+    } catch {
+      await get().loadItems(get().selectedListId || undefined);
+    }
   },
 
   deleteItem: async (id) => {
-    await window.listsAPI.deleteListItem(id);
-    const { selectedListId } = get();
-    await get().loadItems(selectedListId || undefined);
+    const removed = get().items.find(i => i.id === id);
+    set(s => ({ items: s.items.filter(i => i.id !== id) }));
+    try {
+      await window.listsAPI.deleteListItem(id);
+    } catch {
+      if (removed) set(s => ({ items: [...s.items, removed] }));
+    }
   },
 
   moveItem: async (id, column, order) => {
-    await window.listsAPI.updateListItem(id, { column, order });
-    const { selectedListId } = get();
-    await get().loadItems(selectedListId || undefined);
+    set(s => ({ items: s.items.map(i => i.id === id ? { ...i, column, order } : i) }));
+    try {
+      await window.listsAPI.updateListItem(id, { column, order });
+    } catch {
+      await get().loadItems(get().selectedListId || undefined);
+    }
   },
 
   getItemsByColumn: (listId, column) => {

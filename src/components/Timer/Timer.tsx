@@ -15,6 +15,7 @@ import IntentionRow from './IntentionRow';
 import ContinuePreviousCTA from './ContinuePreviousCTA';
 import CancelConfirmModal from './CancelConfirmModal';
 import SetIntentionModal from '../shared/SetIntentionModal';
+import BillableToggle from '../shared/BillableToggle';
 import type { PomodoroSession, CalendarProposal, AdhocEntry, TaskCache } from '../../types';
 
 type FocusState = 'ready-empty' | 'ready-selected' | 'running' | 'paused';
@@ -46,6 +47,8 @@ export default function Timer() {
     durationMinutes,
     setDurationMinutes,
     sessionStartTime,
+    currentBillable,
+    setCurrentBillable,
   } = useTimerStore();
 
   const today = new Date().toISOString().split('T')[0];
@@ -194,6 +197,16 @@ export default function Timer() {
     setPickerOpen(false);
   }, []);
 
+  // Pre-fill the billable toggle from the selected task's default (list item > list > global).
+  useEffect(() => {
+    if (status !== 'idle') return;
+    let cancelled = false;
+    window.listsAPI?.getBillableForTask?.(selectedTask?.task_id || null)
+      .then((b) => { if (!cancelled) setCurrentBillable(b); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [selectedTask?.task_id, status, setCurrentBillable]);
+
   const handleStart = () => {
     const taskId = selectedTask?.task_id;
 
@@ -207,7 +220,7 @@ export default function Timer() {
       }
     }
 
-    startFocus(taskId);
+    startFocus(taskId, currentBillable);
   };
 
   const handleContinuePrevious = async () => {
@@ -229,7 +242,7 @@ export default function Timer() {
 
   const handleBoundaryContinue = () => {
     setShowBoundaryDialog(false);
-    startFocus(pendingTaskId);
+    startFocus(pendingTaskId, currentBillable);
     setPendingTaskId(undefined);
   };
 
@@ -483,16 +496,21 @@ export default function Timer() {
               />
             )}
             {focusState === 'ready-selected' && selectedTask && (
-              <TaskCardWithPicker
-                task={selectedTask}
-                note={intention}
-                recentTasks={recentTasks}
-                pickerOpen={pickerOpen}
-                onToggle={() => setPickerOpen(p => !p)}
-                onSelectTask={(t) => { setSelectedTask(t); setPickerOpen(false); }}
-                onNoteChange={setIntention}
-                searchRef={searchRef}
-              />
+              <>
+                <TaskCardWithPicker
+                  task={selectedTask}
+                  note={intention}
+                  recentTasks={recentTasks}
+                  pickerOpen={pickerOpen}
+                  onToggle={() => setPickerOpen(p => !p)}
+                  onSelectTask={(t) => { setSelectedTask(t); setPickerOpen(false); }}
+                  onNoteChange={setIntention}
+                  searchRef={searchRef}
+                />
+                <div className="mt-2 flex items-center justify-end">
+                  <BillableToggle checked={currentBillable} onChange={setCurrentBillable} size="sm" />
+                </div>
+              </>
             )}
             {isActive && (
               activeTask ? (

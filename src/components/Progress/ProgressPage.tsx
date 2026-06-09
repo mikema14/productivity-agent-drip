@@ -119,53 +119,56 @@ export default function ProgressPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-8 py-8">
-        {/* Page header — editorial style */}
-        <div className="progress-stagger progress-stagger-1 mb-8">
-          <div className="flex items-baseline gap-3">
-            <h1 className="text-3xl font-display font-bold text-txt-primary tracking-tight">Progress</h1>
-            <div className="h-px flex-1 bg-gradient-to-r from-glass-border to-transparent" />
-          </div>
-          <p className="text-txt-dim text-sm mt-1 font-display">Consistency over intensity</p>
+    <div className="flex flex-col h-full">
+      {/* Page header — fixed, editorial style */}
+      <div className="progress-stagger progress-stagger-1 px-8 pt-8 pb-6">
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-3xl font-display font-bold text-txt-primary tracking-tight">Progress</h1>
+          <div className="h-px flex-1 bg-gradient-to-r from-focus/20 to-transparent" />
         </div>
+        <p className="text-txt-dim text-sm mt-1 font-display">Consistency over intensity</p>
+      </div>
 
-        {/* Metrics — full width */}
-        <div className="progress-stagger progress-stagger-2 mb-8">
-          <MetricsRow currentWeek={currentWeek} previousWeek={previousWeek} />
-        </div>
-
-        {/* Two-column: Calendar + AI side by side on large screens */}
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6 mb-8">
-          <div className="progress-stagger progress-stagger-3">
-            <MonthlyCalendar
-              year={selectedYear}
-              month={selectedMonth}
-              dailyMinutes={monthlyStats?.dailyMinutes || []}
-              onPrevMonth={handlePrevMonth}
-              onNextMonth={handleNextMonth}
-            />
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto px-8 pb-8">
+          {/* Metrics — full width */}
+          <div className="progress-stagger progress-stagger-2 mb-8">
+            <MetricsRow currentWeek={currentWeek} previousWeek={previousWeek} />
           </div>
 
-          <div className="progress-stagger progress-stagger-4">
-            <AIInsightsPanel
-              weeklySummaries={weeklySummaries}
-              reflections={monthlyStats?.reflections || []}
-              monthlyStats={monthlyStats ? {
-                totalMinutes: monthlyStats.totalMinutes,
-                deepWorkMinutes: monthlyStats.deepWorkMinutes,
-                daysWorked: monthlyStats.daysWorked,
-                dailyMinutes: monthlyStats.dailyMinutes,
-              } : null}
-              timeOfDay={timeOfDay}
-              period={period}
-            />
-          </div>
-        </div>
+          {/* Two-column: Calendar + AI side by side on large screens */}
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6 mb-8">
+            <div className="progress-stagger progress-stagger-3">
+              <MonthlyCalendar
+                year={selectedYear}
+                month={selectedMonth}
+                dailyMinutes={monthlyStats?.dailyMinutes || []}
+                onPrevMonth={handlePrevMonth}
+                onNextMonth={handleNextMonth}
+              />
+            </div>
 
-        {/* Bottom section: Reflections */}
-        <div className="progress-stagger progress-stagger-5">
-          <ReflectionsSection reflections={monthlyStats?.reflections || []} />
+            <div className="progress-stagger progress-stagger-4">
+              <AIInsightsPanel
+                weeklySummaries={weeklySummaries}
+                reflections={monthlyStats?.reflections || []}
+                monthlyStats={monthlyStats ? {
+                  totalMinutes: monthlyStats.totalMinutes,
+                  deepWorkMinutes: monthlyStats.deepWorkMinutes,
+                  daysWorked: monthlyStats.daysWorked,
+                  dailyMinutes: monthlyStats.dailyMinutes,
+                } : null}
+                timeOfDay={timeOfDay}
+                period={period}
+              />
+            </div>
+          </div>
+
+          {/* Bottom section: Reflections */}
+          <div className="progress-stagger progress-stagger-5">
+            <ReflectionsSection reflections={monthlyStats?.reflections || []} />
+          </div>
         </div>
       </div>
     </div>

@@ -127,7 +127,7 @@ export default function GoalsManagement() {
           <p className="text-txt-muted text-sm">No goals created yet</p>
         ) : (
           goals.map(goal => (
-            <div key={goal.id} className="border border-glass-border rounded-xl p-4">
+            <div key={goal.id} className="border border-focus/20 rounded-xl p-4">
               {editingId === goal.id ? (
                 // Edit Mode
                 <div className="space-y-3">
@@ -135,20 +135,20 @@ export default function GoalsManagement() {
                     value={editTitle}
                     onChange={e => setEditTitle(e.target.value)}
                     placeholder="Goal title"
-                    className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                    className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   />
                   <textarea
                     value={editDescription}
                     onChange={e => setEditDescription(e.target.value)}
                     placeholder="Description"
                     rows={2}
-                    className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                    className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   />
                   <input
                     value={editIdentity}
                     onChange={e => setEditIdentity(e.target.value)}
                     placeholder="Identity reinforcement (e.g., 'a focused developer')"
-                    className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                    className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   />
                   <div className="flex gap-2">
                     <button
@@ -159,7 +159,7 @@ export default function GoalsManagement() {
                     </button>
                     <button
                       onClick={() => setEditingId(null)}
-                      className="px-4 py-2 text-sm text-txt-muted hover:bg-glass-hover rounded-xl"
+                      className="px-4 py-2 text-sm text-txt-muted hover:bg-focus/5 rounded-xl"
                     >
                       Cancel
                     </button>
@@ -211,7 +211,7 @@ export default function GoalsManagement() {
       </div>
 
       {/* Create New Goal */}
-      <div className="border-t border-glass-border pt-4">
+      <div className="border-t border-focus/20 pt-4">
         {!isCreating ? (
           <button
             onClick={() => setIsCreating(true)}
@@ -227,7 +227,7 @@ export default function GoalsManagement() {
               value={newTitle}
               onChange={e => setNewTitle(e.target.value)}
               placeholder="Goal title (required)"
-              className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+              className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
             />
 
             <textarea
@@ -235,14 +235,14 @@ export default function GoalsManagement() {
               onChange={e => setNewDescription(e.target.value)}
               placeholder="Description (optional)"
               rows={2}
-              className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+              className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
             />
 
             <input
               value={newIdentity}
               onChange={e => setNewIdentity(e.target.value)}
               placeholder="Identity reinforcement (e.g., 'a focused developer')"
-              className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+              className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
             />
 
             <div className="flex gap-2">
@@ -254,7 +254,7 @@ export default function GoalsManagement() {
               </button>
               <button
                 onClick={() => setIsCreating(false)}
-                className="px-4 py-2 text-sm text-txt-muted hover:bg-glass-hover rounded-xl"
+                className="px-4 py-2 text-sm text-txt-muted hover:bg-focus/5 rounded-xl"
               >
                 Cancel
               </button>

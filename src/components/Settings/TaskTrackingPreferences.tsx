@@ -78,7 +78,7 @@ export default function TaskTrackingPreferences() {
             value={newTaskId}
             onChange={e => setNewTaskId(e.target.value)}
             placeholder="Enter task ID (e.g., TASK-123)"
-            className="flex-1 px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+            className="flex-1 px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
             onKeyPress={e => e.key === 'Enter' && handleAddTask()}
           />
           <button
@@ -103,7 +103,7 @@ export default function TaskTrackingPreferences() {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Filter by task ID..."
-            className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+            className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
           />
         </div>
       )}
@@ -123,14 +123,14 @@ export default function TaskTrackingPreferences() {
             {filteredTasks.map(pref => (
               <div
                 key={pref.taskId}
-                className="flex items-center justify-between p-3 border border-glass-border rounded-xl hover:bg-glass-hover"
+                className="flex items-center justify-between p-3 border border-focus/20 rounded-xl hover:bg-focus/5"
               >
                 <div className="flex items-center gap-3 flex-1">
                   <input
                     type="checkbox"
                     checked={pref.tracked}
                     onChange={() => handleToggleTracked(pref.taskId, pref.tracked)}
-                    className="w-4 h-4 text-focus border-glass-border bg-glass-bg rounded"
+                    className="w-4 h-4 text-focus border-focus/20 bg-transparent rounded"
                   />
                   <span className="font-mono text-sm font-semibold text-txt-primary">
                     {pref.taskId}
@@ -148,7 +148,7 @@ export default function TaskTrackingPreferences() {
                     className={`px-3 py-1 text-sm rounded-xl ${
                       pref.pinned
                         ? 'text-focus bg-focus/10 hover:bg-focus/20'
-                        : 'text-txt-muted bg-glass-bg hover:bg-glass-hover'
+                        : 'text-txt-muted bg-transparent hover:bg-focus/5'
                     }`}
                   >
                     {pref.pinned ? 'Unpin' : 'Pin'}

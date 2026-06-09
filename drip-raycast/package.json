@@ -1,0 +1,96 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "drip",
+  "title": "Drip",
+  "description": "Quick access to Drip productivity timer, time logging, and Easy Project integration",
+  "icon": "drip-icon.png",
+  "author": "marekmikesz",
+  "categories": ["Productivity"],
+  "license": "MIT",
+  "preferences": [
+    {
+      "name": "apiBaseUrl",
+      "title": "Easy Project URL",
+      "description": "Base URL for Easy Project API",
+      "type": "textfield",
+      "required": false,
+      "default": "https://es.easyproject.com"
+    },
+    {
+      "name": "apiKey",
+      "title": "API Key",
+      "description": "Easy Project API key (X-Redmine-API-Key)",
+      "type": "password",
+      "required": false
+    }
+  ],
+  "commands": [
+    {
+      "name": "timer-status",
+      "title": "Timer Status",
+      "description": "Show Drip timer status in menu bar",
+      "mode": "menu-bar",
+      "interval": "10s"
+    },
+    {
+      "name": "start-focus",
+      "title": "Start Focus Session",
+      "description": "Start a Pomodoro focus session in Drip",
+      "mode": "view"
+    },
+    {
+      "name": "add-entry",
+      "title": "Add Time Entry",
+      "description": "Add a manual time entry to today's log",
+      "mode": "view"
+    },
+    {
+      "name": "todays-log",
+      "title": "Today's Log",
+      "description": "View today's time entries",
+      "mode": "view"
+    },
+    {
+      "name": "search-tasks",
+      "title": "Search Tasks",
+      "description": "Search cached tasks or fetch from Easy Project",
+      "mode": "view"
+    },
+    {
+      "name": "todays-intentions",
+      "title": "Today's Intentions",
+      "description": "View and manage today's intentions",
+      "mode": "view"
+    },
+    {
+      "name": "log-entries",
+      "title": "Log Unlogged Entries",
+      "description": "Post unlogged time entries to Easy Project",
+      "mode": "view"
+    },
+    {
+      "name": "weekly-stats",
+      "title": "Weekly Stats",
+      "description": "View this week's productivity statistics",
+      "mode": "view"
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.64.0",
+    "@raycast/utils": "^1.10.0"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^1.0.8",
+    "@types/node": "20.8.10",
+    "@types/react": "18.2.27",
+    "eslint": "^8.51.0",
+    "prettier": "^3.0.3",
+    "typescript": "^5.2.2"
+  },
+  "scripts": {
+    "build": "ray build -e dist",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint"
+  }
+}

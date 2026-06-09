@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS lists (
   icon_path TEXT,
   task_id TEXT,
   "order" INTEGER NOT NULL DEFAULT 0,
+  billable INTEGER NOT NULL DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -143,6 +144,7 @@ CREATE TABLE IF NOT EXISTS list_items (
   "column" TEXT NOT NULL DEFAULT 'backlog' CHECK("column" IN ('backlog','this_week','today')),
   "order" INTEGER NOT NULL DEFAULT 0,
   completed INTEGER DEFAULT 0,
+  billable INTEGER NOT NULL DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
 );

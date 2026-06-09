@@ -145,10 +145,12 @@ export default function Settings() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-8 py-6 h-full">
     <div className="flex flex-col h-full">
-      <div className="flex-none px-6 py-4 border-b border-glass-border">
-        <h1 className="text-2xl font-display font-semibold text-txt-primary">Settings</h1>
+      <div className="px-8 pt-8 pb-6">
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-2xl font-display font-bold text-txt-primary tracking-tight">Settings</h1>
+          <div className="h-px flex-1 bg-gradient-to-r from-focus/20 to-transparent" />
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-6">
@@ -156,7 +158,7 @@ export default function Settings() {
           {/* API Settings */}
           <section>
             <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Easy Project API</h2>
-            <div className="space-y-4 glass-surface p-6">
+            <div className="space-y-4 bg-transparent border border-focus/30 rounded-xl p-6">
               <div>
                 <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
                   API Base URL
@@ -165,7 +167,7 @@ export default function Settings() {
                   type="text"
                   value={settings.apiBaseUrl}
                   onChange={(e) => setSettings({ ...settings, apiBaseUrl: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                  className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   placeholder="https://es.easyproject.com"
                 />
               </div>
@@ -178,7 +180,7 @@ export default function Settings() {
                   type="password"
                   value={settings.apiKey}
                   onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                  className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   placeholder="Your Easy Project API key"
                 />
                 <p className="mt-1 text-xs text-txt-dim">
@@ -199,7 +201,7 @@ export default function Settings() {
           {/* Calendar Settings */}
           <section>
             <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Calendar Integration</h2>
-            <div className="space-y-4 glass-surface p-6">
+            <div className="space-y-4 bg-transparent border border-focus/30 rounded-xl p-6">
               <div>
                 <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
                   Outlook Calendar ICS URL
@@ -208,7 +210,7 @@ export default function Settings() {
                   type="text"
                   value={settings.calendarUrl}
                   onChange={(e) => setSettings({ ...settings, calendarUrl: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                  className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   placeholder="https://outlook.office365.com/owa/calendar/..."
                 />
                 <p className="mt-1 text-xs text-txt-dim">
@@ -221,7 +223,7 @@ export default function Settings() {
           {/* Pomodoro Settings */}
           <section>
             <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Pomodoro Timer</h2>
-            <div className="space-y-4 glass-surface p-6">
+            <div className="space-y-4 bg-transparent border border-focus/30 rounded-xl p-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
@@ -233,7 +235,7 @@ export default function Settings() {
                     onChange={(e) => setSettings({ ...settings, pomodoroFocus: parseInt(e.target.value) || 25 })}
                     min="1"
                     max="60"
-                    className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                    className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   />
                 </div>
 
@@ -247,7 +249,7 @@ export default function Settings() {
                     onChange={(e) => setSettings({ ...settings, pomodoroShortBreak: parseInt(e.target.value) || 5 })}
                     min="1"
                     max="30"
-                    className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                    className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   />
                 </div>
 
@@ -261,7 +263,7 @@ export default function Settings() {
                     onChange={(e) => setSettings({ ...settings, pomodoroLongBreak: parseInt(e.target.value) || 10 })}
                     min="1"
                     max="60"
-                    className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                    className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   />
                 </div>
 
@@ -275,7 +277,7 @@ export default function Settings() {
                     onChange={(e) => setSettings({ ...settings, sessionsUntilLongBreak: parseInt(e.target.value) || 3 })}
                     min="1"
                     max="10"
-                    className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                    className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   />
                 </div>
               </div>
@@ -285,14 +287,14 @@ export default function Settings() {
           {/* Time Logging Settings */}
           <section>
             <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Time Logging</h2>
-            <div className="space-y-4 glass-surface p-6">
+            <div className="space-y-4 bg-transparent border border-focus/30 rounded-xl p-6">
               <div className="flex items-center">
                 <input
                   type="checkbox"
                   id="defaultBillable"
                   checked={settings.defaultBillable}
                   onChange={(e) => setSettings({ ...settings, defaultBillable: e.target.checked })}
-                  className="w-4 h-4 text-focus border-glass-border bg-glass-bg rounded focus:ring-focus/30"
+                  className="w-4 h-4 text-focus border-focus/20 bg-transparent rounded focus:ring-focus/30"
                 />
                 <label htmlFor="defaultBillable" className="ml-2 text-sm font-medium text-txt-secondary">
                   Mark entries as billable by default
@@ -306,7 +308,7 @@ export default function Settings() {
                 <select
                   value={settings.roundingMode}
                   onChange={(e) => setSettings({ ...settings, roundingMode: e.target.value as any })}
-                  className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                  className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                 >
                   <option value="none">No rounding</option>
                   <option value="5min">Round to nearest 5 minutes</option>
@@ -314,7 +316,7 @@ export default function Settings() {
                 </select>
               </div>
 
-              <div className="pt-4 border-t border-glass-border">
+              <div className="pt-4 border-t border-focus/20">
                 <h3 className="text-sm font-display font-semibold text-txt-primary mb-3">Workday Boundaries</h3>
 
                 <div className="flex items-center mb-3">
@@ -323,7 +325,7 @@ export default function Settings() {
                     id="enableBoundaryCheck"
                     checked={settings.enableBoundaryCheck}
                     onChange={(e) => setSettings({ ...settings, enableBoundaryCheck: e.target.checked })}
-                    className="w-4 h-4 text-focus border-glass-border bg-glass-bg rounded focus:ring-focus/30"
+                    className="w-4 h-4 text-focus border-focus/20 bg-transparent rounded focus:ring-focus/30"
                   />
                   <label htmlFor="enableBoundaryCheck" className="ml-2 text-sm font-medium text-txt-secondary">
                     Show confirmation when starting work outside preferred hours
@@ -339,7 +341,7 @@ export default function Settings() {
                     value={settings.workdayEndTime}
                     onChange={(e) => setSettings({ ...settings, workdayEndTime: e.target.value })}
                     disabled={!settings.enableBoundaryCheck}
-                    className="px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 disabled:opacity-40 disabled:text-txt-dim"
+                    className="px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 disabled:opacity-40 disabled:text-txt-dim"
                   />
                   <p className="mt-1 text-xs text-txt-dim">
                     You'll be asked to confirm if you start work after this time
@@ -352,7 +354,7 @@ export default function Settings() {
           {/* AI Insights */}
           <section>
             <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">AI Insights</h2>
-            <div className="space-y-4 glass-surface p-6">
+            <div className="space-y-4 bg-transparent border border-focus/30 rounded-xl p-6">
               <div>
                 <label className="block uppercase tracking-wider text-xs text-txt-muted mb-2">
                   OpenRouter API Key
@@ -361,7 +363,7 @@ export default function Settings() {
                   type="password"
                   value={settings.openRouterApiKey}
                   onChange={(e) => setSettings({ ...settings, openRouterApiKey: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                  className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   placeholder="sk-or-..."
                 />
                 <p className="mt-1 text-xs text-txt-dim">
@@ -377,7 +379,7 @@ export default function Settings() {
                   type="text"
                   value={settings.openRouterModel}
                   onChange={(e) => setSettings({ ...settings, openRouterModel: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-glass-bg border border-glass-border rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+                  className="w-full px-4 py-2.5 bg-transparent border border-focus/20 rounded-xl text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
                   placeholder="anthropic/claude-4.5-sonnet-20250929"
                 />
                 <p className="mt-1 text-xs text-txt-dim">
@@ -390,14 +392,14 @@ export default function Settings() {
           {/* Menu Bar */}
           <section>
             <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Menu Bar</h2>
-            <div className="space-y-4 glass-surface p-6">
+            <div className="space-y-4 bg-transparent border border-focus/30 rounded-xl p-6">
               <div className="flex items-center">
                 <input
                   type="checkbox"
                   id="showTrayIcon"
                   checked={settings.showTrayIcon}
                   onChange={(e) => setSettings({ ...settings, showTrayIcon: e.target.checked })}
-                  className="w-4 h-4 text-focus border-glass-border bg-glass-bg rounded focus:ring-focus/30"
+                  className="w-4 h-4 text-focus border-focus/20 bg-transparent rounded focus:ring-focus/30"
                 />
                 <label htmlFor="showTrayIcon" className="ml-2 text-sm font-medium text-txt-secondary">
                   Show Electron menu bar icon
@@ -414,7 +416,7 @@ export default function Settings() {
             <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">
               Task Tracking
             </h2>
-            <div className="space-y-4 glass-surface p-6">
+            <div className="space-y-4 bg-transparent border border-focus/30 rounded-xl p-6">
               <TaskTrackingPreferences />
             </div>
           </section>
@@ -441,7 +443,6 @@ export default function Settings() {
           </div>
         </div>
       </div>
-    </div>
     </div>
   );
 }

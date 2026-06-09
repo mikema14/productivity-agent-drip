@@ -37,13 +37,8 @@ export default {
         txt: {
           primary: '#f0f0f2',
           secondary: '#a0a0b0',
-          muted: '#6b6b80',
+          muted: '#8585a0',
           dim: '#45455a',
-        },
-        glass: {
-          bg: 'rgba(255, 255, 255, 0.03)',
-          border: 'rgba(255, 255, 255, 0.06)',
-          hover: 'rgba(255, 255, 255, 0.08)',
         },
       },
       boxShadow: {

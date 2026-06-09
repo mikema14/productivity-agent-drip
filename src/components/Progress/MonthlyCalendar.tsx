@@ -62,12 +62,12 @@ export default function MonthlyCalendar({ year, month, dailyMinutes, onPrevMonth
   const deepPct = totalMinutes > 0 ? Math.round((deepMinutes / totalMinutes) * 100) : 0;
 
   return (
-    <div className="glass-surface p-6 h-full flex flex-col">
+    <div className="bg-transparent border border-focus/30 rounded-xl p-6 h-full flex flex-col">
       {/* Header with month nav */}
       <div className="flex items-center justify-between mb-5">
         <button
           onClick={onPrevMonth}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-txt-muted hover:text-txt-primary hover:bg-glass-hover transition-all"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-txt-muted hover:text-txt-primary hover:bg-focus/5 transition-all"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M9 3L5 7L9 11" />
@@ -84,7 +84,7 @@ export default function MonthlyCalendar({ year, month, dailyMinutes, onPrevMonth
         <button
           onClick={onNextMonth}
           disabled={!canGoNext}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-txt-muted hover:text-txt-primary hover:bg-glass-hover transition-all disabled:opacity-20 disabled:cursor-not-allowed"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-txt-muted hover:text-txt-primary hover:bg-focus/5 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M5 3L9 7L5 11" />
@@ -135,7 +135,7 @@ export default function MonthlyCalendar({ year, month, dailyMinutes, onPrevMonth
       </div>
 
       {/* Footer: summary + legend */}
-      <div className="flex items-center justify-between mt-4 pt-4 border-t border-glass-border">
+      <div className="flex items-center justify-between mt-4 pt-4 border-t border-focus/20">
         <div className="flex items-center gap-4">
           <div className="text-xs text-txt-muted">
             <span className="font-mono text-txt-secondary">{formatHours(totalMinutes) || '0m'}</span> total

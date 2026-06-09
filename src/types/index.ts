@@ -5,13 +5,17 @@ export interface TimerState {
   status: TimerStatus;
   remainingSeconds: number;
   currentTaskId: string | null;
+  currentBillable: boolean;
   sessionCount: number;
   isPaused: boolean;
   intention: string;
   showCompletionModal: boolean;
+  durationMinutes: number;
   setIntention: (intention: string) => void;
   setShowCompletionModal: (show: boolean) => void;
-  startFocus: (taskId?: string) => void;
+  setDurationMinutes: (minutes: number) => void;
+  setCurrentBillable: (billable: boolean) => void;
+  startFocus: (taskId?: string, billable?: boolean) => void;
   startBreak: (isLong: boolean) => void;
   tick: () => void;
   pause: () => void;
@@ -390,6 +394,7 @@ export interface TaskList {
   task_id: string | null;
   order: number;
   archived: 0 | 1;
+  billable: 0 | 1;
   created_at: string;
 }
 
@@ -405,6 +410,7 @@ export interface ListItem {
   completed_at: string | null;
   description: string | null;
   subtasks: string; // JSON: Subtask[]
+  billable: 0 | 1;
   created_at: string;
 }
 
@@ -428,6 +434,7 @@ export interface ListsAPI {
   updateListItem: (id: string, updates: Partial<ListItem>) => Promise<void>;
   deleteListItem: (id: string) => Promise<void>;
   archiveOldCompleted: () => Promise<number>;
+  getBillableForTask: (taskId: string | null) => Promise<boolean>;
 }
 
 // Component props

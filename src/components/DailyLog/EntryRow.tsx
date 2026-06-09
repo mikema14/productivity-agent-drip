@@ -1,8 +1,9 @@
-import { useState, memo } from 'react';
+import { useState, useEffect, memo } from 'react';
 import type { LogEntry } from '../../stores/logStore';
 import type { MergedEntry } from '../../utils/mergeEntries';
 import TaskIdInput from '../shared/TaskIdInput';
 import TaskDisplay from '../shared/TaskDisplay';
+import BillableToggle from '../shared/BillableToggle';
 
 interface EntryRowProps {
   entry: LogEntry | MergedEntry;
@@ -17,6 +18,13 @@ interface EntryRowProps {
 function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAccept, onDismiss, inTimeline = false }: EntryRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedEntry, setEditedEntry] = useState(entry);
+
+  // Keep the edit buffer in sync with the latest entry prop. The row is memo-ized
+  // and persists across reloads, so without this the buffer would be a stale
+  // mount-time snapshot and Save could revert fields (e.g. billable) to old values.
+  useEffect(() => {
+    if (!isEditing) setEditedEntry(entry);
+  }, [entry, isEditing]);
 
   const isBreak = entry.source === 'break';
 
@@ -123,15 +131,10 @@ function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAccept, onDismiss,
 
           {/* Row 3: Billable and Actions */}
           <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={editedEntry.billable ?? true}
-                onChange={(e) => setEditedEntry({ ...editedEntry, billable: e.target.checked })}
-                className="w-4 h-4 accent-focus"
-              />
-              <span className="text-sm text-txt-secondary">Billable</span>
-            </label>
+            <BillableToggle
+              checked={editedEntry.billable ?? true}
+              onChange={(v) => setEditedEntry({ ...editedEntry, billable: v })}
+            />
             <div className="flex gap-2">
               <button
                 onClick={handleSave}

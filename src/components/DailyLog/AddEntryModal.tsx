@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import TaskIdInput from '../shared/TaskIdInput';
+import BillableToggle from '../shared/BillableToggle';
 import type { LogTemplate } from '../../types';
 
 interface AddEntryModalProps {
@@ -43,6 +44,10 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
     if (!title) {
       setTitle(taskTitle);
     }
+    // Pre-fill billable from the task's default (list item > list > global).
+    window.listsAPI?.getBillableForTask?.(selectedTaskId)
+      .then(setBillable)
+      .catch(() => {});
   };
 
   const applyTemplate = (template: LogTemplate) => {
@@ -226,19 +231,9 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
             />
           </div>
 
-          <div>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={billable}
-                onChange={(e) => setBillable(e.target.checked)}
-                className="w-4 h-4 text-focus border-focus/20 rounded focus:ring-focus/30"
-                disabled={isSubmitting}
-              />
-              <span className="text-sm font-medium text-txt-secondary">
-                Billable
-              </span>
-            </label>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-txt-secondary">Billable</span>
+            <BillableToggle checked={billable} onChange={setBillable} disabled={isSubmitting} />
           </div>
         </form>
 

@@ -14,7 +14,7 @@ function MetricCard({ label, value, sub, color, delay }: {
 }) {
   return (
     <div
-      className="group relative overflow-hidden rounded-2xl border border-glass-border bg-drip-surface/40 backdrop-blur-sm p-5 transition-all duration-300 hover:border-glass-hover hover:bg-drip-surface/60"
+      className="group relative overflow-hidden rounded-2xl border border-focus/20 bg-drip-surface/40 backdrop-blur-sm p-5 transition-all duration-300 hover:border-focus/30 hover:bg-focus/5"
     >
       {/* Subtle top accent line */}
       <div className={`absolute top-0 left-4 right-4 h-px ${color} opacity-30`} />

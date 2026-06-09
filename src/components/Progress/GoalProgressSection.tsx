@@ -49,7 +49,7 @@ export default function GoalProgressSection() {
 
   if (goalsWithProgress.length === 0) {
     return (
-      <div className="glass-surface p-6 h-full flex flex-col items-center justify-center text-center">
+      <div className="bg-transparent border border-focus/30 rounded-xl p-6 h-full flex flex-col items-center justify-center text-center">
         <div className="text-txt-dim/20 text-3xl font-mono mb-2">+</div>
         <p className="text-xs text-txt-dim">No goals defined</p>
         <p className="text-[10px] text-txt-dim/60 mt-1">Create goals in Settings</p>
@@ -58,7 +58,7 @@ export default function GoalProgressSection() {
   }
 
   return (
-    <div className="glass-surface p-6 h-full">
+    <div className="bg-transparent border border-focus/30 rounded-xl p-6 h-full">
       <h2 className="text-xs uppercase tracking-[0.15em] text-txt-muted font-display mb-5">Goals</h2>
 
       <div className="space-y-5">
@@ -92,7 +92,7 @@ export default function GoalProgressSection() {
                   {goal.linkedTasks.map(task => (
                     <span
                       key={task.taskId}
-                      className="px-2 py-0.5 bg-white/[0.03] border border-glass-border text-txt-dim rounded text-[10px] font-mono hover:text-txt-muted transition-colors"
+                      className="px-2 py-0.5 bg-white/[0.03] border border-focus/20 text-txt-dim rounded text-[10px] font-mono hover:text-txt-muted transition-colors"
                       title={`${task.title}: ${Math.round(task.minutes / 60 * 10) / 10}h`}
                     >
                       #{task.taskId}

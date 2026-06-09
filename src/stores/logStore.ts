@@ -188,21 +188,23 @@ export const useLogStore = create<LogState>()(
 
     try {
       if (entry.type === 'pomodoro') {
-        await window.logAPI.updateSession(id, {
-          task_id: changes.taskId,
-          comment: changes.comment || null,
-          duration_minutes: changes.durationMinutes,
-          billable: changes.billable !== undefined ? (changes.billable ? 1 : 0) : undefined,
-        });
+        // Only write fields actually present in `changes` so an edit can't clobber
+        // an unrelated field (e.g. billable) to a default/undefined value.
+        const dbUpdates: Partial<PomodoroSession> = {};
+        if ('taskId' in changes) dbUpdates.task_id = changes.taskId ?? null;
+        if ('comment' in changes) dbUpdates.comment = changes.comment || null;
+        if ('durationMinutes' in changes) dbUpdates.duration_minutes = changes.durationMinutes;
+        if ('billable' in changes) dbUpdates.billable = changes.billable ? 1 : 0;
+        await window.logAPI.updateSession(id, dbUpdates);
       } else if (entry.type === 'adhoc') {
-        await window.logAPI.updateAdhocEntry(id, {
-          task_id: changes.taskId,
-          title: changes.title,
-          comment: changes.comment || null,
-          duration_minutes: changes.durationMinutes,
-          marked_to_log: changes.markedToLog ? 1 : 0,
-          billable: changes.billable !== undefined ? (changes.billable ? 1 : 0) : undefined,
-        });
+        const dbUpdates: Partial<AdhocEntry> = {};
+        if ('taskId' in changes) dbUpdates.task_id = changes.taskId ?? null;
+        if ('title' in changes) dbUpdates.title = changes.title;
+        if ('comment' in changes) dbUpdates.comment = changes.comment || null;
+        if ('durationMinutes' in changes) dbUpdates.duration_minutes = changes.durationMinutes;
+        if ('markedToLog' in changes) dbUpdates.marked_to_log = changes.markedToLog ? 1 : 0;
+        if ('billable' in changes) dbUpdates.billable = changes.billable ? 1 : 0;
+        await window.logAPI.updateAdhocEntry(id, dbUpdates);
       } else if (entry.type === 'calendar') {
         await window.logAPI.updateCalendarProposal?.(id, {
           task_id: changes.taskId || null,
