@@ -45,6 +45,7 @@ interface LogState {
   toggleLogMark: (id: string) => void;
   toggleSelectAll: () => Promise<void>;
   logSelected: () => Promise<LogResult>;
+  moveEntries: (targetDate: string, entryIds?: string[]) => Promise<void>;
 }
 
 export const useLogStore = create<LogState>()(
@@ -417,6 +418,40 @@ export const useLogStore = create<LogState>()(
       failed: failedCount,
       errors,
     };
+  },
+
+  moveEntries: async (targetDate: string, entryIds?: string[]) => {
+    const { entries, selectedDate } = get();
+
+    const toMove = entryIds
+      ? entries.filter(e => entryIds.includes(e.id))
+      : entries.filter(e => e.markedToLog && !e.logged && e.source !== 'break');
+
+    for (const entry of toMove) {
+      if (entry.type === 'adhoc') {
+        await window.logAPI.updateAdhocEntry(entry.id, { date: targetDate });
+
+      } else if (entry.type === 'pomodoro') {
+        // Keep time-of-day, replace only the YYYY-MM-DD prefix
+        const startAt = entry.startTime ?? '';
+        const timePart = startAt.substring(10); // "T08:06:14.742Z"
+        const newStartAt = `${targetDate}${timePart}`;
+        await window.logAPI.updateSession(entry.id, { start_at: newStartAt });
+
+      } else if (entry.type === 'calendar') {
+        const updates: Record<string, unknown> = { date: targetDate };
+        if (entry.startTime) {
+          const timePart = entry.startTime.substring(10);
+          const newStartAt = `${targetDate}${timePart}`;
+          updates.start_at = newStartAt;
+          const newStartMs = new Date(newStartAt).getTime();
+          updates.end_at = new Date(newStartMs + entry.durationMinutes * 60 * 1000).toISOString();
+        }
+        await window.logAPI.updateCalendarProposal?.(entry.id, updates);
+      }
+    }
+
+    await get().loadDay(selectedDate, true);
   },
 
   // Time calculation selectors

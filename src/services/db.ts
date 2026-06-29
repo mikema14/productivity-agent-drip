@@ -1013,6 +1013,14 @@ export function updateCalendarProposal(id: string, updates: any): void {
     fields.push('comment = ?');
     values.push(updates.comment);
   }
+  if (updates.date !== undefined) {
+    fields.push('date = ?');
+    values.push(updates.date);
+  }
+  if (updates.logged !== undefined) {
+    fields.push('logged = ?');
+    values.push(updates.logged);
+  }
 
   if (fields.length === 0) return;
 

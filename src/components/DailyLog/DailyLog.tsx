@@ -34,6 +34,7 @@ export default function DailyLog() {
     toggleLogMark,
     toggleSelectAll,
     logSelected,
+    moveEntries,
   } = useLogStore();
 
   const { isDayLocked } = useShutdownStore();
@@ -49,6 +50,8 @@ export default function DailyLog() {
   const [isGrouped, setIsGrouped] = useState(false);
   const [dayLocked, setDayLocked] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showMoveCalendar, setShowMoveCalendar] = useState(false);
+  const [moveSingleId, setMoveSingleId] = useState<string | null>(null);
 
   // Auto-dismiss toast after 10 seconds
   useEffect(() => {
@@ -197,6 +200,30 @@ export default function DailyLog() {
   const stableToggle  = useCallback((id: string)               => handleToggleLogMergedRef.current(id),       []);
   const stableAccept  = useCallback((id: string)               => handleAcceptProposalRef.current(id),        []);
   const stableDismiss = useCallback((id: string)               => handleDismissProposalRef.current(id),       []);
+
+  // Move entries handlers
+  const handleMoveSingleRef = useRef((id: string) => {
+    setMoveSingleId(id);
+    setShowMoveCalendar(true);
+  });
+  const stableMove = useCallback((id: string) => handleMoveSingleRef.current(id), []);
+
+  const handleMoveConfirm = async (targetDate: string) => {
+    setShowMoveCalendar(false);
+    const ids = moveSingleId ? [moveSingleId] : undefined;
+    setMoveSingleId(null);
+    const count = ids ? ids.length : entries.filter(e => e.markedToLog && !e.logged && e.source !== 'break').length;
+    try {
+      await moveEntries(targetDate, ids);
+      window.timerAPI.showNotification(
+        'Entries Moved',
+        `${count} ${count === 1 ? 'entry' : 'entries'} moved to ${targetDate}`
+      );
+    } catch (error) {
+      console.error('Failed to move entries:', error);
+      window.timerAPI.showNotification('Move Failed', 'Could not move entries');
+    }
+  };
 
   const handleLogSelected = async () => {
     setIsLogging(true);
@@ -399,6 +426,7 @@ export default function DailyLog() {
                 onEndDay={handleEndDay}
                 onSelectToggle={toggleSelectAll}
                 onLogSelected={handleLogSelected}
+                onMoveEntries={() => { setMoveSingleId(null); setShowMoveCalendar(true); }}
                 isDayLocked={dayLocked}
                 isSyncing={isSyncing}
                 markedCount={markedCount}
@@ -406,6 +434,16 @@ export default function DailyLog() {
                 allSelected={allSelected}
                 isLogging={isLogging}
               />
+
+              {showMoveCalendar && (
+                <div className="relative z-50">
+                  <CalendarPopover
+                    selectedDate={selectedDate}
+                    onSelectDate={handleMoveConfirm}
+                    onClose={() => setShowMoveCalendar(false)}
+                  />
+                </div>
+              )}
 
               {viewMode === 'timeline' ? (
                 <TimelineView entries={entries} />
@@ -428,6 +466,7 @@ export default function DailyLog() {
                         onToggleLog={stableToggle}
                         onAccept={stableAccept}
                         onDismiss={stableDismiss}
+                        onMove={stableMove}
                       />
                     </TimelineItem>
                   ))}

@@ -12,10 +12,11 @@ interface EntryRowProps {
   onToggleLog: (id: string) => void;
   onAccept?: (id: string) => void;
   onDismiss?: (id: string) => void;
+  onMove?: (id: string) => void;
   inTimeline?: boolean;  // Adjusts styling when in timeline
 }
 
-function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAccept, onDismiss, inTimeline = false }: EntryRowProps) {
+function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAccept, onDismiss, onMove, inTimeline = false }: EntryRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedEntry, setEditedEntry] = useState(entry);
 
@@ -261,6 +262,14 @@ function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAccept, onDismiss,
                       Edit
                     </button>
                   )}
+                  {onMove && !entry.logged && (
+                    <button
+                      onClick={() => onMove(entry.id)}
+                      className="px-3 py-1 text-sm text-txt-muted hover:bg-focus/5 rounded"
+                    >
+                      Move
+                    </button>
+                  )}
                   <button
                     onClick={() => onDelete(entry.id)}
                     className="px-3 py-1 text-sm text-red-400 hover:bg-red-500/10 rounded"
@@ -297,5 +306,6 @@ export default memo(EntryRow, (prev, next) =>
   prev.entry.billable        === next.entry.billable &&
   prev.entry.markedToLog     === next.entry.markedToLog &&
   prev.entry.logged          === next.entry.logged &&
-  prev.entry.isProposal      === next.entry.isProposal
+  prev.entry.isProposal      === next.entry.isProposal &&
+  prev.onMove                === next.onMove
 );

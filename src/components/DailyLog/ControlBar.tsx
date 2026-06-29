@@ -15,6 +15,7 @@ interface ControlBarProps {
   onEndDay: () => void;
   onSelectToggle: () => void;
   onLogSelected: () => void;
+  onMoveEntries: () => void;
 
   // State
   isDayLocked: boolean;
@@ -33,16 +34,25 @@ export default function ControlBar(props: ControlBarProps) {
         {/* Left: View Toggle */}
         <ViewToggle viewMode={props.viewMode} onViewChange={props.onViewModeChange} />
 
-        {/* Right: Primary Action - Log Selected */}
+        {/* Right: Move + Log actions */}
         {props.markedCount > 0 && (
-          <button
-            onClick={props.onLogSelected}
-            disabled={props.isLogging}
-            className="px-4 py-2 bg-emerald-500/80 hover:bg-emerald-500 text-white rounded-xl font-display font-medium backdrop-blur-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {props.isLogging ? 'Logging...' : `Log ${props.markedCount} ${props.markedCount === 1 ? 'Item' : 'Items'}`}
-            <span>→</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={props.onMoveEntries}
+              className="px-3 py-2 text-sm border border-focus/20 text-txt-muted rounded-xl hover:bg-focus/5 hover:text-txt-secondary flex items-center gap-1.5 transition-all"
+            >
+              <span>↗</span>
+              <span>Move to...</span>
+            </button>
+            <button
+              onClick={props.onLogSelected}
+              disabled={props.isLogging}
+              className="px-4 py-2 bg-emerald-500/80 hover:bg-emerald-500 text-white rounded-xl font-display font-medium backdrop-blur-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {props.isLogging ? 'Logging...' : `Log ${props.markedCount} ${props.markedCount === 1 ? 'Item' : 'Items'}`}
+              <span>→</span>
+            </button>
+          </div>
         )}
       </div>
 
