@@ -21,6 +21,7 @@
 | **Destructive ghost** | `text-txt-dim hover:text-red-400 transition-colors` |
 | **Toggle (active)** | `bg-focus/15 text-focus border border-focus/30` |
 | **Toggle (inactive)** | `text-txt-secondary hover:text-txt-primary hover:bg-focus/5` |
+| **Billable toggle** | Shared `BillableToggle` pill — active `bg-focus/15 text-focus border-focus/30` (with `✓`), inactive `bg-transparent text-txt-secondary border-focus/20 hover:bg-focus/5`, `rounded-full`. Use it for any billable control (timer, lists, items, log entries) instead of a raw checkbox. See `BILLABLE_FEATURE.md`. |
 | **Filter pill (active)** | `bg-focus/15 text-focus` |
 | **Filter pill (inactive)** | `text-txt-muted hover:text-txt-secondary hover:bg-focus/5` |
 | **Container / card** | `bg-transparent border border-focus/30 rounded-xl` |
