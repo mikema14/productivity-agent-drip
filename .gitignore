@@ -24,6 +24,9 @@ out/
 *.db-shm
 *.db-wal
 
+# Leexi sync runtime state (watermark + processed tasks — machine-local)
+leexi-sync/state.json
+
 # IDE
 .vscode/
 .idea/
