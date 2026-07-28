@@ -13,6 +13,7 @@ interface TaskDetailInlineProps {
 
 export default function TaskDetailInline({ item, listColor, onUpdate, onClose }: TaskDetailInlineProps) {
   const [title, setTitle] = useState(item.title);
+  const [taskId, setTaskId] = useState(item.task_id || '');
   const [description, setDescription] = useState(item.description || '');
   const [subtasks, setSubtasks] = useState<Subtask[]>(() => {
     try { return JSON.parse(item.subtasks || '[]'); } catch { return []; }
@@ -22,6 +23,13 @@ export default function TaskDetailInline({ item, listColor, onUpdate, onClose }:
   const saveTitle = () => {
     if (title.trim() && title !== item.title) {
       onUpdate(item.id, { title: title.trim() });
+    }
+  };
+
+  const saveTaskId = () => {
+    const val = taskId.trim() || null;
+    if (val !== (item.task_id || null)) {
+      onUpdate(item.id, { task_id: val });
     }
   };
 
@@ -71,6 +79,19 @@ export default function TaskDetailInline({ item, listColor, onUpdate, onClose }:
             <path d="M4 10l6-6M10 10L4 4" />
           </svg>
         </button>
+      </div>
+
+      {/* Task ID */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-txt-muted font-medium w-16 shrink-0">Task ID</span>
+        <input
+          value={taskId}
+          onChange={e => setTaskId(e.target.value)}
+          onBlur={saveTaskId}
+          onKeyDown={e => e.key === 'Enter' && saveTaskId()}
+          placeholder="e.g. 673129"
+          className="flex-1 bg-transparent border border-focus/20 rounded-lg px-2 py-1 text-xs font-mono text-txt-primary placeholder-txt-dim outline-none focus:ring-1 focus:ring-focus/20 transition-all"
+        />
       </div>
 
       {/* Description */}

@@ -5,14 +5,13 @@ import BillableToggle from '../shared/BillableToggle';
 interface AddItemInlineProps {
   listId: string;
   column: ListItemColumn;
-  showTaskId?: boolean;
   /** The parent list's billable default — seeds the toggle for new items. */
   defaultBillable?: boolean;
   onAdd: (title: string, taskId: string | null, billable: boolean) => Promise<void>;
   onCancel: () => void;
 }
 
-export default function AddItemInline({ showTaskId, defaultBillable = true, onAdd, onCancel }: AddItemInlineProps) {
+export default function AddItemInline({ defaultBillable = true, onAdd, onCancel }: AddItemInlineProps) {
   const [title, setTitle] = useState('');
   const [taskId, setTaskId] = useState('');
   const [billable, setBillable] = useState(defaultBillable);
@@ -44,21 +43,17 @@ export default function AddItemInline({ showTaskId, defaultBillable = true, onAd
           if (e.key === 'Escape') onCancel();
         }}
       />
-      {showTaskId && (
-        <input
-          value={taskId}
-          onChange={(e) => setTaskId(e.target.value)}
-          placeholder="Task ID (optional)"
-          className="w-full px-3 py-1.5 bg-transparent border border-focus/20 text-txt-primary placeholder-txt-dim rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-focus/30 transition-all"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleSubmit();
-            if (e.key === 'Escape') onCancel();
-          }}
-        />
-      )}
-      {showTaskId && (
-        <BillableToggle checked={billable} onChange={setBillable} size="sm" />
-      )}
+      <input
+        value={taskId}
+        onChange={(e) => setTaskId(e.target.value)}
+        placeholder="Task ID (optional)"
+        className="w-full px-3 py-1.5 bg-transparent border border-focus/20 text-txt-primary placeholder-txt-dim rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-focus/30 transition-all"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') handleSubmit();
+          if (e.key === 'Escape') onCancel();
+        }}
+      />
+      <BillableToggle checked={billable} onChange={setBillable} size="sm" />
       <div className="flex gap-1.5">
         <button
           onClick={handleSubmit}

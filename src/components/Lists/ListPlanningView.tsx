@@ -51,6 +51,7 @@ export default function ListPlanningView() {
   const [expandedChecklistId, setExpandedChecklistId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [taskNames, setTaskNames] = useState<Record<string, string>>({});
+  const [openListPickerId, setOpenListPickerId] = useState<string | null>(null);
 
   const selectedList = lists.find(l => l.id === selectedListId);
   const listTaskName = useTaskName(selectedList?.task_id || null);
@@ -62,6 +63,19 @@ export default function ListPlanningView() {
   useEffect(() => { loadLists(); }, []);
   useEffect(() => { if (selectedListId) loadItems(selectedListId); }, [selectedListId]);
   useEffect(() => { if (!selectedListId && lists.length > 0) selectList(lists[0].id); }, [lists, selectedListId]);
+
+  useEffect(() => {
+    if (!openListPickerId) return;
+    const handler = () => setOpenListPickerId(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [openListPickerId]);
+
+  const handleMoveToList = (itemId: string, newListId: string) => {
+    updateItem(itemId, { list_id: newListId });
+    setOpenListPickerId(null);
+    if (selectedListId) loadItems(selectedListId);
+  };
 
   // Resolve item task IDs to names for tooltips
   useEffect(() => {
@@ -251,7 +265,6 @@ export default function ListPlanningView() {
                     <AddItemInline
                       listId={selectedListId!}
                       column={key}
-                      showTaskId={isFolderList}
                       defaultBillable={selectedList.billable !== 0}
                       onAdd={(title, taskId, billable) => handleAddItem(key, title, taskId, billable)}
                       onCancel={() => setAddingColumn(null)}
@@ -305,6 +318,32 @@ export default function ListPlanningView() {
                                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M5 3l3 3-3 3" /></svg>
                                 </button>
                               )}
+                              {/* Move to list */}
+                              <div className="relative" onClick={e => e.stopPropagation()}>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setOpenListPickerId(openListPickerId === item.id ? null : item.id); }}
+                                  className="p-1 text-txt-muted hover:text-txt-secondary"
+                                  title="Move to list"
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M1 3h4l1 1.5h5v6H1z" />
+                                  </svg>
+                                </button>
+                                {openListPickerId === item.id && (
+                                  <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-drip-surface border border-focus/30 rounded-xl shadow-xl py-1 animate-fade-in">
+                                    {lists.filter(l => l.id !== selectedListId && !l.archived).map(l => (
+                                      <button
+                                        key={l.id}
+                                        onClick={() => handleMoveToList(item.id, l.id)}
+                                        className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-txt-secondary hover:bg-focus/10 hover:text-txt-primary transition-colors text-left"
+                                      >
+                                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: l.color }} />
+                                        {l.name}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                               <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} className="p-1 text-txt-muted hover:text-red-400" title="Delete">
                                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 3l6 6M9 3l-6 6" /></svg>
                               </button>

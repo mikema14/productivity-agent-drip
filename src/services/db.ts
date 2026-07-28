@@ -1576,7 +1576,7 @@ export function updateListItem(id: string, updates: Partial<ListItem>): void {
       updates.archived = 0;
     }
   }
-  const allowed = ['title', 'task_id', 'column', 'order', 'completed', 'archived', 'completed_at', 'description', 'subtasks', 'billable'] as const;
+  const allowed = ['list_id', 'title', 'task_id', 'column', 'order', 'completed', 'archived', 'completed_at', 'description', 'subtasks', 'billable'] as const;
   const sets: string[] = [];
   const values: any[] = [];
   for (const key of allowed) {
