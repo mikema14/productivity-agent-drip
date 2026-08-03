@@ -320,6 +320,7 @@ export default function AllListsOverview() {
             item={item}
             listColor={list?.color || '#f59e0b'}
             isFolderList={!list?.task_id}
+            listTaskId={list?.task_id ?? null}
             onUpdate={updateItem}
             onClose={() => setExpandedItemId(null)}
           />

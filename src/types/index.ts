@@ -15,7 +15,7 @@ export interface TimerState {
   setShowCompletionModal: (show: boolean) => void;
   setDurationMinutes: (minutes: number) => void;
   setCurrentBillable: (billable: boolean) => void;
-  startFocus: (taskId?: string, billable?: boolean) => void;
+  startFocus: (taskId?: string, billable?: boolean) => Promise<void>;
   startBreak: (isLong: boolean) => void;
   tick: () => void;
   pause: () => void;

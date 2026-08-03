@@ -355,6 +355,7 @@ export default function ListPlanningView() {
                               item={item}
                               listColor={selectedList.color}
                               isFolderList={isFolderList}
+                              listTaskId={selectedList.task_id}
                               onUpdate={updateItem}
                               onClose={() => setExpandedItemId(null)}
                             />

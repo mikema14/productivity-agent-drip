@@ -29,6 +29,17 @@ export interface LogResult {
   errors: Array<{ entryId: string; error: string }>;
 }
 
+// A single piece of time to record — used by both the "save locally" and the
+// "post to Easy Project now" paths.
+export interface TimeEntryInput {
+  date: string; // YYYY-MM-DD
+  durationMinutes: number;
+  title: string;
+  taskId: string | null;
+  comment: string | null;
+  billable: boolean;
+}
+
 interface LogState {
   entries: LogEntry[];
   selectedDate: string;
@@ -45,6 +56,7 @@ interface LogState {
   toggleLogMark: (id: string) => void;
   toggleSelectAll: () => Promise<void>;
   logSelected: () => Promise<LogResult>;
+  logEntryNow: (entry: TimeEntryInput) => Promise<{ success: boolean; error?: string }>;
   moveEntries: (targetDate: string, entryIds?: string[]) => Promise<void>;
 }
 
@@ -418,6 +430,68 @@ export const useLogStore = create<LogState>()(
       failed: failedCount,
       errors,
     };
+  },
+
+  logEntryNow: async (entry: TimeEntryInput) => {
+    // Always persist locally first, so a failed POST still leaves the time
+    // recorded and marked-to-log for a retry from the Daily Log view.
+    let localId: string;
+    try {
+      localId = await window.logAPI.addAdhocEntry({
+        date: entry.date,
+        duration_minutes: entry.durationMinutes,
+        title: entry.title,
+        task_id: entry.taskId,
+        comment: entry.comment,
+        marked_to_log: 1,
+        logged: 0,
+        is_todo: 0,
+        due_date: null,
+        completed: 0,
+        billable: entry.billable ? 1 : 0,
+        start_time: null,
+      });
+    } catch (error) {
+      console.error('Failed to save entry before logging:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Could not save the entry',
+      };
+    }
+
+    try {
+      if (!entry.taskId) throw new Error('Task ID is required');
+      if (entry.durationMinutes <= 0) throw new Error('Duration must be greater than 0');
+
+      const { projectId } = await easyProjectAPI.getIssue(entry.taskId);
+
+      // postTimeEntry rejects an empty comment, so fall back like logSelected does.
+      const comment = entry.comment?.trim() || entry.title || 'Work session';
+
+      await easyProjectAPI.postTimeEntry({
+        issueId: entry.taskId,
+        projectId,
+        hours: entry.durationMinutes / 60,
+        spentOn: entry.date,
+        comments: comment,
+        billable: entry.billable,
+      });
+
+      await window.logAPI.updateAdhocEntry(localId, { logged: 1 });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to log entry to Easy Project:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    } finally {
+      // Only refresh when the entry landed on the day currently on screen.
+      if (entry.date === get().selectedDate) {
+        await get().loadDay(entry.date, true);
+      }
+    }
   },
 
   moveEntries: async (targetDate: string, entryIds?: string[]) => {

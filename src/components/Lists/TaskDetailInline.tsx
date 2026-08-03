@@ -2,16 +2,21 @@ import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { ListItem, Subtask } from '../../types';
 import BillableToggle from '../shared/BillableToggle';
+import LogTimeModal, { type LogTimeMode } from './LogTimeModal';
+import { useTimerStore } from '../../stores/timerStore';
+import { useLogStore } from '../../stores/logStore';
 
 interface TaskDetailInlineProps {
   item: ListItem;
   listColor: string;
   isFolderList: boolean;
+  /** The parent list's own task ID, which wins over the item's (same rule as TimerTaskList). */
+  listTaskId?: string | null;
   onUpdate: (id: string, updates: Partial<ListItem>) => Promise<void>;
   onClose: () => void;
 }
 
-export default function TaskDetailInline({ item, listColor, onUpdate, onClose }: TaskDetailInlineProps) {
+export default function TaskDetailInline({ item, listColor, listTaskId, onUpdate, onClose }: TaskDetailInlineProps) {
   const [title, setTitle] = useState(item.title);
   const [taskId, setTaskId] = useState(item.task_id || '');
   const [description, setDescription] = useState(item.description || '');
@@ -19,6 +24,84 @@ export default function TaskDetailInline({ item, listColor, onUpdate, onClose }:
     try { return JSON.parse(item.subtasks || '[]'); } catch { return []; }
   });
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [showLogModal, setShowLogModal] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const timerStatus = useTimerStore(s => s.status);
+  const startFocus = useTimerStore(s => s.startFocus);
+  const setIntention = useTimerStore(s => s.setIntention);
+  const setDurationMinutes = useTimerStore(s => s.setDurationMinutes);
+
+  // The list's task ID wins over the item's, matching TimerTaskList's resolution.
+  // Use the live field values so an unsaved edit is still what gets acted on.
+  const resolvedTaskId = listTaskId || taskId.trim() || null;
+  const resolvedTitle = title.trim() || item.title;
+  const isBillable = item.billable !== 0;
+  const sessionRunning = timerStatus !== 'idle';
+
+  const handleStartSession = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActionError(null);
+
+    // startFocus has no guard of its own — starting over a live session would
+    // silently discard its elapsed time.
+    if (useTimerStore.getState().status !== 'idle') return;
+
+    // Use the configured focus length. The store's own durationMinutes is just
+    // whatever the Timer's picker was last left at, so it can't be trusted here.
+    let focusMinutes = 25;
+    try {
+      focusMinutes = parseInt(await window.timerAPI.getSettings('pomodoroFocus') || '25', 10) || 25;
+    } catch {
+      // keep the 25 fallback
+    }
+
+    // Re-check after the await.
+    if (useTimerStore.getState().status !== 'idle') return;
+
+    // startFocus reads durationMinutes off the store, so set it first — this also
+    // keeps the Timer view's ring and picker in agreement with the real timer.
+    if (useTimerStore.getState().durationMinutes !== focusMinutes) {
+      setDurationMinutes(focusMinutes);
+    }
+
+    // The intention becomes the session's comment, and it persists between
+    // sessions — so always set it rather than inheriting a stale one.
+    setIntention(resolvedTitle);
+    await startFocus(resolvedTaskId || undefined, isBillable);
+
+    if (useTimerStore.getState().status === 'focus') {
+      window.timerAPI.showNotification('Focus session started', `${focusMinutes}m · ${resolvedTitle}`);
+    } else {
+      setActionError('Could not start the timer');
+    }
+  };
+
+  const handleLogSubmit = async (
+    mode: LogTimeMode,
+    values: { durationMinutes: number; date: string; comment: string | null }
+  ) => {
+    const payload = {
+      date: values.date,
+      durationMinutes: values.durationMinutes,
+      title: resolvedTitle,
+      taskId: resolvedTaskId,
+      comment: values.comment,
+      billable: isBillable,
+    };
+
+    if (mode === 'local') {
+      await useLogStore.getState().addManualEntry(payload);
+      window.timerAPI.showNotification('Added to Daily Log', `${values.durationMinutes}m · ${resolvedTitle}`);
+      return;
+    }
+
+    const result = await useLogStore.getState().logEntryNow(payload);
+    if (!result.success) {
+      throw new Error(`Saved to Daily Log, but not sent to Easy Project: ${result.error}`);
+    }
+    window.timerAPI.showNotification('Time logged', `${values.durationMinutes}m · task ${resolvedTaskId}`);
+  };
 
   const saveTitle = () => {
     if (title.trim() && title !== item.title) {
@@ -106,15 +189,44 @@ export default function TaskDetailInline({ item, listColor, onUpdate, onClose }:
         />
       </div>
 
-      {/* Billable */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-txt-muted font-medium">Billable</span>
+      {/* Actions + Billable — wraps rather than overflowing a narrow column */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={handleStartSession}
+            disabled={sessionRunning}
+            title={sessionRunning ? 'A session is already running — open Timer to manage it' : 'Start a focus session for this task'}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-focus/15 text-focus rounded-lg hover:bg-focus/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+              <path d="M2 1l7 4-7 4z" />
+            </svg>
+            {sessionRunning ? 'Running' : 'Start'}
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setActionError(null); setShowLogModal(true); }}
+            title="Log time spent on this task"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-transparent border border-focus/20 text-txt-secondary rounded-lg hover:bg-focus/5 transition-colors"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <circle cx="5" cy="5" r="4" />
+              <path d="M5 3v2.2l1.5 1" />
+            </svg>
+            Log
+          </button>
+        </div>
         <BillableToggle
-          checked={item.billable !== 0}
+          checked={isBillable}
           onChange={(v) => onUpdate(item.id, { billable: v ? 1 : 0 })}
           size="sm"
         />
       </div>
+
+      {actionError && (
+        <div className="px-3 py-2 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg">
+          {actionError}
+        </div>
+      )}
 
       {/* Subtasks */}
       <div>
@@ -186,6 +298,16 @@ export default function TaskDetailInline({ item, listColor, onUpdate, onClose }:
           />
         </div>
       </div>
+
+      {showLogModal && (
+        <LogTimeModal
+          taskTitle={resolvedTitle}
+          taskId={resolvedTaskId}
+          billable={isBillable}
+          onClose={() => setShowLogModal(false)}
+          onSubmit={handleLogSubmit}
+        />
+      )}
     </div>
   );
 }
