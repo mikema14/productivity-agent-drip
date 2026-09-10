@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { updateTray } from './tray';
-import { sendTickToOverlay } from './overlayWindow';
+import { sendTickToOverlay, sampleActiveDisplay } from './overlayWindow';
 import { saveSetting } from '../src/services/db';
 
 interface TimerState {
@@ -140,6 +140,11 @@ function tick() {
 
   // Feed the overlay's break countdown (no-ops unless the break pill is up)
   sendTickToOverlay(state.status, state.remainingSeconds);
+
+  // Remember which display is in use, so the overlay lands there at session end
+  if (state.tickCount % 5 === 0) {
+    sampleActiveDisplay();
+  }
 }
 
 function handleComplete() {

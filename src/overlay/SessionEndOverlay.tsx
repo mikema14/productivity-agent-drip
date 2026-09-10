@@ -128,6 +128,12 @@ export function SessionEndOverlay() {
 
   useEffect(() => {
     window.overlayAPI?.onState((next) => {
+      // main sets the window back to click-through on hide, so drop the cached
+      // value or the next hover would be deduped away and clicks would never
+      // reach the overlay again.
+      interactiveRef.current = false;
+      noteFocusedRef.current = false;
+
       setPayload(next);
       stopEscalation();
 
@@ -155,8 +161,18 @@ export function SessionEndOverlay() {
     window.overlayAPI?.onTick((seconds) => setRemaining(seconds));
 
     const onBeforeUnload = () => flushNote(true);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        flushNote(true);
+        setExpanded(false);
+      }
+    };
     window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      window.removeEventListener('keydown', onKey);
+    };
   }, [flushNote, stopEscalation]);
 
   // Hover detection: the window is mostly empty pixels and click-through by
@@ -201,6 +217,7 @@ export function SessionEndOverlay() {
   useEffect(() => {
     if (expanded) inputRef.current?.focus();
   }, [expanded]);
+
 
   const act = useCallback(
     (type: OverlayActionType) => {

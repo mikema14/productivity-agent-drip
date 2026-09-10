@@ -1,26 +1,31 @@
 /**
- * Single source of truth for the overlay's glass recipe.
+ * Single source of truth for the overlay's surface.
  *
  * A transparent Electron BrowserWindow cannot blur the desktop behind it —
- * `backdrop-filter` only blurs content within the same window. So the fill is
- * raised well above the 0.62 used in the design mock, and the amber glow is
- * rendered as a layer *behind* the pane, which is what makes it read as glass.
+ * `backdrop-filter` only blurs content within the same window — so rather than
+ * imitate glass badly, this commits to a near-solid dark HUD in the spirit of
+ * macOS's own screenshot toolbar: crisp edge, tight shadow, high contrast on
+ * any wallpaper. The amber glow still renders as a layer behind the pane.
  */
-export const GLASS_OPACITY = 0.86;
+export const GLASS_OPACITY = 0.9;
 
 export const GLASS = {
   fill: `rgba(16, 16, 20, ${GLASS_OPACITY})`,
   fillWarm: `rgba(22, 17, 12, ${GLASS_OPACITY + 0.04})`,
   fillCool: `rgba(16, 20, 18, ${GLASS_OPACITY - 0.04})`,
-  hairline: 'rgba(255, 255, 255, 0.11)',
-  hairlineHot: 'rgba(245, 158, 11, 0.35)',
+  // A firmer edge than glass would use — it's what separates the HUD from a
+  // bright wallpaper.
+  hairline: 'rgba(255, 255, 255, 0.16)',
+  hairlineHot: 'rgba(245, 158, 11, 0.45)',
   blur: 'blur(52px) saturate(180%)',
   radiusCard: 24,
   radiusPill: 18,
+  // Tighter and lighter than the mock's — a big soft black shadow reads as a
+  // smudge on a light desktop.
   shadowCard:
-    '0 28px 64px rgba(0, 0, 0, 0.58), 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 0.5px 0 rgba(255, 255, 255, 0.11)',
+    '0 16px 40px rgba(0, 0, 0, 0.34), 0 2px 8px rgba(0, 0, 0, 0.22), inset 0 0.5px 0 rgba(255, 255, 255, 0.14)',
   shadowPill:
-    '0 12px 32px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.30), inset 0 0.5px 0 rgba(255, 255, 255, 0.10)',
+    '0 8px 22px rgba(0, 0, 0, 0.30), 0 1px 4px rgba(0, 0, 0, 0.20), inset 0 0.5px 0 rgba(255, 255, 255, 0.14)',
   sheen: 'linear-gradient(160deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 38%)',
   ease: 'cubic-bezier(0.32, 0.72, 0, 1)',
 } as const;
@@ -44,5 +49,9 @@ export const TXT = {
   dim: '#45455a',
 } as const;
 
-/** Window geometry — must match OVERLAY_W/H in electron/overlayWindow.ts */
-export const WINDOW = { width: 420, height: 280, inset: 18 } as const;
+/**
+ * Window geometry — must match OVERLAY_W/H in electron/overlayWindow.ts.
+ * `inset` has to exceed the shadow's blur + offset, or the window edge clips it
+ * into a hard dark line.
+ */
+export const WINDOW = { width: 480, height: 320, inset: 44 } as const;

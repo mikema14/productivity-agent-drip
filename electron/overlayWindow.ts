@@ -14,8 +14,13 @@ import type { SessionOverlayPayload } from '../src/types';
  * the main window renderer, which owns all timer logic.
  */
 
-const OVERLAY_W = 420;
-const OVERLAY_H = 280;
+/**
+ * The window is deliberately larger than the widest shape (384px card) so the
+ * drop shadow and the escalation halo have room. At a smaller size the shadow
+ * gets clipped by the window edge and shows as a hard dark line.
+ */
+const OVERLAY_W = 480;
+const OVERLAY_H = 320;
 const MARGIN_X = 12;
 /**
  * macOS drops notification banners into the top-right corner, so the overlay
@@ -49,10 +54,31 @@ export function setOverlayEnabled(value: boolean): void {
   if (!value) destroyOverlay();
 }
 
+/**
+ * Display the user was last seen working on. Sampled while a timer runs, so a
+ * pointer parked on another screen doesn't send the overlay to the wrong one —
+ * which is the common case when working fullscreen on a second display.
+ */
+let lastActiveDisplayId: number | null = null;
+
+export function sampleActiveDisplay(): void {
+  try {
+    lastActiveDisplayId = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).id;
+  } catch {
+    // A display can disappear mid-sample; the next one will pick it up.
+  }
+}
+
+function targetWorkArea() {
+  const displays = screen.getAllDisplays();
+  const remembered = displays.find((d) => d.id === lastActiveDisplayId);
+  if (remembered) return remembered.workArea;
+  return screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+}
+
 function positionOverlay(win: BrowserWindow): void {
   try {
-    const point = screen.getCursorScreenPoint();
-    const { workArea } = screen.getDisplayNearestPoint(point);
+    const workArea = targetWorkArea();
     win.setBounds({
       x: Math.round(workArea.x + workArea.width - OVERLAY_W - MARGIN_X),
       y: Math.round(workArea.y + MARGIN_Y),
@@ -74,6 +100,9 @@ function createOverlay(): BrowserWindow {
     backgroundColor: '#00000000',
     hasShadow: false, // an OS shadow would trace the square window, not the pill
     resizable: false,
+    // Not movable: a -webkit-app-region drag handle swallows mouse events on
+    // macOS, so dragging and hover/click cannot coexist on the same surface.
+    // See "Prompts & Docs/OVERLAY_DRAGGABLE_NOTES.md".
     movable: false,
     minimizable: false,
     maximizable: false,
@@ -172,7 +201,13 @@ export function hideOverlay(): void {
 
 export function setOverlayInteractive(interactive: boolean): void {
   if (!overlay || overlay.isDestroyed()) return;
-  overlay.setIgnoreMouseEvents(!interactive, { forward: true });
+  if (interactive) {
+    // `forward` is only meaningful while ignoring; passing it here is undefined
+    // behaviour on macOS.
+    overlay.setIgnoreMouseEvents(false);
+  } else {
+    overlay.setIgnoreMouseEvents(true, { forward: true });
+  }
 }
 
 export function sendTickToOverlay(status: 'idle' | 'focus' | 'break', remainingSeconds: number): void {
