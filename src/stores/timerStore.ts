@@ -163,8 +163,8 @@ export const useTimerStore = create<TimerStore>()(
       void window.timerAPI?.notifyBreakStarted(duration, isLong);
     }
 
-    // Show notification
-    if (isLong) {
+    // The overlay's break pill already labels a long break
+    if (isLong && !keepOverlay) {
       notifyLongBreak();
     }
   },
@@ -226,9 +226,6 @@ export const useTimerStore = create<TimerStore>()(
     // Increment session count
     const newSessionCount = state.sessionCount + 1;
 
-    // Show notification
-    notifySessionComplete();
-
     // Save last task for "Continue" feature - get task title from cache
     let taskTitle = null;
     if (state.currentTaskId && window.logAPI) {
@@ -260,6 +257,12 @@ export const useTimerStore = create<TimerStore>()(
       overlayShown = result.shown;
     } catch (error) {
       console.error('[Timer] Failed to show session overlay:', error);
+    }
+
+    // The overlay IS the session-end prompt. A banner on top of it would only
+    // cover it, so notify only when the overlay didn't show.
+    if (!overlayShown) {
+      notifySessionComplete();
     }
 
     const focusSecs = state.durationMinutes * 60;
@@ -331,9 +334,6 @@ export const useTimerStore = create<TimerStore>()(
       }
     }
 
-    // Show notification
-    notifyBreakComplete();
-
     let breakOverlayShown = false;
     try {
       const result = await window.timerAPI.showSessionOverlay({
@@ -343,6 +343,10 @@ export const useTimerStore = create<TimerStore>()(
       breakOverlayShown = result.shown;
     } catch (error) {
       console.error('[Timer] Failed to show break overlay:', error);
+    }
+
+    if (!breakOverlayShown) {
+      notifyBreakComplete();
     }
 
     const focusSecs = get().durationMinutes * 60;
@@ -466,12 +470,6 @@ export const useTimerStore = create<TimerStore>()(
     try {
       const sessionId = await window.timerAPI.saveSession(session);
 
-      // Show notification
-      window.timerAPI.showNotification(
-        'Session Complete',
-        `${elapsedMinutes} minutes logged. Time for a break!`
-      );
-
       // Increment session count
       const newCount = sessionCount + 1;
       const isLongBreak = newCount % SESSIONS_UNTIL_LONG_BREAK === 0;
@@ -503,6 +501,13 @@ export const useTimerStore = create<TimerStore>()(
         earlyOverlayShown = result.shown;
       } catch (error) {
         console.error('[Timer] Failed to show session overlay:', error);
+      }
+
+      if (!earlyOverlayShown) {
+        window.timerAPI.showNotification(
+          'Session Complete',
+          `${elapsedMinutes} minutes logged. Time for a break!`
+        );
       }
 
       const focusSecs2 = get().durationMinutes * 60;

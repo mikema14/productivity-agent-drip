@@ -16,7 +16,12 @@ import type { SessionOverlayPayload } from '../src/types';
 
 const OVERLAY_W = 420;
 const OVERLAY_H = 280;
-const MARGIN = 12;
+const MARGIN_X = 12;
+/**
+ * macOS drops notification banners into the top-right corner, so the overlay
+ * clears that band — otherwise a Teams or Mail banner sits on top of the pill.
+ */
+const MARGIN_Y = 96;
 
 let overlay: BrowserWindow | null = null;
 let enabled = true;
@@ -49,8 +54,8 @@ function positionOverlay(win: BrowserWindow): void {
     const point = screen.getCursorScreenPoint();
     const { workArea } = screen.getDisplayNearestPoint(point);
     win.setBounds({
-      x: Math.round(workArea.x + workArea.width - OVERLAY_W - MARGIN),
-      y: Math.round(workArea.y + MARGIN),
+      x: Math.round(workArea.x + workArea.width - OVERLAY_W - MARGIN_X),
+      y: Math.round(workArea.y + MARGIN_Y),
       width: OVERLAY_W,
       height: OVERLAY_H,
     });
