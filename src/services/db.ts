@@ -585,7 +585,8 @@ function initializeDefaultSettings(database: Database.Database) {
     { key: 'pomodoroLongBreak', value: '10' },
     { key: 'sessionsUntilLongBreak', value: '3' },
     { key: 'defaultBillable', value: 'true' },
-    { key: 'roundingMode', value: 'none' }
+    { key: 'roundingMode', value: 'none' },
+    { key: 'sessionEndOverlay', value: 'true' }
   ];
 
   const insertStmt = database.prepare(

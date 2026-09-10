@@ -33,6 +33,17 @@ export default defineConfig({
             outDir: 'dist-electron'
           }
         }
+      },
+      {
+        entry: 'electron/overlayPreload.ts',
+        onstart(options) {
+          options.reload()
+        },
+        vite: {
+          build: {
+            outDir: 'dist-electron'
+          }
+        }
       }
     ]),
     renderer()
@@ -45,6 +56,14 @@ export default defineConfig({
       '@services': resolve(__dirname, './src/services'),
       '@types': resolve(__dirname, './src/types'),
       '@utils': resolve(__dirname, './src/utils')
+    }
+  },
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        overlay: resolve(__dirname, 'overlay.html')
+      }
     }
   },
   server: {

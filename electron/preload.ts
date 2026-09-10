@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PomodoroSession, TimerAPI, LogAPI, AdhocEntry, CalendarProposal, TaskCache, ApiTestResult, IssueData, TimeEntryPayload } from '../src/types';
+import type { PomodoroSession, TimerAPI, LogAPI, AdhocEntry, CalendarProposal, TaskCache, ApiTestResult, IssueData, TimeEntryPayload, OverlayActionType } from '../src/types';
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object
@@ -173,6 +173,28 @@ const timerAPI: TimerAPI = {
     if (!result.success) {
       throw new Error(result.error || 'Failed to toggle tray');
     }
+  },
+
+  // Session-end overlay
+  showSessionOverlay: async (payload): Promise<{ shown: boolean }> => {
+    const result = await ipcRenderer.invoke('overlay:show', payload);
+    return { shown: !!result?.shown };
+  },
+
+  hideSessionOverlay: async (): Promise<void> => {
+    await ipcRenderer.invoke('overlay:hide');
+  },
+
+  notifyBreakStarted: async (totalSeconds: number, isLong: boolean): Promise<void> => {
+    await ipcRenderer.invoke('overlay:break-started', totalSeconds, isLong);
+  },
+
+  setOverlayEnabled: async (enabled: boolean): Promise<void> => {
+    await ipcRenderer.invoke('overlay:set-enabled', enabled);
+  },
+
+  onOverlayAction: (callback: (type: OverlayActionType) => void) => {
+    ipcRenderer.on('overlay-action', (_event, type) => callback(type));
   }
 };
 

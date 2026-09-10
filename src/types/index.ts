@@ -9,14 +9,14 @@ export interface TimerState {
   sessionCount: number;
   isPaused: boolean;
   intention: string;
-  showCompletionModal: boolean;
+  /** True while the always-on-top session-end overlay is up. */
+  overlayOpen: boolean;
   durationMinutes: number;
   setIntention: (intention: string) => void;
-  setShowCompletionModal: (show: boolean) => void;
   setDurationMinutes: (minutes: number) => void;
   setCurrentBillable: (billable: boolean) => void;
   startFocus: (taskId?: string, billable?: boolean) => Promise<void>;
-  startBreak: (isLong: boolean) => void;
+  startBreak: (isLong: boolean, fromOverlay?: boolean) => void;
   tick: () => void;
   pause: () => void;
   resume: () => void;
@@ -172,6 +172,47 @@ export interface ApiTestResult {
   };
 }
 
+// Session-end overlay (always-on-top glass window)
+export interface FocusCompletePayload {
+  kind: 'focus-complete';
+  sessionId: string | null;
+  taskId: string | null;
+  taskTitle: string | null;
+  durationMinutes: number;
+  startedAt: string;
+  endedAt: string;
+  note: string;
+  nextBreakMinutes: number;
+  isLongBreak: boolean;
+}
+
+export interface BreakCompletePayload {
+  kind: 'break-complete';
+  nextFocusMinutes: number;
+}
+
+export interface BreakRunningPayload {
+  kind: 'break-running';
+  totalSeconds: number;
+  remainingSeconds: number;
+  isLong: boolean;
+}
+
+export type SessionOverlayPayload =
+  | FocusCompletePayload
+  | BreakCompletePayload
+  | BreakRunningPayload;
+
+export type OverlayActionType = 'start-break' | 'next-focus' | 'dismiss';
+
+export interface OverlayAPI {
+  onState: (callback: (payload: SessionOverlayPayload) => void) => void;
+  onTick: (callback: (remainingSeconds: number) => void) => void;
+  action: (type: OverlayActionType) => void;
+  saveNote: (sessionId: string, note: string) => Promise<void>;
+  setInteractive: (interactive: boolean) => void;
+}
+
 // IPC channel types
 export interface TimerAPI {
   saveSession: (session: Omit<PomodoroSession, 'id'>) => Promise<string>;
@@ -204,6 +245,12 @@ export interface TimerAPI {
   onUrlStartFocus: (callback: (data: { taskId?: string; intention?: string }) => void) => void;
   onUrlTimerAction: (callback: (action: 'pause' | 'resume' | 'stop' | 'finish-early' | 'start-break' | 'skip-break', data?: any) => void) => void;
   toggleTray: (show: boolean) => Promise<void>;
+  // Session-end overlay
+  showSessionOverlay: (payload: FocusCompletePayload | BreakCompletePayload) => Promise<{ shown: boolean }>;
+  hideSessionOverlay: () => Promise<void>;
+  notifyBreakStarted: (totalSeconds: number, isLong: boolean) => Promise<void>;
+  setOverlayEnabled: (enabled: boolean) => Promise<void>;
+  onOverlayAction: (callback: (type: OverlayActionType) => void) => void;
 }
 
 export interface LogAPI {
@@ -380,6 +427,7 @@ declare global {
     dashboardAPI: DashboardAPI;
     aiAPI: AIAPI;
     listsAPI: ListsAPI;
+    overlayAPI: OverlayAPI;
   }
 }
 

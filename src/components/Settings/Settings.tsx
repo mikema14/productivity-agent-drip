@@ -17,6 +17,7 @@ export default function Settings() {
     openRouterApiKey: '',
     openRouterModel: 'anthropic/claude-4.5-sonnet-20250929',
     showTrayIcon: false,
+    sessionEndOverlay: true,
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -43,6 +44,7 @@ export default function Settings() {
       const openRouterApiKey = await window.timerAPI.getSettings('openRouterApiKey') || '';
       const openRouterModel = await window.timerAPI.getSettings('openRouterModel') || 'anthropic/claude-4.5-sonnet-20250929';
       const showTrayIcon = (await window.timerAPI.getSettings('show_tray_icon') || 'false') === 'true';
+      const sessionEndOverlay = (await window.timerAPI.getSettings('sessionEndOverlay') || 'true') === 'true';
 
       setSettings({
         apiBaseUrl,
@@ -59,6 +61,7 @@ export default function Settings() {
         openRouterApiKey,
         openRouterModel,
         showTrayIcon,
+        sessionEndOverlay,
       });
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -85,6 +88,8 @@ export default function Settings() {
       await window.timerAPI.saveSettings('openRouterModel', settings.openRouterModel);
       await window.timerAPI.saveSettings('show_tray_icon', settings.showTrayIcon.toString());
       await window.timerAPI.toggleTray(settings.showTrayIcon);
+      await window.timerAPI.saveSettings('sessionEndOverlay', settings.sessionEndOverlay.toString());
+      await window.timerAPI.setOverlayEnabled(settings.sessionEndOverlay);
 
       setSaveMessage({ type: 'success', text: 'Settings saved successfully!' });
       setTimeout(() => setSaveMessage(null), 3000);
@@ -407,6 +412,29 @@ export default function Settings() {
               </div>
               <p className="text-xs text-txt-dim">
                 Enable this if you want the native Electron tray icon in addition to the Raycast menu bar
+              </p>
+            </div>
+          </section>
+
+          {/* Session End Overlay */}
+          <section>
+            <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Session End</h2>
+            <div className="space-y-4 bg-transparent border border-focus/30 rounded-xl p-6">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="sessionEndOverlay"
+                  checked={settings.sessionEndOverlay}
+                  onChange={(e) => setSettings({ ...settings, sessionEndOverlay: e.target.checked })}
+                  className="w-4 h-4 text-focus border-focus/20 bg-transparent rounded focus:ring-focus/30"
+                />
+                <label htmlFor="sessionEndOverlay" className="ml-2 text-sm font-medium text-txt-secondary">
+                  Show glass session-end overlay
+                </label>
+              </div>
+              <p className="text-xs text-txt-dim">
+                A small always-on-top card appears when a focus session ends, even when Drip is hidden.
+                With this off, session end only fires a notification.
               </p>
             </div>
           </section>

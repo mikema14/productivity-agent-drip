@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* The overlay lives in a transparent BrowserWindow — never paint an opaque body.
+   Deliberately does NOT import src/index.css, whose base layer applies bg-drip-bg. */
+html,
+body,
+#overlay-root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: transparent !important;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* The note field is the one place text selection is wanted */
+input {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+input:focus-visible,
+button:focus-visible {
+  outline: none;
+}
+
+/* Escalation animations — reserved for the ignored-session state only */
+@keyframes drip-halo {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes drip-dot {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}

@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain, Notification, net, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Notification, net, shell, screen } from 'electron';
 import { join } from 'path';
+import type { FocusCompletePayload, BreakCompletePayload, OverlayActionType } from '../src/types';
 import {
   initDB,
   closeDB,
@@ -74,6 +75,16 @@ import {
   getBillableDefaultForTask
 } from '../src/services/db';
 import { createTray, updateTray, destroyTray } from './tray';
+import {
+  initOverlayEnabled,
+  setOverlayEnabled,
+  showOverlay,
+  sendOverlayState,
+  hideOverlay,
+  setOverlayInteractive,
+  repositionOverlayIfVisible,
+  destroyOverlay
+} from './overlayWindow';
 import {
   setMainWindowReference,
   startTimer,
@@ -242,10 +253,21 @@ app.whenReady().then(() => {
     createTray(mainWindow);
   }
 
+  // Session-end overlay: read the enabled flag once, create the window lazily
+  initOverlayEnabled();
+
+  // A disconnected or rearranged display would otherwise leave the overlay
+  // alive at off-screen coordinates.
+  screen.on('display-removed', repositionOverlayIfVisible);
+  screen.on('display-added', repositionOverlayIfVisible);
+  screen.on('display-metrics-changed', repositionOverlayIfVisible);
+
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (!mainWindow || mainWindow.isDestroyed()) {
       createWindow();
-    } else if (mainWindow) {
+      // Without this the timer module keeps sending to a dead window
+      setMainWindowReference(mainWindow);
+    } else {
       mainWindow.show();
     }
   });
@@ -254,6 +276,7 @@ app.whenReady().then(() => {
 // Quit when all windows are closed (except on macOS)
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    destroyOverlay();
     app.quit();
   }
 });
@@ -262,6 +285,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   app.isQuitting = true;
   cleanupTimer();
+  destroyOverlay();
   closeDB();
   destroyTray();
 });
@@ -359,6 +383,86 @@ ipcMain.handle('get-days-since-last-log', async () => {
 // Update tray time
 ipcMain.on('update-tray-time', (_event, time: string) => {
   updateTray(time);
+});
+
+// ---------------------------------------------------------------------------
+// Session-end overlay
+// ---------------------------------------------------------------------------
+
+// Main window renderer asks for the overlay. Returns { shown: false } when the
+// setting is off or window creation failed, so the caller can fall back.
+ipcMain.handle('overlay:show', async (_event, payload: FocusCompletePayload | BreakCompletePayload) => {
+  try {
+    return { success: true, shown: showOverlay(payload) };
+  } catch (error) {
+    console.error('Failed to show overlay:', error);
+    return { success: true, shown: false };
+  }
+});
+
+ipcMain.handle('overlay:hide', async () => {
+  try {
+    hideOverlay();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// The break actually started — patch the pill's progress denominator.
+ipcMain.handle('overlay:break-started', async (_event, totalSeconds: number, isLong: boolean) => {
+  try {
+    sendOverlayState({
+      kind: 'break-running',
+      totalSeconds,
+      remainingSeconds: totalSeconds,
+      isLong
+    });
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('overlay:set-enabled', async (_event, value: boolean) => {
+  try {
+    setOverlayEnabled(value);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// Narrow write path for the overlay's note field — deliberately not the
+// generic update-session handler.
+ipcMain.handle('overlay:save-note', async (_event, sessionId: string, note: string) => {
+  try {
+    updateSession(sessionId, { comment: note.trim() || 'Focus session' });
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to save overlay note:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// Overlay relays its actions to the main window renderer, which owns all timer
+// logic — the overlay never drives the timer itself.
+ipcMain.on('overlay:action', (_event, type: OverlayActionType) => {
+  if (type === 'start-break') {
+    // Collapse to the break pill immediately so there is no flash; the real
+    // totalSeconds arrives via overlay:break-started.
+    sendOverlayState({ kind: 'break-running', totalSeconds: 300, remainingSeconds: 300, isLong: false });
+  } else {
+    hideOverlay();
+  }
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('overlay-action', type);
+  }
+});
+
+ipcMain.on('overlay:set-interactive', (_event, interactive: boolean) => {
+  setOverlayInteractive(interactive);
 });
 
 // Show notification

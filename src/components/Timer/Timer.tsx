@@ -4,7 +4,6 @@ import { useIntentionsStore } from '../../stores/intentionsStore';
 import { formatTime } from '../../utils/time';
 import { useTaskName } from '../../hooks/useTaskName';
 import TimerDayTimeline from './TimerDayTimeline';
-import CompletionPromptModal from './CompletionPromptModal';
 import BoundaryConfirmDialog from './BoundaryConfirmDialog';
 import TimerTaskList from '../Lists/TimerTaskList';
 import DurationSegments from './DurationSegments';
@@ -31,7 +30,6 @@ export default function Timer() {
     currentTaskId,
     sessionCount,
     intention,
-    showCompletionModal,
     setIntention,
     startFocus,
     pause,
@@ -40,9 +38,6 @@ export default function Timer() {
     reset,
     finishEarly,
     isPaused,
-    continueFromModal,
-    startBreakFromModal,
-    dismissCompletionModal,
     extendSession,
     durationMinutes,
     setDurationMinutes,
@@ -681,16 +676,6 @@ export default function Timer() {
       </div>
 
       {/* Modals */}
-      {showCompletionModal && (
-        <CompletionPromptModal
-          onContinue={continueFromModal}
-          onBreak={startBreakFromModal}
-          onDismiss={dismissCompletionModal}
-          taskId={currentTaskId}
-          intention={intention}
-        />
-      )}
-
       {showBoundaryDialog && (
         <BoundaryConfirmDialog
           workdayEndTime={workdayEndTime}
