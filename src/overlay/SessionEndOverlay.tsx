@@ -7,13 +7,14 @@ import type {
   OverlayActionType,
   SessionOverlayPayload
 } from '../types';
-import { BREAK, FOCUS, GLASS, TXT, WINDOW } from './glass';
+import { BREAK, CARD_W, FOCUS, GLASS, TXT, WINDOW } from './glass';
+import { playEscalationChime } from './chime';
 
 const ESCALATE_AFTER_MS = 60_000;
 const NOTE_DEBOUNCE_MS = 400;
 const HOVER_LEAVE_MS = 80;
 
-type Shape = 'pill' | 'card' | 'break';
+type Shape = 'card' | 'break';
 
 function pad(n: number): string {
   return n < 10 ? `0${n}` : String(n);
@@ -32,7 +33,7 @@ function mmss(totalSeconds: number): string {
 /** Dev affordance: `?state=card` renders a state without finishing a session. */
 function devPayload(): SessionOverlayPayload | null {
   const which = new URLSearchParams(window.location.search).get('state');
-  if (which === 'card' || which === 'pill') {
+  if (which === 'card') {
     return {
       kind: 'focus-complete',
       sessionId: 'dev',
@@ -58,9 +59,7 @@ function devPayload(): SessionOverlayPayload | null {
 export function SessionEndOverlay() {
   const initial = useMemo(devPayload, []);
   const [payload, setPayload] = useState<SessionOverlayPayload | null>(initial);
-  const [expanded, setExpanded] = useState(
-    () => new URLSearchParams(window.location.search).get('state') === 'card'
-  );
+
   const [escalated, setEscalated] = useState(false);
   const [note, setNote] = useState('');
   const [remaining, setRemaining] = useState(0);
@@ -77,7 +76,7 @@ export function SessionEndOverlay() {
   const savedNoteRef = useRef('');
 
   const isBreakRunning = payload?.kind === 'break-running';
-  const shape: Shape = isBreakRunning ? 'break' : expanded ? 'card' : 'pill';
+  const shape: Shape = isBreakRunning ? 'break' : 'card';
   const accent = payload?.kind === 'focus-complete' ? FOCUS : BREAK;
 
   // ---------------------------------------------------------------- note save
@@ -123,7 +122,17 @@ export function SessionEndOverlay() {
       window.clearTimeout(escalateTimer.current);
       escalateTimer.current = null;
     }
-    setEscalated(false);
+    setEscalated((was) => {
+      if (was) window.overlayAPI?.setEscalated(false);
+      return false;
+    });
+  }, []);
+
+  const escalate = useCallback(() => {
+    setEscalated(true);
+    // The full-width top-edge strip lives in its own window; main owns it.
+    window.overlayAPI?.setEscalated(true);
+    playEscalationChime();
   }, []);
 
   useEffect(() => {
@@ -138,12 +147,10 @@ export function SessionEndOverlay() {
       stopEscalation();
 
       if (next.kind === 'break-running') {
-        setExpanded(false);
         setRemaining(next.remainingSeconds);
         return;
       }
 
-      setExpanded(false);
       if (next.kind === 'focus-complete') {
         sessionIdRef.current = next.sessionId;
         noteRef.current = next.note;
@@ -155,7 +162,7 @@ export function SessionEndOverlay() {
         savedNoteRef.current = '';
         setNote('');
       }
-      escalateTimer.current = window.setTimeout(() => setEscalated(true), ESCALATE_AFTER_MS);
+      escalateTimer.current = window.setTimeout(escalate, ESCALATE_AFTER_MS);
     });
 
     window.overlayAPI?.onTick((seconds) => setRemaining(seconds));
@@ -164,7 +171,7 @@ export function SessionEndOverlay() {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         flushNote(true);
-        setExpanded(false);
+        window.overlayAPI?.action('dismiss');
       }
     };
     window.addEventListener('beforeunload', onBeforeUnload);
@@ -173,7 +180,7 @@ export function SessionEndOverlay() {
       window.removeEventListener('beforeunload', onBeforeUnload);
       window.removeEventListener('keydown', onKey);
     };
-  }, [flushNote, stopEscalation]);
+  }, [escalate, flushNote, stopEscalation]);
 
   // Hover detection: the window is mostly empty pixels and click-through by
   // default, so ask main for mouse events only while the cursor is on the shape.
@@ -193,10 +200,7 @@ export function SessionEndOverlay() {
           leaveTimer.current = null;
         }
         setInteractive(true);
-        if (!isBreakRunning) {
-          stopEscalation();
-          setExpanded(true);
-        }
+        if (!isBreakRunning) stopEscalation();
         return;
       }
 
@@ -205,8 +209,9 @@ export function SessionEndOverlay() {
       if (leaveTimer.current) return;
       leaveTimer.current = window.setTimeout(() => {
         leaveTimer.current = null;
+        // Release mouse events so the empty area around the card stays
+        // click-through. The card itself stays up.
         setInteractive(false);
-        setExpanded(false);
       }, HOVER_LEAVE_MS);
     };
 
@@ -214,9 +219,11 @@ export function SessionEndOverlay() {
     return () => window.removeEventListener('mousemove', onMove);
   }, [isBreakRunning, setInteractive, stopEscalation]);
 
+  // Focus the note as soon as a finished session appears, so typing works
+  // without hunting for the field.
   useEffect(() => {
-    if (expanded) inputRef.current?.focus();
-  }, [expanded]);
+    if (payload && payload.kind === 'focus-complete') inputRef.current?.focus();
+  }, [payload]);
 
 
   const act = useCallback(
@@ -299,45 +306,6 @@ export function SessionEndOverlay() {
     );
   }
 
-  if (shape === 'pill') {
-    const isFocus = payload.kind === 'focus-complete';
-    const minutes = isFocus ? (payload as FocusCompletePayload).durationMinutes : null;
-    return (
-      <div style={anchor}>
-        <div
-          ref={shapeRef}
-          onClick={() => setExpanded(true)}
-          style={{
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            height: 36,
-            padding: '0 14px 0 12px',
-            borderRadius: GLASS.radiusPill,
-            boxSizing: 'border-box',
-            cursor: 'pointer',
-            background: isFocus ? GLASS.fill : GLASS.fillCool,
-            backdropFilter: GLASS.blur,
-            WebkitBackdropFilter: GLASS.blur,
-            border: `0.5px solid ${escalated ? GLASS.hairlineHot : GLASS.hairline}`,
-            boxShadow: GLASS.shadowPill,
-            transition: `border-color 200ms ease`
-          }}
-        >
-          <div style={sheen} />
-          <Dot color={accent.base} size={6} breathe={escalated} />
-          <span style={{ fontSize: 12.5, fontWeight: 500, color: TXT.primary, letterSpacing: '-0.005em' }}>
-            {isFocus ? 'Focus done' : 'Break over'}
-          </span>
-          {minutes !== null && (
-            <span style={{ ...mono, fontSize: 11.5, color: TXT.muted }}>{minutes}m</span>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   // shape === 'card'
   const isFocus = payload.kind === 'focus-complete';
   const focus = isFocus ? (payload as FocusCompletePayload) : null;
@@ -363,7 +331,7 @@ export function SessionEndOverlay() {
           ref={shapeRef}
           style={{
             position: 'relative',
-            width: 384,
+            width: CARD_W,
             boxSizing: 'border-box',
             padding: '16px 16px 14px',
             borderRadius: GLASS.radiusCard,
@@ -372,6 +340,7 @@ export function SessionEndOverlay() {
             WebkitBackdropFilter: GLASS.blur,
             border: escalated ? `1px solid ${GLASS.hairlineHot}` : `0.5px solid ${GLASS.hairline}`,
             boxShadow: GLASS.shadowCard,
+            animation: `drip-arrive 260ms ${GLASS.ease} both`,
             transition: `border-color 200ms ease, background-color 200ms ease`
           }}
         >

@@ -82,6 +82,7 @@ import {
   sendOverlayState,
   hideOverlay,
   setOverlayInteractive,
+  setOverlayEscalated,
   repositionOverlayIfVisible,
   destroyOverlay
 } from './overlayWindow';
@@ -463,6 +464,11 @@ ipcMain.on('overlay:action', (_event, type: OverlayActionType) => {
 
 ipcMain.on('overlay:set-interactive', (_event, interactive: boolean) => {
   setOverlayInteractive(interactive);
+});
+
+// Escalation: raise or drop the full-width top-edge attention strip
+ipcMain.on('overlay:set-escalated', (_event, escalated: boolean) => {
+  setOverlayEscalated(escalated);
 });
 
 // Show notification

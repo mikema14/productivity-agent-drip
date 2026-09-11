@@ -51,3 +51,42 @@ button:focus-visible {
     opacity: 1;
   }
 }
+
+/* Top-edge attention strip */
+@keyframes drip-edge {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Card arrival — a short slide + settle, so appearance registers as motion */
+@keyframes drip-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Two amber pulses on arrival, then still */
+@keyframes drip-announce {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  18%,
+  58% {
+    opacity: 0.9;
+  }
+  38%,
+  78% {
+    opacity: 0.15;
+  }
+}

@@ -29,6 +29,10 @@ const overlayAPI: OverlayAPI = {
   setInteractive: (interactive: boolean): void => {
     ipcRenderer.send('overlay:set-interactive', interactive);
   },
+
+  setEscalated: (escalated: boolean): void => {
+    ipcRenderer.send('overlay:set-escalated', escalated);
+  },
 };
 
 contextBridge.exposeInMainWorld('overlayAPI', overlayAPI);

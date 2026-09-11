@@ -211,6 +211,8 @@ export interface OverlayAPI {
   action: (type: OverlayActionType) => void;
   saveNote: (sessionId: string, note: string) => Promise<void>;
   setInteractive: (interactive: boolean) => void;
+  /** Escalation state — main owns the full-width top-edge attention strip. */
+  setEscalated: (escalated: boolean) => void;
 }
 
 // IPC channel types

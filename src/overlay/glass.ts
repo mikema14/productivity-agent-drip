@@ -54,4 +54,10 @@ export const TXT = {
  * `inset` has to exceed the shadow's blur + offset, or the window edge clips it
  * into a hard dark line.
  */
-export const WINDOW = { width: 480, height: 320, inset: 44 } as const;
+export const WINDOW = { width: 560, height: 400, inset: 44 } as const;
+
+/** Card width. Sized up from 384 — the overlay was too easy to overlook. */
+export const CARD_W = 440;
+
+/** Height of the full-width top-edge attention strip window. */
+export const EDGE_H = 26;

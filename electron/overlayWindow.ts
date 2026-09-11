@@ -19,8 +19,10 @@ import type { SessionOverlayPayload } from '../src/types';
  * drop shadow and the escalation halo have room. At a smaller size the shadow
  * gets clipped by the window edge and shows as a hard dark line.
  */
-const OVERLAY_W = 480;
-const OVERLAY_H = 320;
+const OVERLAY_W = 560;
+const OVERLAY_H = 400;
+/** Height of the top-edge attention strip window. */
+const EDGE_H = 26;
 const MARGIN_X = 12;
 /**
  * macOS drops notification banners into the top-right corner, so the overlay
@@ -29,6 +31,12 @@ const MARGIN_X = 12;
 const MARGIN_Y = 96;
 
 let overlay: BrowserWindow | null = null;
+/**
+ * Full-width strips along the top edge of EVERY display, shown only on
+ * escalation. One per display: a window lives on a single display, so a single
+ * strip would leave whichever screen the user is actually looking at bare.
+ */
+let edges: BrowserWindow[] = [];
 let enabled = true;
 let loaded = false;
 /** Payload that arrived before the renderer finished loading. */
@@ -141,16 +149,99 @@ function createOverlay(): BrowserWindow {
     lastKind = null;
   });
 
-  if (isDev) {
-    win.loadURL('http://localhost:5173/overlay.html');
-    if (process.env.DRIP_OVERLAY_DEVTOOLS === '1') {
-      win.webContents.openDevTools({ mode: 'detach' });
-    }
-  } else {
-    win.loadFile(join(__dirname, '../dist/overlay.html'));
+  loadOverlayHtml(win);
+  if (isDev && process.env.DRIP_OVERLAY_DEVTOOLS === '1') {
+    win.webContents.openDevTools({ mode: 'detach' });
   }
 
   return win;
+}
+
+function loadOverlayHtml(win: BrowserWindow, search?: string): void {
+  if (isDev) {
+    win.loadURL(`http://localhost:5173/overlay.html${search ? `?${search}` : ''}`);
+  } else {
+    win.loadFile(join(__dirname, '../dist/overlay.html'), search ? { search } : undefined);
+  }
+}
+
+/**
+ * The escalation cue: a breathing amber strip across the whole top edge of the
+ * active display. A small static card in a corner is what peripheral vision
+ * filters out; full-width motion is not. Never interactive, covers no content.
+ */
+function showEdgeGlow(): void {
+  hideEdgeGlow();
+  for (const display of screen.getAllDisplays()) {
+    try {
+      const { workArea } = display;
+      const win = new BrowserWindow({
+        x: workArea.x,
+        y: workArea.y,
+        width: workArea.width,
+        height: EDGE_H,
+        show: false,
+        frame: false,
+        transparent: true,
+        backgroundColor: '#00000000',
+        hasShadow: false,
+        resizable: false,
+        movable: false,
+        minimizable: false,
+        maximizable: false,
+        fullscreenable: false,
+        skipTaskbar: true,
+        alwaysOnTop: true,
+        focusable: false, // nothing to click; never take focus
+        roundedCorners: false,
+        webPreferences: {
+          contextIsolation: true,
+          nodeIntegration: false,
+          backgroundThrottling: false,
+        },
+      });
+
+      win.setAlwaysOnTop(true, 'screen-saver');
+      win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      win.setIgnoreMouseEvents(true);
+
+      loadOverlayHtml(win, 'edge=1');
+      // setBounds again after load: a transparent window can be nudged by the
+      // compositor before its first paint.
+      win.setBounds({ x: workArea.x, y: workArea.y, width: workArea.width, height: EDGE_H });
+      win.showInactive();
+      edges.push(win);
+    } catch (error) {
+      console.error(`[Overlay] Failed to show edge glow on display ${display.id}:`, error);
+    }
+  }
+}
+
+function hideEdgeGlow(): void {
+  for (const win of edges) {
+    if (!win.isDestroyed()) win.destroy();
+  }
+  edges = [];
+}
+
+function isEdgeGlowVisible(): boolean {
+  return edges.some((win) => !win.isDestroyed() && win.isVisible());
+}
+
+export function setOverlayEscalated(escalated: boolean): void {
+  if (!escalated) {
+    hideEdgeGlow();
+    return;
+  }
+
+  // Escalation happens a minute after the session ended, by which time the
+  // timer has stopped sampling — so re-read where the user is now and bring
+  // the card to that display before lighting every screen.
+  sampleActiveDisplay();
+  if (overlay && !overlay.isDestroyed() && overlay.isVisible()) {
+    positionOverlay(overlay);
+  }
+  showEdgeGlow();
 }
 
 function ensureOverlay(): BrowserWindow | null {
@@ -170,6 +261,7 @@ export function sendOverlayState(payload: SessionOverlayPayload): boolean {
   if (!win) return false;
 
   lastKind = payload.kind;
+  hideEdgeGlow();
   if (loaded) {
     win.webContents.send('overlay:state', payload);
   } else {
@@ -196,6 +288,7 @@ export function hideOverlay(): void {
     overlay.setIgnoreMouseEvents(true, { forward: true });
     overlay.hide();
   }
+  hideEdgeGlow();
   lastKind = null;
 }
 
@@ -220,6 +313,11 @@ export function repositionOverlayIfVisible(): void {
   if (overlay && !overlay.isDestroyed() && overlay.isVisible()) {
     positionOverlay(overlay);
   }
+  // Displays changed: rebuild the strips so a new screen gets one and a
+  // removed screen's window goes away.
+  if (isEdgeGlowVisible()) {
+    showEdgeGlow();
+  }
 }
 
 export function isOverlayVisible(): boolean {
@@ -227,6 +325,7 @@ export function isOverlayVisible(): boolean {
 }
 
 export function destroyOverlay(): void {
+  hideEdgeGlow();
   if (overlay && !overlay.isDestroyed()) {
     overlay.destroy();
   }
