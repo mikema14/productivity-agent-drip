@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTaskSearch } from '../../hooks/useTaskSearch';
+import type { TaskCache } from '../../types';
 
 interface TaskIdInputProps {
   value: string;
@@ -7,35 +9,18 @@ interface TaskIdInputProps {
   placeholder?: string;
 }
 
-interface RecentTask {
-  task_id: string;
-  title: string;
-}
-
 export default function TaskIdInput({ value, onChange, onTaskSelect, placeholder = 'Task ID' }: TaskIdInputProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [recentTasks, setRecentTasks] = useState<RecentTask[]>([]);
-  const [filteredTasks, setFilteredTasks] = useState<RecentTask[]>([]);
+  const [recentTasks, setRecentTasks] = useState<TaskCache[]>([]);
   const [isSelectingFromDropdown, setIsSelectingFromDropdown] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Empty input -> the short recents list; typing searches the full task history
+  const { results: filteredTasks } = useTaskSearch(value, recentTasks);
 
   useEffect(() => {
     loadRecentTasks();
   }, []);
-
-  useEffect(() => {
-    if (value.trim()) {
-      const searchTerm = value.toLowerCase();
-      const filtered = recentTasks.filter(
-        (task) =>
-          task.task_id.toLowerCase().includes(searchTerm) ||
-          task.title.toLowerCase().includes(searchTerm)
-      );
-      setFilteredTasks(filtered);
-    } else {
-      setFilteredTasks(recentTasks);
-    }
-  }, [value, recentTasks]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -54,7 +39,6 @@ export default function TaskIdInput({ value, onChange, onTaskSelect, placeholder
     try {
       const tasks = await window.logAPI.getRecentTasks();
       setRecentTasks(tasks);
-      setFilteredTasks(tasks);
     } catch (error) {
       console.error('Failed to load recent tasks:', error);
     }
@@ -70,7 +54,7 @@ export default function TaskIdInput({ value, onChange, onTaskSelect, placeholder
     }
   };
 
-  const handleSelectTask = (task: RecentTask) => {
+  const handleSelectTask = (task: TaskCache) => {
     setIsSelectingFromDropdown(true);
     onChange(task.task_id);
     onTaskSelect(task.task_id, task.title);
@@ -154,9 +138,14 @@ export default function TaskIdInput({ value, onChange, onTaskSelect, placeholder
                 <span className="text-focus font-mono shrink-0 w-20">
                   #{task.task_id}
                 </span>
-                <span className="text-txt-secondary">
+                <span className="text-txt-secondary flex-1 truncate min-w-0">
                   {task.title}
                 </span>
+                {task.project_name && (
+                  <span className="font-mono text-[11px] text-txt-muted shrink-0 truncate max-w-[100px]">
+                    {task.project_name}
+                  </span>
+                )}
               </div>
             </div>
           ))}

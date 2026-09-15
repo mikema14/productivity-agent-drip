@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { TimerState } from '../types';
+import type { BreakCompletePayload, FocusCompletePayload, TimerState } from '../types';
 import { formatTrayTime, getCurrentDate, formatDateTime } from '../utils/time';
 import {
   notifySessionComplete,
@@ -22,11 +22,50 @@ interface TimerStore extends TimerState {
 }
 
 const DEFAULT_DURATION_MINUTES = 25;
+
 const SESSIONS_UNTIL_LONG_BREAK = 3;
 
 function getBreakSeconds(durationMinutes: number, isLong: boolean): number {
   const shortSecs = Math.max(60, Math.round((durationMinutes / 5) * 60));
   return isLong ? shortSecs * 2 : shortSecs;
+}
+
+function getBreakMinutes(durationMinutes: number, isLong: boolean): number {
+  return Math.max(1, Math.round(getBreakSeconds(durationMinutes, isLong) / 60));
+}
+
+async function resolveTaskTitle(taskId: string | null): Promise<string | null> {
+  if (!taskId || !window.logAPI) return null;
+  try {
+    const cachedTask = await window.logAPI.getCachedTask(taskId);
+    return cachedTask?.title || null;
+  } catch (error) {
+    console.error('Failed to get task title:', error);
+    return null;
+  }
+}
+
+/**
+ * Raise the always-on-top overlay and return whether its window went up. The
+ * notification always fires as well: `shown` only means the window was created,
+ * not that it landed somewhere the user can see. The overlay sits below the
+ * macOS banner band, so the two don't cover each other.
+ */
+async function raiseSessionEndOverlay(
+  payload: FocusCompletePayload | BreakCompletePayload,
+  notify: () => void
+): Promise<boolean> {
+  let shown = false;
+
+  try {
+    const result = await window.timerAPI.showSessionOverlay(payload);
+    shown = result.shown;
+  } catch (error) {
+    console.error('[Timer] Failed to show session overlay:', error);
+  }
+
+  notify();
+  return shown;
 }
 
 export const useTimerStore = create<TimerStore>()(
@@ -42,7 +81,7 @@ export const useTimerStore = create<TimerStore>()(
       intervalId: null,
       sessionStartTime: null,
       intention: '',
-      showCompletionModal: false,
+      overlayOpen: false,
       timerMode: 'pomodoro',
       sessionViewMode: 'flat',
       lastTaskId: null,
@@ -51,10 +90,6 @@ export const useTimerStore = create<TimerStore>()(
 
       setIntention: (intention: string) => {
         set({ intention });
-      },
-
-      setShowCompletionModal: (show: boolean) => {
-        set({ showCompletionModal: show });
       },
 
       setTimerMode: (mode: 'pomodoro' | 'stopwatch') => {
@@ -74,8 +109,13 @@ export const useTimerStore = create<TimerStore>()(
         set({ currentBillable: billable });
       },
 
-  startFocus: async (taskId?: string, billable?: boolean) => {
+  startFocus: async (taskId?: string, billable?: boolean, fromOverlay?: boolean) => {
     const state = get();
+
+    if (state.overlayOpen && !fromOverlay) {
+      void window.timerAPI?.hideSessionOverlay();
+    }
+    set({ overlayOpen: false });
 
     if (state.intervalId) {
       clearInterval(state.intervalId);
@@ -96,8 +136,7 @@ export const useTimerStore = create<TimerStore>()(
     const focusSecs = state.durationMinutes * 60;
     const nextSessionCount = state.sessionCount + 1;
     const isLongBreak = nextSessionCount % SESSIONS_UNTIL_LONG_BREAK === 0;
-    const nextBreakSecs = getBreakSeconds(state.durationMinutes, isLongBreak);
-    const nextBreakMins = Math.round(nextBreakSecs / 60) as 5 | 10;
+    const nextBreakMins = getBreakMinutes(state.durationMinutes, isLongBreak) as 5 | 10;
 
     try {
       await window.timerAPI.startMainTimer(focusSecs, 'focus', nextBreakMins, taskId || undefined);
@@ -118,8 +157,14 @@ export const useTimerStore = create<TimerStore>()(
     });
   },
 
-  startBreak: async (isLong: boolean) => {
+  startBreak: async (isLong: boolean, fromOverlay?: boolean) => {
     const state = get();
+
+    const keepOverlay = !!fromOverlay;
+    if (state.overlayOpen && !keepOverlay) {
+      void window.timerAPI?.hideSessionOverlay();
+      set({ overlayOpen: false });
+    }
 
     if (state.intervalId) {
       clearInterval(state.intervalId);
@@ -144,8 +189,13 @@ export const useTimerStore = create<TimerStore>()(
       sessionStartTime: new Date()
     });
 
-    // Show notification
-    if (isLong) {
+    // Give the overlay's break pill its real progress denominator
+    if (keepOverlay) {
+      void window.timerAPI?.notifyBreakStarted(duration, isLong);
+    }
+
+    // The overlay's break pill already labels a long break
+    if (isLong && !keepOverlay) {
       notifyLongBreak();
     }
   },
@@ -186,10 +236,11 @@ export const useTimerStore = create<TimerStore>()(
     let comment = state.intention.trim() || 'Focus session';
 
     // Save session to database
+    const endTime = new Date();
+    let sessionId: string | null = null;
     if (window.timerAPI && state.sessionStartTime) {
       console.log('[Timer] Saving session to database...');
-      const endTime = new Date();
-      await window.timerAPI.saveSession({
+      sessionId = await window.timerAPI.saveSession({
         start_at: formatDateTime(state.sessionStartTime),
         end_at: formatDateTime(endTime),
         duration_minutes: state.durationMinutes,
@@ -206,19 +257,27 @@ export const useTimerStore = create<TimerStore>()(
     // Increment session count
     const newSessionCount = state.sessionCount + 1;
 
-    // Show notification
-    notifySessionComplete();
-
     // Save last task for "Continue" feature - get task title from cache
-    let taskTitle = null;
-    if (state.currentTaskId && window.logAPI) {
-      try {
-        const cachedTask = await window.logAPI.getCachedTask(state.currentTaskId);
-        taskTitle = cachedTask?.title || null;
-      } catch (error) {
-        console.error('Failed to get task title:', error);
-      }
-    }
+    const taskTitle = await resolveTaskTitle(state.currentTaskId);
+
+    // Raise the always-on-top overlay. It works whether or not the main window
+    // is visible, which the old in-window modal did not.
+    const isLongBreak = newSessionCount % SESSIONS_UNTIL_LONG_BREAK === 0;
+    const overlayShown = await raiseSessionEndOverlay(
+      {
+        kind: 'focus-complete',
+        sessionId,
+        taskId: state.currentTaskId,
+        taskTitle,
+        durationMinutes: state.durationMinutes,
+        startedAt: state.sessionStartTime.toISOString(),
+        endedAt: endTime.toISOString(),
+        note: state.intention.trim(),
+        nextBreakMinutes: getBreakMinutes(state.durationMinutes, isLongBreak),
+        isLongBreak,
+      },
+      notifySessionComplete
+    );
 
     const focusSecs = state.durationMinutes * 60;
     set({
@@ -229,7 +288,7 @@ export const useTimerStore = create<TimerStore>()(
       remainingSeconds: focusSecs,
       totalDuration: focusSecs,
       isPaused: false,
-      showCompletionModal: true,
+      overlayOpen: overlayShown,
       lastTaskId: state.currentTaskId,
       lastTaskTitle: taskTitle,
     });
@@ -289,11 +348,14 @@ export const useTimerStore = create<TimerStore>()(
       }
     }
 
-    // Show notification
-    notifyBreakComplete();
+    const breakOverlayShown = await raiseSessionEndOverlay(
+      { kind: 'break-complete', nextFocusMinutes: get().durationMinutes },
+      notifyBreakComplete
+    );
 
     const focusSecs = get().durationMinutes * 60;
     set({
+      overlayOpen: breakOverlayShown,
       status: 'idle',
       remainingSeconds: focusSecs,
       totalDuration: focusSecs,
@@ -410,17 +472,33 @@ export const useTimerStore = create<TimerStore>()(
     };
 
     try {
-      await window.timerAPI.saveSession(session);
-
-      // Show notification
-      window.timerAPI.showNotification(
-        'Session Complete',
-        `${elapsedMinutes} minutes logged. Time for a break!`
-      );
+      const sessionId = await window.timerAPI.saveSession(session);
 
       // Increment session count
       const newCount = sessionCount + 1;
       const isLongBreak = newCount % SESSIONS_UNTIL_LONG_BREAK === 0;
+
+      const taskTitle = await resolveTaskTitle(currentTaskId);
+
+      const earlyOverlayShown = await raiseSessionEndOverlay(
+        {
+          kind: 'focus-complete',
+          sessionId,
+          taskId: currentTaskId || null,
+          taskTitle,
+          durationMinutes: elapsedMinutes,
+          startedAt: sessionStartTime.toISOString(),
+          endedAt: now.toISOString(),
+          note: intention.trim(),
+          nextBreakMinutes: getBreakMinutes(get().durationMinutes, isLongBreak),
+          isLongBreak,
+        },
+        () =>
+          window.timerAPI.showNotification(
+            'Session Complete',
+            `${elapsedMinutes} minutes logged. Time for a break!`
+          )
+      );
 
       const focusSecs2 = get().durationMinutes * 60;
       set({
@@ -432,6 +510,7 @@ export const useTimerStore = create<TimerStore>()(
         isPaused: false,
         intervalId: null,
         sessionStartTime: null,
+        overlayOpen: earlyOverlayShown,
       });
 
       // Update tray
@@ -478,17 +557,17 @@ export const useTimerStore = create<TimerStore>()(
     });
   },
 
-  continueFromModal: () => {
+  continueFromModal: (fromOverlay?: boolean) => {
     const state = get();
-    set({ showCompletionModal: false });
+    set({ overlayOpen: false });
     // Reuse existing startFocus with current taskId
-    get().startFocus(state.currentTaskId || undefined);
+    get().startFocus(state.currentTaskId || undefined, undefined, fromOverlay);
   },
 
   dismissCompletionModal: () => {
     const focusSecs4 = get().durationMinutes * 60;
     set({
-      showCompletionModal: false,
+      overlayOpen: false,
       intention: '',
       status: 'idle',
       remainingSeconds: focusSecs4,
@@ -503,13 +582,14 @@ export const useTimerStore = create<TimerStore>()(
     }
   },
 
-  startBreakFromModal: () => {
+  startBreakFromModal: (fromOverlay?: boolean) => {
     const state = get();
-    set({ showCompletionModal: false, intention: '' }); // Clear intention on break
+    set({ intention: '' }); // Clear intention on break
 
     // Determine break type
     const isLongBreak = state.sessionCount % SESSIONS_UNTIL_LONG_BREAK === 0;
-    get().startBreak(isLongBreak);
+    // The overlay stays up and collapses into the break pill.
+    get().startBreak(isLongBreak, fromOverlay || state.overlayOpen);
   },
 
   extendSession: async (minutes: number) => {
@@ -658,6 +738,20 @@ export function setupMainTimerListeners() {
     }
   });
 
+  // The overlay relays its buttons here so they drive the exact same actions
+  // the app's own flow uses — the overlay never touches the timer directly.
+  window.timerAPI.onOverlayAction((type) => {
+    console.log('[Timer] Overlay action received:', type);
+    const state = useTimerStore.getState();
+    if (type === 'start-break') {
+      state.startBreakFromModal(true);
+    } else if (type === 'next-focus') {
+      state.continueFromModal(true);
+    } else {
+      state.dismissCompletionModal();
+    }
+  });
+
   window.timerAPI.onUrlTimerAction((action, data) => {
     console.log('[Timer] URL timer action received:', action, data);
     const state = useTimerStore.getState();
@@ -667,7 +761,7 @@ export function setupMainTimerListeners() {
       case 'stop': state.reset(); break;
       case 'finish-early': state.finishEarly(); break;
       case 'start-break': {
-        if (state.showCompletionModal) {
+        if (state.overlayOpen) {
           state.startBreakFromModal();
         } else {
           state.startBreak(data?.isLong ?? false);
@@ -675,7 +769,7 @@ export function setupMainTimerListeners() {
         break;
       }
       case 'skip-break': {
-        if (state.showCompletionModal) {
+        if (state.overlayOpen) {
           state.dismissCompletionModal();
         }
         break;

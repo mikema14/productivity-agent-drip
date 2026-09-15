@@ -6,7 +6,7 @@ import TaskDisplay from '../shared/TaskDisplay';
 import BillableToggle from '../shared/BillableToggle';
 
 interface EntryRowProps {
-  entry: LogEntry | MergedEntry;
+  entry: MergedEntry;
   onUpdate: (id: string, changes: Partial<LogEntry>) => void;
   onDelete: (id: string) => void;
   onToggleLog: (id: string) => void;

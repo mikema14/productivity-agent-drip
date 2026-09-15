@@ -585,7 +585,8 @@ function initializeDefaultSettings(database: Database.Database) {
     { key: 'pomodoroLongBreak', value: '10' },
     { key: 'sessionsUntilLongBreak', value: '3' },
     { key: 'defaultBillable', value: 'true' },
-    { key: 'roundingMode', value: 'none' }
+    { key: 'roundingMode', value: 'none' },
+    { key: 'sessionEndOverlay', value: 'true' }
   ];
 
   const insertStmt = database.prepare(
@@ -829,12 +830,56 @@ export function getRecentTasks() {
   const database = getDB();
 
   const stmt = database.prepare(`
-    SELECT task_id, title FROM task_cache
+    SELECT task_id, title, project_id, project_name, last_seen_at FROM task_cache
     ORDER BY last_seen_at DESC
     LIMIT 10
   `);
 
   return stmt.all();
+}
+
+/**
+ * Search the full task cache by task ID, title or project name.
+ *
+ * Unlike getRecentTasks/getAllCachedTasks this is not capped to recent history -
+ * it scans every task Drip has ever recorded. Results are ranked exact ID first,
+ * then prefix matches, then substring matches, each tie-broken by recency.
+ */
+export function searchCachedTasks(query: string, limit = 50) {
+  const q = query.trim();
+  if (!q) return getAllCachedTasks();
+
+  const database = getDB();
+
+  // Escape LIKE wildcards so a literal % or _ in the query doesn't match everything
+  const esc = q.replace(/[\\%_]/g, (c) => `\\${c}`);
+  const contains = `%${esc}%`;
+  const prefix = `${esc}%`;
+
+  // The match quality is computed once per row and reused for ORDER BY, rather
+  // than re-running the same LIKE comparisons in each ORDER BY CASE branch.
+  const stmt = database.prepare(`
+    WITH ranked AS (
+      SELECT task_id, title, project_id, project_name, last_seen_at,
+        CASE
+          WHEN task_id = @exact                   THEN 0
+          WHEN task_id LIKE @prefix   ESCAPE '\\' THEN 1
+          WHEN title   LIKE @prefix   ESCAPE '\\' THEN 2
+          WHEN title   LIKE @contains ESCAPE '\\' THEN 3
+          WHEN task_id      LIKE @contains ESCAPE '\\'
+            OR project_name LIKE @contains ESCAPE '\\' THEN 4
+          ELSE -1
+        END AS match_rank
+      FROM task_cache
+    )
+    SELECT task_id, title, project_id, project_name, last_seen_at
+    FROM ranked
+    WHERE match_rank >= 0
+    ORDER BY match_rank, last_seen_at DESC
+    LIMIT @limit
+  `);
+
+  return stmt.all({ contains, prefix, exact: q, limit });
 }
 
 // Adhoc entry operations

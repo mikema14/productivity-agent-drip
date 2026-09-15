@@ -1,5 +1,7 @@
-import { app, BrowserWindow, ipcMain, Notification, net, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Notification, net, shell, screen } from 'electron';
 import { join } from 'path';
+import { readFileSync, statSync, writeFileSync } from 'fs';
+import type { FocusCompletePayload, BreakCompletePayload, OverlayActionType } from '../src/types';
 import {
   initDB,
   closeDB,
@@ -25,6 +27,7 @@ import {
   getCachedTask,
   cacheTask,
   getRecentTasks,
+  searchCachedTasks,
   getTemplates,
   addTemplate,
   updateTemplate,
@@ -75,6 +78,17 @@ import {
 } from '../src/services/db';
 import { createTray, updateTray, destroyTray } from './tray';
 import {
+  initOverlayEnabled,
+  setOverlayEnabled,
+  showOverlay,
+  sendOverlayState,
+  hideOverlay,
+  setOverlayInteractive,
+  setOverlayEscalated,
+  repositionOverlayIfVisible,
+  destroyOverlay
+} from './overlayWindow';
+import {
   setMainWindowReference,
   startTimer,
   pauseTimer,
@@ -88,6 +102,10 @@ import {
 let mainWindow: BrowserWindow | null = null;
 
 const isDev = !app.isPackaged;
+
+const CALENDAR_REFRESH_MS = 15 * 60 * 1000;
+const CALENDAR_CACHE_PATH = join(app.getPath('userData'), 'calendar-feed-cache.ics');
+let calendarRefreshInFlight: Promise<void> | null = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -242,10 +260,23 @@ app.whenReady().then(() => {
     createTray(mainWindow);
   }
 
+  // Session-end overlay: read the enabled flag once, create the window lazily
+  initOverlayEnabled();
+
+  startCalendarBackgroundRefresh();
+
+  // A disconnected or rearranged display would otherwise leave the overlay
+  // alive at off-screen coordinates.
+  screen.on('display-removed', repositionOverlayIfVisible);
+  screen.on('display-added', repositionOverlayIfVisible);
+  screen.on('display-metrics-changed', repositionOverlayIfVisible);
+
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (!mainWindow || mainWindow.isDestroyed()) {
       createWindow();
-    } else if (mainWindow) {
+      // Without this the timer module keeps sending to a dead window
+      setMainWindowReference(mainWindow);
+    } else {
       mainWindow.show();
     }
   });
@@ -254,6 +285,7 @@ app.whenReady().then(() => {
 // Quit when all windows are closed (except on macOS)
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    destroyOverlay();
     app.quit();
   }
 });
@@ -262,6 +294,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   app.isQuitting = true;
   cleanupTimer();
+  destroyOverlay();
   closeDB();
   destroyTray();
 });
@@ -359,6 +392,107 @@ ipcMain.handle('get-days-since-last-log', async () => {
 // Update tray time
 ipcMain.on('update-tray-time', (_event, time: string) => {
   updateTray(time);
+});
+
+// ---------------------------------------------------------------------------
+// Session-end overlay
+// ---------------------------------------------------------------------------
+
+// Main window renderer asks for the overlay. Returns { shown: false } when the
+// setting is off or window creation failed, so the caller can fall back.
+// The break the card is offering, so the collapse into the break pill can use
+// the real numbers instead of a guess.
+let pendingBreak: { totalSeconds: number; isLong: boolean } | null = null;
+
+ipcMain.handle('overlay:show', async (_event, payload: FocusCompletePayload | BreakCompletePayload) => {
+  try {
+    pendingBreak =
+      payload.kind === 'focus-complete'
+        ? { totalSeconds: payload.nextBreakMinutes * 60, isLong: payload.isLongBreak }
+        : null;
+    return { success: true, shown: showOverlay(payload) };
+  } catch (error) {
+    console.error('Failed to show overlay:', error);
+    return { success: true, shown: false };
+  }
+});
+
+ipcMain.handle('overlay:hide', async () => {
+  try {
+    hideOverlay();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// The break actually started — patch the pill's progress denominator.
+ipcMain.handle('overlay:break-started', async (_event, totalSeconds: number, isLong: boolean) => {
+  try {
+    sendOverlayState({
+      kind: 'break-running',
+      totalSeconds,
+      remainingSeconds: totalSeconds,
+      isLong
+    });
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('overlay:set-enabled', async (_event, value: boolean) => {
+  try {
+    setOverlayEnabled(value);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// Narrow write path for the overlay's note field — deliberately not the
+// generic update-session handler.
+ipcMain.handle('overlay:save-note', async (_event, sessionId: string, note: string) => {
+  try {
+    updateSession(sessionId, { comment: note.trim() || 'Focus session' });
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to save overlay note:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+// Overlay relays its actions to the main window renderer, which owns all timer
+// logic — the overlay never drives the timer itself.
+ipcMain.on('overlay:action', (_event, type: OverlayActionType) => {
+  if (type === 'start-break') {
+    // Collapse to the break pill immediately so there is no flash; the exact
+    // totalSeconds arrives via overlay:break-started. Without a known break the
+    // card stays up until that message lands rather than showing a guess.
+    if (pendingBreak) {
+      sendOverlayState({
+        kind: 'break-running',
+        totalSeconds: pendingBreak.totalSeconds,
+        remainingSeconds: pendingBreak.totalSeconds,
+        isLong: pendingBreak.isLong
+      });
+    }
+  } else {
+    hideOverlay();
+  }
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('overlay-action', type);
+  }
+});
+
+ipcMain.on('overlay:set-interactive', (_event, interactive: boolean) => {
+  setOverlayInteractive(interactive);
+});
+
+// Escalation: raise or drop the full-width top-edge attention strip
+ipcMain.on('overlay:set-escalated', (_event, escalated: boolean) => {
+  setOverlayEscalated(escalated);
 });
 
 // Show notification
@@ -520,6 +654,16 @@ ipcMain.handle('get-recent-tasks', async () => {
     return { success: true, tasks };
   } catch (error) {
     console.error('Failed to get recent tasks:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('search-cached-tasks', async (_event, query: string, limit?: number) => {
+  try {
+    const tasks = searchCachedTasks(query, limit);
+    return { success: true, tasks };
+  } catch (error) {
+    console.error('Failed to search cached tasks:', error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -770,42 +914,122 @@ ipcMain.handle('post-time-entry', async (_event, baseUrl: string, apiKey: string
 });
 
 // Fetch calendar feed
-ipcMain.handle('fetch-calendar-feed', async (_event, url: string) => {
-  try {
-    console.log('Fetching calendar feed from:', url);
+function downloadCalendarFeed(url: string): Promise<{ success: boolean; data?: string; error?: string }> {
+  return new Promise((resolve) => {
+    const request = net.request({ method: 'GET', url });
 
-    return new Promise((resolve) => {
-      const request = net.request({
-        method: 'GET',
-        url: url
-      });
+    let responseData = '';
+    let settled = false;
 
-      let responseData = '';
+    const settle = (result: { success: boolean; data?: string; error?: string }) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve(result);
+    };
 
-      request.on('response', (response) => {
-        console.log('Calendar feed response status:', response.statusCode);
+    const timeout = setTimeout(() => {
+      request.abort();
+      settle({ success: false, error: 'Calendar feed timed out after 30s' });
+    }, 30000);
 
-        if (response.statusCode === 200) {
-          response.on('data', (chunk) => {
-            responseData += chunk.toString();
-          });
-
-          response.on('end', () => {
-            console.log('Calendar feed fetched successfully');
-            resolve({ success: true, data: responseData });
-          });
-        } else {
-          resolve({ success: false, error: `HTTP error: ${response.statusCode}` });
-        }
-      });
-
-      request.on('error', (error) => {
-        console.error('Calendar feed fetch error:', error);
-        resolve({ success: false, error: error.message });
-      });
-
-      request.end();
+    request.on('response', (response) => {
+      if (response.statusCode === 200) {
+        response.on('data', (chunk) => {
+          responseData += chunk.toString();
+        });
+        response.on('end', () => settle({ success: true, data: responseData }));
+      } else {
+        settle({ success: false, error: `HTTP error: ${response.statusCode}` });
+      }
     });
+
+    request.on('error', (error) => {
+      console.error('Calendar feed fetch error:', error);
+      settle({ success: false, error: error.message });
+    });
+
+    request.end();
+  });
+}
+
+function readCalendarCache(): { data: string; fetchedAt: number } | null {
+  try {
+    const stat = statSync(CALENDAR_CACHE_PATH);
+    return { data: readFileSync(CALENDAR_CACHE_PATH, 'utf8'), fetchedAt: stat.mtimeMs };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Download the feed, persist it, and tell the renderer to re-index. Concurrent
+ * callers join the running download - the feed takes seconds to generate
+ * server-side and a second request would return the same bytes.
+ */
+function refreshCalendarFeed(url: string): Promise<void> {
+  if (calendarRefreshInFlight) {
+    return calendarRefreshInFlight;
+  }
+
+  calendarRefreshInFlight = downloadCalendarFeed(url)
+    .then((result) => {
+      if (!result.success || !result.data) {
+        console.warn('Calendar feed refresh failed:', result.error);
+        return;
+      }
+      try {
+        writeFileSync(CALENDAR_CACHE_PATH, result.data, 'utf8');
+      } catch (error) {
+        console.error('Failed to write calendar cache:', error);
+      }
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('calendar-feed-updated');
+      }
+    })
+    .finally(() => {
+      calendarRefreshInFlight = null;
+    });
+
+  return calendarRefreshInFlight;
+}
+
+function startCalendarBackgroundRefresh(): void {
+  const refresh = () => {
+    const url = getSetting('calendarUrl');
+    if (url) {
+      void refreshCalendarFeed(url);
+    }
+  };
+
+  refresh();
+  setInterval(refresh, CALENDAR_REFRESH_MS);
+}
+
+ipcMain.handle('fetch-calendar-feed', async (_event, url: string, forceRefresh?: boolean) => {
+  try {
+    const cached = forceRefresh ? null : readCalendarCache();
+
+    if (cached) {
+      // Serving the file first keeps the first calendar view after launch
+      // instant; the periodic refresh normally keeps this file current.
+      if (Date.now() - cached.fetchedAt > CALENDAR_REFRESH_MS) {
+        void refreshCalendarFeed(url);
+      }
+      return { success: true, data: cached.data, fetchedAt: cached.fetchedAt, fromCache: true };
+    }
+
+    const result = await downloadCalendarFeed(url);
+
+    if (result.success && result.data) {
+      try {
+        writeFileSync(CALENDAR_CACHE_PATH, result.data, 'utf8');
+      } catch (error) {
+        console.error('Failed to write calendar cache:', error);
+      }
+    }
+
+    return { ...result, fetchedAt: Date.now(), fromCache: false };
   } catch (error) {
     console.error('Failed to fetch calendar feed:', error);
     return { success: false, error: (error as Error).message };

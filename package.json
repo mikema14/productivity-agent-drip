@@ -1,6 +1,6 @@
 {
   "name": "drip",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Drip - Consistent progress tracking for Easy Project",
   "main": "dist-electron/main.js",
   "author": "Marek Mikesz",

@@ -9,22 +9,22 @@ export interface TimerState {
   sessionCount: number;
   isPaused: boolean;
   intention: string;
-  showCompletionModal: boolean;
+  /** True while the always-on-top session-end overlay is up. */
+  overlayOpen: boolean;
   durationMinutes: number;
   setIntention: (intention: string) => void;
-  setShowCompletionModal: (show: boolean) => void;
   setDurationMinutes: (minutes: number) => void;
   setCurrentBillable: (billable: boolean) => void;
-  startFocus: (taskId?: string, billable?: boolean) => Promise<void>;
-  startBreak: (isLong: boolean) => void;
+  startFocus: (taskId?: string, billable?: boolean, fromOverlay?: boolean) => Promise<void>;
+  startBreak: (isLong: boolean, fromOverlay?: boolean) => void;
   tick: () => void;
   pause: () => void;
   resume: () => void;
   skip: () => void;
   finishEarly: () => Promise<void>;
   reset: () => void;
-  continueFromModal: () => void;
-  startBreakFromModal: () => void;
+  continueFromModal: (fromOverlay?: boolean) => void;
+  startBreakFromModal: (fromOverlay?: boolean) => void;
   dismissCompletionModal: () => void;
   extendSession: (minutes: number) => void;
   totalDuration: number;
@@ -83,6 +83,12 @@ export interface CalendarProposal {
   task_id: string | null;
   comment: string | null;
   logged: 0 | 1;
+}
+
+export interface CalendarFeedResult {
+  data: string;
+  fetchedAt: number;
+  fromCache: boolean;
 }
 
 export interface DailySummary {
@@ -172,6 +178,49 @@ export interface ApiTestResult {
   };
 }
 
+// Session-end overlay (always-on-top glass window)
+export interface FocusCompletePayload {
+  kind: 'focus-complete';
+  sessionId: string | null;
+  taskId: string | null;
+  taskTitle: string | null;
+  durationMinutes: number;
+  startedAt: string;
+  endedAt: string;
+  note: string;
+  nextBreakMinutes: number;
+  isLongBreak: boolean;
+}
+
+export interface BreakCompletePayload {
+  kind: 'break-complete';
+  nextFocusMinutes: number;
+}
+
+export interface BreakRunningPayload {
+  kind: 'break-running';
+  totalSeconds: number;
+  remainingSeconds: number;
+  isLong: boolean;
+}
+
+export type SessionOverlayPayload =
+  | FocusCompletePayload
+  | BreakCompletePayload
+  | BreakRunningPayload;
+
+export type OverlayActionType = 'start-break' | 'next-focus' | 'dismiss';
+
+export interface OverlayAPI {
+  onState: (callback: (payload: SessionOverlayPayload) => void) => void;
+  onTick: (callback: (remainingSeconds: number) => void) => void;
+  action: (type: OverlayActionType) => void;
+  saveNote: (sessionId: string, note: string) => Promise<void>;
+  setInteractive: (interactive: boolean) => void;
+  /** Escalation state — main owns the full-width top-edge attention strip. */
+  setEscalated: (escalated: boolean) => void;
+}
+
 // IPC channel types
 export interface TimerAPI {
   saveSession: (session: Omit<PomodoroSession, 'id'>) => Promise<string>;
@@ -184,7 +233,8 @@ export interface TimerAPI {
   testApiConnection?: (baseUrl: string, apiKey: string) => Promise<ApiTestResult>;
   getIssue?: (baseUrl: string, apiKey: string, issueId: string) => Promise<IssueData>;
   postTimeEntry?: (baseUrl: string, apiKey: string, payload: TimeEntryPayload) => Promise<number>;
-  fetchCalendarFeed?: (url: string) => Promise<string>;
+  fetchCalendarFeed?: (url: string, forceRefresh?: boolean) => Promise<CalendarFeedResult>;
+  onCalendarFeedUpdated?: (callback: () => void) => () => void;
   getDaysSinceLastLog?: () => Promise<number | null>;
   openExternal?: (url: string) => Promise<void>;
   // Main process timer control
@@ -204,6 +254,12 @@ export interface TimerAPI {
   onUrlStartFocus: (callback: (data: { taskId?: string; intention?: string }) => void) => void;
   onUrlTimerAction: (callback: (action: 'pause' | 'resume' | 'stop' | 'finish-early' | 'start-break' | 'skip-break', data?: any) => void) => void;
   toggleTray: (show: boolean) => Promise<void>;
+  // Session-end overlay
+  showSessionOverlay: (payload: FocusCompletePayload | BreakCompletePayload) => Promise<{ shown: boolean }>;
+  hideSessionOverlay: () => Promise<void>;
+  notifyBreakStarted: (totalSeconds: number, isLong: boolean) => Promise<void>;
+  setOverlayEnabled: (enabled: boolean) => Promise<void>;
+  onOverlayAction: (callback: (type: OverlayActionType) => void) => void;
 }
 
 export interface LogAPI {
@@ -224,7 +280,8 @@ export interface LogAPI {
   getCachedTasks: () => Promise<TaskCache[]>;
   getCachedTask: (taskId: string) => Promise<TaskCache | null>;
   cacheTask?: (taskId: string, title: string, projectId: number, projectName: string) => Promise<void>;
-  getRecentTasks: () => Promise<Array<{ task_id: string; title: string }>>;
+  getRecentTasks: () => Promise<TaskCache[]>;
+  searchTasks: (query: string, limit?: number) => Promise<TaskCache[]>;
   getTemplates: () => Promise<LogTemplate[]>;
   addTemplate: (template: Omit<LogTemplate, 'id' | 'created_at'>) => Promise<string>;
   updateTemplate: (id: string, template: Omit<LogTemplate, 'id' | 'created_at'>) => Promise<void>;
@@ -380,6 +437,7 @@ declare global {
     dashboardAPI: DashboardAPI;
     aiAPI: AIAPI;
     listsAPI: ListsAPI;
+    overlayAPI: OverlayAPI;
   }
 }
 
