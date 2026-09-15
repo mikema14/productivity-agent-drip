@@ -1,4 +1,5 @@
-import type { LogEntry, PomodoroSession } from '../types';
+import type { PomodoroSession } from '../types';
+import type { LogEntry } from '../stores/logStore';
 
 export interface MergedEntry extends LogEntry {
   isMerged: boolean;

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useTaskSearch } from '../../hooks/useTaskSearch';
 import type { TaskCache } from '../../types';
 
 interface Props {
@@ -36,12 +37,8 @@ export default function TaskPicker({ recentTasks, onSelect, searchRef }: Props) 
   const internalRef = useRef<HTMLInputElement>(null);
   const inputRef = searchRef || internalRef;
 
-  const filtered = query.trim()
-    ? recentTasks.filter(t =>
-        t.task_id.includes(query) ||
-        t.title.toLowerCase().includes(query.toLowerCase())
-      )
-    : recentTasks;
+  // Empty query -> the short recents list; typing searches the full task history
+  const { results: filtered, isSearching } = useTaskSearch(query, recentTasks);
 
   // List is visible when focused or query is non-empty
   const showList = listOpen;
@@ -136,7 +133,7 @@ export default function TaskPicker({ recentTasks, onSelect, searchRef }: Props) 
           placeholder="Search task ID or title…"
           className="flex-1 bg-transparent text-[13px] text-txt-primary placeholder-txt-muted focus:outline-none"
         />
-        {isLoading && <span className="text-[11px] text-txt-muted animate-pulse">Loading…</span>}
+        {(isLoading || isSearching) && <span className="text-[11px] text-txt-muted animate-pulse">Loading…</span>}
         <span
           onClick={(e) => {
             e.stopPropagation();
@@ -163,7 +160,7 @@ export default function TaskPicker({ recentTasks, onSelect, searchRef }: Props) 
               className="px-4 pb-1.5 font-medium uppercase text-focus"
               style={{ fontSize: '10.5px', letterSpacing: '0.08em' }}
             >
-              Recent tasks
+              {query.trim() ? `All tasks · ${filtered.length}` : 'Recent tasks'}
             </div>
           )}
 
@@ -192,6 +189,8 @@ export default function TaskPicker({ recentTasks, onSelect, searchRef }: Props) 
                   <span className="text-[11px] text-txt-muted shrink-0">{relativeTime(task.last_seen_at)}</span>
                 </button>
               ))
+            ) : isSearching ? (
+              <div className="px-2 py-3 text-[13px] text-txt-muted text-center">Searching…</div>
             ) : query.trim() ? (
               <div className="px-2 py-3 text-[13px] text-txt-muted text-center">
                 No matching tasks.{' '}

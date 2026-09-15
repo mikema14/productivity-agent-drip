@@ -8,7 +8,9 @@
  */
 export function playEscalationChime(): void {
   try {
-    const Ctor = window.AudioContext || (window as any).webkitAudioContext;
+    const Ctor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return;
     const ctx = new Ctor();
 

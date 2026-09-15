@@ -1,3 +1,5 @@
+import { COLOR } from './src/theme/tokens.js';
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -11,35 +13,21 @@ export default {
         mono: ['JetBrains Mono', 'Menlo', 'monospace'],
       },
       colors: {
-        drip: {
-          bg: '#0a0a0c',
-          surface: '#141418',
-          elevated: '#1c1c22',
-          border: '#2a2a32',
-        },
+        drip: COLOR.drip,
         focus: {
-          DEFAULT: '#f59e0b',
-          light: '#fbbf24',
-          dark: '#d97706',
+          ...COLOR.focus,
           glow: 'rgba(245, 158, 11, 0.15)',
           muted: 'rgba(245, 158, 11, 0.1)',
         },
         break: {
-          DEFAULT: '#34d399',
-          light: '#6ee7b7',
-          dark: '#10b981',
+          ...COLOR.break,
           glow: 'rgba(52, 211, 153, 0.15)',
           muted: 'rgba(52, 211, 153, 0.1)',
         },
         idle: {
           DEFAULT: '#64748b',
         },
-        txt: {
-          primary: '#f0f0f2',
-          secondary: '#a0a0b0',
-          muted: '#8585a0',
-          dim: '#45455a',
-        },
+        txt: COLOR.txt,
       },
       boxShadow: {
         'glow-focus': '0 0 40px rgba(245, 158, 11, 0.15), 0 0 80px rgba(245, 158, 11, 0.05)',

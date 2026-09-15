@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PomodoroSession, TimerAPI, LogAPI, AdhocEntry, CalendarProposal, TaskCache, ApiTestResult, IssueData, TimeEntryPayload, OverlayActionType } from '../src/types';
+import type { PomodoroSession, TimerAPI, LogAPI, AdhocEntry, CalendarProposal, CalendarFeedResult, TaskCache, ApiTestResult, IssueData, TimeEntryPayload, OverlayActionType } from '../src/types';
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object
@@ -79,12 +79,18 @@ const timerAPI: TimerAPI = {
     throw new Error(result.error || 'Failed to post time entry');
   },
 
-  fetchCalendarFeed: async (url: string): Promise<string> => {
-    const result = await ipcRenderer.invoke('fetch-calendar-feed', url);
+  fetchCalendarFeed: async (url: string, forceRefresh?: boolean): Promise<CalendarFeedResult> => {
+    const result = await ipcRenderer.invoke('fetch-calendar-feed', url, forceRefresh);
     if (result.success) {
-      return result.data;
+      return { data: result.data, fetchedAt: result.fetchedAt, fromCache: result.fromCache };
     }
     throw new Error(result.error || 'Failed to fetch calendar feed');
+  },
+
+  onCalendarFeedUpdated: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('calendar-feed-updated', handler);
+    return () => ipcRenderer.removeListener('calendar-feed-updated', handler);
   },
 
   getDaysSinceLastLog: async (): Promise<number | null> => {
@@ -298,12 +304,20 @@ const logAPI: LogAPI = {
     }
   },
 
-  getRecentTasks: async (): Promise<Array<{ task_id: string; title: string }>> => {
+  getRecentTasks: async (): Promise<TaskCache[]> => {
     const result = await ipcRenderer.invoke('get-recent-tasks');
     if (result.success) {
       return result.tasks;
     }
     throw new Error(result.error || 'Failed to get recent tasks');
+  },
+
+  searchTasks: async (query: string, limit?: number): Promise<TaskCache[]> => {
+    const result = await ipcRenderer.invoke('search-cached-tasks', query, limit);
+    if (result.success) {
+      return result.tasks;
+    }
+    throw new Error(result.error || 'Failed to search tasks');
   },
 
   addCalendarProposal: async (proposal: Omit<CalendarProposal, 'id'>): Promise<string> => {

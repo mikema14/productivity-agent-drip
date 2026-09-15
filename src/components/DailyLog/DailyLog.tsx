@@ -11,7 +11,7 @@ import TimelineItem from '../shared/TimelineItem';
 import EndDayModal from './EndDayModal';
 import CalendarPopover from './CalendarPopover';
 import { mergeEntriesByTaskId } from '../../utils/mergeEntries';
-import { forceSyncCalendar, getLastSyncTime } from '../../services/calendar';
+import { forceSyncCalendar, getLastSyncTime, invalidateCalendarCache } from '../../services/calendar';
 
 const formatTotalTime = (minutes: number) => {
   const hours = Math.floor(minutes / 60);
@@ -86,6 +86,16 @@ export default function DailyLog() {
     loadDay(selectedDate);
     const syncTime = getLastSyncTime(selectedDate);
     setLastSyncTime(syncTime);
+  }, [selectedDate, loadDay]);
+
+  // The main process refreshes the ICS feed in the background; the first one
+  // after launch replaces whatever the on-disk cache served.
+  useEffect(() => {
+    return window.timerAPI.onCalendarFeedUpdated?.(async () => {
+      invalidateCalendarCache();
+      await loadDay(selectedDate);
+      setLastSyncTime(getLastSyncTime(selectedDate));
+    });
   }, [selectedDate, loadDay]);
 
   // Check if day is locked

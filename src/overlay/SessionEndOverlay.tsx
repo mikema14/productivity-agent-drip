@@ -9,10 +9,10 @@ import type {
 } from '../types';
 import { BREAK, CARD_W, FOCUS, GLASS, TXT, WINDOW } from './glass';
 import { playEscalationChime } from './chime';
+import { useOverlayHoverInteractivity } from './useOverlayHoverInteractivity';
 
 const ESCALATE_AFTER_MS = 60_000;
 const NOTE_DEBOUNCE_MS = 400;
-const HOVER_LEAVE_MS = 80;
 
 type Shape = 'card' | 'break';
 
@@ -69,8 +69,6 @@ export function SessionEndOverlay() {
   const noteFocusedRef = useRef(false);
   const escalateTimer = useRef<number | null>(null);
   const noteTimer = useRef<number | null>(null);
-  const leaveTimer = useRef<number | null>(null);
-  const interactiveRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
   const noteRef = useRef('');
   const savedNoteRef = useRef('');
@@ -109,13 +107,6 @@ export function SessionEndOverlay() {
     [flushNote]
   );
 
-  // ------------------------------------------------------------ interactivity
-  const setInteractive = useCallback((value: boolean) => {
-    if (interactiveRef.current === value) return;
-    interactiveRef.current = value;
-    window.overlayAPI?.setInteractive(value);
-  }, []);
-
   // ---------------------------------------------------------------- lifecycle
   const stopEscalation = useCallback(() => {
     if (escalateTimer.current) {
@@ -135,12 +126,20 @@ export function SessionEndOverlay() {
     playEscalationChime();
   }, []);
 
+  // Hovering the card means the user has seen it, so stop nagging.
+  const onHoverEnter = useCallback(() => {
+    if (!isBreakRunning) stopEscalation();
+  }, [isBreakRunning, stopEscalation]);
+
+  const { resetInteractive } = useOverlayHoverInteractivity({
+    shapeRef,
+    holdRef: noteFocusedRef,
+    onEnter: onHoverEnter
+  });
+
   useEffect(() => {
     window.overlayAPI?.onState((next) => {
-      // main sets the window back to click-through on hide, so drop the cached
-      // value or the next hover would be deduped away and clicks would never
-      // reach the overlay again.
-      interactiveRef.current = false;
+      resetInteractive();
       noteFocusedRef.current = false;
 
       setPayload(next);
@@ -180,44 +179,7 @@ export function SessionEndOverlay() {
       window.removeEventListener('beforeunload', onBeforeUnload);
       window.removeEventListener('keydown', onKey);
     };
-  }, [escalate, flushNote, stopEscalation]);
-
-  // Hover detection: the window is mostly empty pixels and click-through by
-  // default, so ask main for mouse events only while the cursor is on the shape.
-  useEffect(() => {
-    const onMove = (event: MouseEvent) => {
-      const rect = shapeRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const inside =
-        event.clientX >= rect.left &&
-        event.clientX <= rect.right &&
-        event.clientY >= rect.top &&
-        event.clientY <= rect.bottom;
-
-      if (inside) {
-        if (leaveTimer.current) {
-          window.clearTimeout(leaveTimer.current);
-          leaveTimer.current = null;
-        }
-        setInteractive(true);
-        if (!isBreakRunning) stopEscalation();
-        return;
-      }
-
-      // Never drop interactivity mid-word.
-      if (noteFocusedRef.current) return;
-      if (leaveTimer.current) return;
-      leaveTimer.current = window.setTimeout(() => {
-        leaveTimer.current = null;
-        // Release mouse events so the empty area around the card stays
-        // click-through. The card itself stays up.
-        setInteractive(false);
-      }, HOVER_LEAVE_MS);
-    };
-
-    window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
-  }, [isBreakRunning, setInteractive, stopEscalation]);
+  }, [escalate, flushNote, resetInteractive, stopEscalation]);
 
   // Focus the note as soon as a finished session appears, so typing works
   // without hunting for the field.

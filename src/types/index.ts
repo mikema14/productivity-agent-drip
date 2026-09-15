@@ -15,7 +15,7 @@ export interface TimerState {
   setIntention: (intention: string) => void;
   setDurationMinutes: (minutes: number) => void;
   setCurrentBillable: (billable: boolean) => void;
-  startFocus: (taskId?: string, billable?: boolean) => Promise<void>;
+  startFocus: (taskId?: string, billable?: boolean, fromOverlay?: boolean) => Promise<void>;
   startBreak: (isLong: boolean, fromOverlay?: boolean) => void;
   tick: () => void;
   pause: () => void;
@@ -23,8 +23,8 @@ export interface TimerState {
   skip: () => void;
   finishEarly: () => Promise<void>;
   reset: () => void;
-  continueFromModal: () => void;
-  startBreakFromModal: () => void;
+  continueFromModal: (fromOverlay?: boolean) => void;
+  startBreakFromModal: (fromOverlay?: boolean) => void;
   dismissCompletionModal: () => void;
   extendSession: (minutes: number) => void;
   totalDuration: number;
@@ -83,6 +83,12 @@ export interface CalendarProposal {
   task_id: string | null;
   comment: string | null;
   logged: 0 | 1;
+}
+
+export interface CalendarFeedResult {
+  data: string;
+  fetchedAt: number;
+  fromCache: boolean;
 }
 
 export interface DailySummary {
@@ -227,7 +233,8 @@ export interface TimerAPI {
   testApiConnection?: (baseUrl: string, apiKey: string) => Promise<ApiTestResult>;
   getIssue?: (baseUrl: string, apiKey: string, issueId: string) => Promise<IssueData>;
   postTimeEntry?: (baseUrl: string, apiKey: string, payload: TimeEntryPayload) => Promise<number>;
-  fetchCalendarFeed?: (url: string) => Promise<string>;
+  fetchCalendarFeed?: (url: string, forceRefresh?: boolean) => Promise<CalendarFeedResult>;
+  onCalendarFeedUpdated?: (callback: () => void) => () => void;
   getDaysSinceLastLog?: () => Promise<number | null>;
   openExternal?: (url: string) => Promise<void>;
   // Main process timer control
@@ -273,7 +280,8 @@ export interface LogAPI {
   getCachedTasks: () => Promise<TaskCache[]>;
   getCachedTask: (taskId: string) => Promise<TaskCache | null>;
   cacheTask?: (taskId: string, title: string, projectId: number, projectName: string) => Promise<void>;
-  getRecentTasks: () => Promise<Array<{ task_id: string; title: string }>>;
+  getRecentTasks: () => Promise<TaskCache[]>;
+  searchTasks: (query: string, limit?: number) => Promise<TaskCache[]>;
   getTemplates: () => Promise<LogTemplate[]>;
   addTemplate: (template: Omit<LogTemplate, 'id' | 'created_at'>) => Promise<string>;
   updateTemplate: (id: string, template: Omit<LogTemplate, 'id' | 'created_at'>) => Promise<void>;

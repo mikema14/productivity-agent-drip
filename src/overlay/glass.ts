@@ -1,3 +1,5 @@
+import { COLOR } from '../theme/tokens.js';
+
 /**
  * Single source of truth for the overlay's surface.
  *
@@ -31,23 +33,18 @@ export const GLASS = {
 } as const;
 
 export const FOCUS = {
-  base: '#f59e0b',
-  light: '#fbbf24',
-  bright: '#fde68a',
-  dark: '#d97706',
+  base: COLOR.focus.DEFAULT,
+  light: COLOR.focus.light,
+  bright: COLOR.focus.bright,
+  dark: COLOR.focus.dark,
 } as const;
 
 export const BREAK = {
-  base: '#34d399',
-  light: '#6ee7b7',
+  base: COLOR.break.DEFAULT,
+  light: COLOR.break.light,
 } as const;
 
-export const TXT = {
-  primary: '#f0f0f2',
-  secondary: '#a0a0b0',
-  muted: '#8585a0',
-  dim: '#45455a',
-} as const;
+export const TXT = COLOR.txt;
 
 /**
  * Window geometry — must match OVERLAY_W/H in electron/overlayWindow.ts.

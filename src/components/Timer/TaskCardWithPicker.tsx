@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTimerStore } from '../../stores/timerStore';
+import { useTaskSearch } from '../../hooks/useTaskSearch';
 import type { TaskCache } from '../../types';
 
 interface Props {
@@ -81,12 +82,8 @@ export default function TaskCardWithPicker({
     };
   }, [pickerOpen, onToggle]);
 
-  const filtered = query.trim()
-    ? recentTasks.filter(t =>
-        t.task_id.includes(query) ||
-        t.title.toLowerCase().includes(query.toLowerCase())
-      )
-    : recentTasks;
+  // Empty query -> the short recents list; typing searches the full task history
+  const { results: filtered, isSearching } = useTaskSearch(query, recentTasks);
 
   const handleSearchKeyDown = async (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
@@ -184,7 +181,7 @@ export default function TaskCardWithPicker({
               placeholder="Search task ID or title…"
               className="flex-1 bg-transparent text-[13px] text-txt-primary placeholder-txt-muted focus:outline-none"
             />
-            {isLoading && <span className="text-[11px] text-txt-muted animate-pulse">Loading…</span>}
+            {(isLoading || isSearching) && <span className="text-[11px] text-txt-muted animate-pulse">Loading…</span>}
           </div>
 
           {/* Section label */}
@@ -193,7 +190,7 @@ export default function TaskCardWithPicker({
               className="px-4 pt-3 pb-1.5 font-medium uppercase text-focus"
               style={{ fontSize: '10.5px', letterSpacing: '0.08em' }}
             >
-              Recent tasks
+              {query.trim() ? `All tasks · ${filtered.length}` : 'Recent tasks'}
             </div>
           )}
 
@@ -235,6 +232,8 @@ export default function TaskCardWithPicker({
                   </button>
                 );
               })
+            ) : isSearching ? (
+              <div className="px-2 py-3 text-[13px] text-txt-muted text-center">Searching…</div>
             ) : query.trim() ? (
               <div className="px-2 py-3 text-[13px] text-txt-muted text-center">
                 No matching tasks.{' '}

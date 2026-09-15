@@ -30,48 +30,68 @@ const MARGIN_X = 12;
  */
 const MARGIN_Y = 96;
 
-let overlay: BrowserWindow | null = null;
-/**
- * Full-width strips along the top edge of EVERY display, shown only on
- * escalation. One per display: a window lives on a single display, so a single
- * strip would leave whichever screen the user is actually looking at bare.
- */
-let edges: BrowserWindow[] = [];
-let enabled = true;
-let loaded = false;
-/** Payload that arrived before the renderer finished loading. */
-let pendingState: SessionOverlayPayload | null = null;
-let lastKind: SessionOverlayPayload['kind'] | null = null;
+interface OverlayState {
+  win: BrowserWindow | null;
+  /**
+   * Full-width strips along the top edge of EVERY display, shown only on
+   * escalation. One per display: a window lives on a single display, so a
+   * single strip would leave whichever screen the user is looking at bare.
+   */
+  edges: Array<{ displayId: number; win: BrowserWindow }>;
+  loaded: boolean;
+  /** Payload that arrived before the renderer finished loading. */
+  pendingState: SessionOverlayPayload | null;
+  lastKind: SessionOverlayPayload['kind'] | null;
+  /**
+   * Display the user was last seen working on. Sampled while a timer runs, so
+   * a pointer parked on another screen doesn't send the overlay to the wrong
+   * one — the common case when working fullscreen on a second display.
+   */
+  lastActiveDisplayId: number | null;
+  /** The user's setting, not lifecycle state — resetState() leaves it alone. */
+  enabled: boolean;
+}
+
+const state: OverlayState = {
+  win: null,
+  edges: [],
+  loaded: false,
+  pendingState: null,
+  lastKind: null,
+  lastActiveDisplayId: null,
+  enabled: true,
+};
+
+/** Clears everything tied to the overlay window's lifetime. */
+function resetState(): void {
+  state.win = null;
+  state.loaded = false;
+  state.pendingState = null;
+  state.lastKind = null;
+}
 
 const isDev = !app.isPackaged;
 
 export function initOverlayEnabled(): void {
   try {
-    enabled = getSetting('sessionEndOverlay') !== 'false';
+    state.enabled = getSetting('sessionEndOverlay') !== 'false';
   } catch {
-    enabled = true;
+    state.enabled = true;
   }
 }
 
 export function isOverlayEnabled(): boolean {
-  return enabled;
+  return state.enabled;
 }
 
 export function setOverlayEnabled(value: boolean): void {
-  enabled = value;
+  state.enabled = value;
   if (!value) destroyOverlay();
 }
 
-/**
- * Display the user was last seen working on. Sampled while a timer runs, so a
- * pointer parked on another screen doesn't send the overlay to the wrong one —
- * which is the common case when working fullscreen on a second display.
- */
-let lastActiveDisplayId: number | null = null;
-
 export function sampleActiveDisplay(): void {
   try {
-    lastActiveDisplayId = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).id;
+    state.lastActiveDisplayId = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).id;
   } catch {
     // A display can disappear mid-sample; the next one will pick it up.
   }
@@ -79,7 +99,7 @@ export function sampleActiveDisplay(): void {
 
 function targetWorkArea() {
   const displays = screen.getAllDisplays();
-  const remembered = displays.find((d) => d.id === lastActiveDisplayId);
+  const remembered = displays.find((d) => d.id === state.lastActiveDisplayId);
   if (remembered) return remembered.workArea;
   return screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
 }
@@ -134,20 +154,16 @@ function createOverlay(): BrowserWindow {
   // renderer can ask for interactivity when the cursor enters the shape.
   win.setIgnoreMouseEvents(true, { forward: true });
 
-  loaded = false;
+  state.loaded = false;
   win.webContents.on('did-finish-load', () => {
-    loaded = true;
-    if (pendingState) {
-      win.webContents.send('overlay:state', pendingState);
-      pendingState = null;
+    state.loaded = true;
+    if (state.pendingState) {
+      win.webContents.send('overlay:state', state.pendingState);
+      state.pendingState = null;
     }
   });
 
-  win.on('closed', () => {
-    overlay = null;
-    loaded = false;
-    lastKind = null;
-  });
+  win.on('closed', resetState);
 
   loadOverlayHtml(win);
   if (isDev && process.env.DRIP_OVERLAY_DEVTOOLS === '1') {
@@ -171,8 +187,29 @@ function loadOverlayHtml(win: BrowserWindow, search?: string): void {
  * filters out; full-width motion is not. Never interactive, covers no content.
  */
 function showEdgeGlow(): void {
+  const displays = screen.getAllDisplays();
+  const live = state.edges.filter(({ win }) => !win.isDestroyed());
+  const sameDisplays =
+    live.length === displays.length && displays.every((d) => live.some((e) => e.displayId === d.id));
+
+  // Displays unchanged: move the strips we already have. Rebuilding a
+  // BrowserWindow per display on every reposition is visibly slower.
+  if (sameDisplays) {
+    try {
+      for (const { displayId, win } of live) {
+        const { workArea } = displays.find((d) => d.id === displayId)!;
+        win.setBounds({ x: workArea.x, y: workArea.y, width: workArea.width, height: EDGE_H });
+        if (!win.isVisible()) win.showInactive();
+      }
+      state.edges = live;
+      return;
+    } catch (error) {
+      console.error('[Overlay] Failed to reposition edge glow, rebuilding:', error);
+    }
+  }
+
   hideEdgeGlow();
-  for (const display of screen.getAllDisplays()) {
+  for (const display of displays) {
     try {
       const { workArea } = display;
       const win = new BrowserWindow({
@@ -210,7 +247,7 @@ function showEdgeGlow(): void {
       // compositor before its first paint.
       win.setBounds({ x: workArea.x, y: workArea.y, width: workArea.width, height: EDGE_H });
       win.showInactive();
-      edges.push(win);
+      state.edges.push({ displayId: display.id, win });
     } catch (error) {
       console.error(`[Overlay] Failed to show edge glow on display ${display.id}:`, error);
     }
@@ -218,14 +255,14 @@ function showEdgeGlow(): void {
 }
 
 function hideEdgeGlow(): void {
-  for (const win of edges) {
+  for (const { win } of state.edges) {
     if (!win.isDestroyed()) win.destroy();
   }
-  edges = [];
+  state.edges = [];
 }
 
 function isEdgeGlowVisible(): boolean {
-  return edges.some((win) => !win.isDestroyed() && win.isVisible());
+  return state.edges.some(({ win }) => !win.isDestroyed() && win.isVisible());
 }
 
 export function setOverlayEscalated(escalated: boolean): void {
@@ -238,20 +275,20 @@ export function setOverlayEscalated(escalated: boolean): void {
   // timer has stopped sampling — so re-read where the user is now and bring
   // the card to that display before lighting every screen.
   sampleActiveDisplay();
-  if (overlay && !overlay.isDestroyed() && overlay.isVisible()) {
-    positionOverlay(overlay);
+  if (isOverlayVisible()) {
+    positionOverlay(state.win!);
   }
   showEdgeGlow();
 }
 
 function ensureOverlay(): BrowserWindow | null {
-  if (overlay && !overlay.isDestroyed()) return overlay;
+  if (state.win && !state.win.isDestroyed()) return state.win;
   try {
-    overlay = createOverlay();
-    return overlay;
+    state.win = createOverlay();
+    return state.win;
   } catch (error) {
     console.error('[Overlay] Failed to create window:', error);
-    overlay = null;
+    resetState();
     return null;
   }
 }
@@ -260,21 +297,21 @@ export function sendOverlayState(payload: SessionOverlayPayload): boolean {
   const win = ensureOverlay();
   if (!win) return false;
 
-  lastKind = payload.kind;
+  state.lastKind = payload.kind;
   hideEdgeGlow();
-  if (loaded) {
+  if (state.loaded) {
     win.webContents.send('overlay:state', payload);
   } else {
-    pendingState = payload;
+    state.pendingState = payload;
   }
   return true;
 }
 
 export function showOverlay(payload: SessionOverlayPayload): boolean {
-  if (!enabled) return false;
+  if (!state.enabled) return false;
   if (!sendOverlayState(payload)) return false;
 
-  const win = overlay!;
+  const win = state.win!;
   positionOverlay(win);
   if (!win.isVisible()) {
     // Never show()/focus() — the overlay must not steal keyboard focus.
@@ -284,34 +321,34 @@ export function showOverlay(payload: SessionOverlayPayload): boolean {
 }
 
 export function hideOverlay(): void {
-  if (overlay && !overlay.isDestroyed() && overlay.isVisible()) {
-    overlay.setIgnoreMouseEvents(true, { forward: true });
-    overlay.hide();
+  if (isOverlayVisible()) {
+    state.win!.setIgnoreMouseEvents(true, { forward: true });
+    state.win!.hide();
   }
   hideEdgeGlow();
-  lastKind = null;
+  state.lastKind = null;
 }
 
 export function setOverlayInteractive(interactive: boolean): void {
-  if (!overlay || overlay.isDestroyed()) return;
+  if (!state.win || state.win.isDestroyed()) return;
   if (interactive) {
     // `forward` is only meaningful while ignoring; passing it here is undefined
     // behaviour on macOS.
-    overlay.setIgnoreMouseEvents(false);
+    state.win.setIgnoreMouseEvents(false);
   } else {
-    overlay.setIgnoreMouseEvents(true, { forward: true });
+    state.win.setIgnoreMouseEvents(true, { forward: true });
   }
 }
 
 export function sendTickToOverlay(status: 'idle' | 'focus' | 'break', remainingSeconds: number): void {
-  if (!overlay || overlay.isDestroyed() || !overlay.isVisible()) return;
-  if (status !== 'break' || lastKind !== 'break-running') return;
-  overlay.webContents.send('overlay:tick', remainingSeconds);
+  if (!isOverlayVisible()) return;
+  if (status !== 'break' || state.lastKind !== 'break-running') return;
+  state.win!.webContents.send('overlay:tick', remainingSeconds);
 }
 
 export function repositionOverlayIfVisible(): void {
-  if (overlay && !overlay.isDestroyed() && overlay.isVisible()) {
-    positionOverlay(overlay);
+  if (isOverlayVisible()) {
+    positionOverlay(state.win!);
   }
   // Displays changed: rebuild the strips so a new screen gets one and a
   // removed screen's window goes away.
@@ -321,16 +358,13 @@ export function repositionOverlayIfVisible(): void {
 }
 
 export function isOverlayVisible(): boolean {
-  return !!overlay && !overlay.isDestroyed() && overlay.isVisible();
+  return !!state.win && !state.win.isDestroyed() && state.win.isVisible();
 }
 
 export function destroyOverlay(): void {
   hideEdgeGlow();
-  if (overlay && !overlay.isDestroyed()) {
-    overlay.destroy();
+  if (state.win && !state.win.isDestroyed()) {
+    state.win.destroy();
   }
-  overlay = null;
-  loaded = false;
-  pendingState = null;
-  lastKind = null;
+  resetState();
 }
