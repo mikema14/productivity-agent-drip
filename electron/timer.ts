@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron';
 import { updateTray } from './tray';
 import { sendTickToOverlay, sampleActiveDisplay } from './overlayWindow';
 import { saveSetting } from '../src/services/db';
+import { raycastFocusStart, raycastFocusEnd } from './raycastFocus';
 
 interface TimerState {
   status: 'idle' | 'focus' | 'break';
@@ -110,6 +111,13 @@ export function startTimer(duration: number, timerType: 'focus' | 'break', nextB
   // Write initial state to DB for Raycast
   writeTimerState();
 
+  // Mirror into Raycast Focus (breaks end any running Focus session)
+  if (timerType === 'focus') {
+    raycastFocusStart(duration, taskId);
+  } else {
+    raycastFocusEnd();
+  }
+
   // Create interval in main process (won't be throttled)
   state.intervalId = setInterval(() => {
     tick();
@@ -181,6 +189,8 @@ function handleComplete() {
   state.paused = false;
   state.nextBreakDuration = undefined; // Clear for next session
 
+  raycastFocusEnd();
+
   // Write state to DB for Raycast — include pendingBreak if focus just completed
   if (completedType === 'focus' && savedBreakDuration) {
     writePendingBreakState(savedBreakDuration, savedTaskId);
@@ -201,6 +211,7 @@ export function pauseTimer() {
     state.intervalId = null;
     state.paused = true;
     writeTimerState();
+    if (state.status === 'focus') raycastFocusEnd();
   }
 }
 
@@ -209,6 +220,7 @@ export function resumeTimer() {
     console.log('[MainTimer] Resuming timer');
     state.paused = false;
     writeTimerState();
+    if (state.status === 'focus') raycastFocusStart(state.remainingSeconds, state.currentTaskId);
     state.intervalId = setInterval(() => {
       tick();
     }, 1000);
@@ -232,6 +244,7 @@ export function stopTimer() {
 
   updateTray('Ready');
   writeTimerState();
+  raycastFocusEnd();
 }
 
 export function getTimerState() {
@@ -250,6 +263,8 @@ export function extendTimer(additionalSeconds: number) {
     // Update tray immediately
     updateTray(formatTrayTime(state.remainingSeconds));
 
+    if (!state.paused) raycastFocusStart(state.remainingSeconds, state.currentTaskId);
+
     // Notify renderer
     sendToRenderer('timer-extended', state.remainingSeconds);
   }
@@ -257,6 +272,7 @@ export function extendTimer(additionalSeconds: number) {
 
 // Cleanup on app quit
 export function cleanupTimer() {
+  raycastFocusEnd();
   if (state.intervalId) {
     console.log('[MainTimer] Cleaning up timer interval');
     clearInterval(state.intervalId);
