@@ -26,13 +26,6 @@
   ],
   "commands": [
     {
-      "name": "timer-status",
-      "title": "Timer Status",
-      "description": "Show Drip timer status in menu bar",
-      "mode": "menu-bar",
-      "interval": "10s"
-    },
-    {
       "name": "start-focus",
       "title": "Start Focus Session",
       "description": "Start a Pomodoro focus session in Drip",
