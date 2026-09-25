@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import PlanBoard, { SHOW_DONE_KEY, SHOW_TASK_IDS_KEY } from './PlanBoard';
 import { useListsStore } from '../../stores/listsStore';
 import { useTimerStore } from '../../stores/timerStore';
-import type { ListItem, TaskList } from '../../types';
+import type { ListItem, PomodoroSession, TaskList } from '../../types';
 
 type DragHandlers = {
   onDragStart?: (e: { active: { id: string } }) => void;
@@ -450,5 +450,68 @@ describe('PlanBoard — list scope', () => {
     const { user } = renderList('l2');
     await user.click(screen.getByText('Title w1'));
     expect(screen.getByTestId('task-detail')).toHaveTextContent('detail:w1:679834:false');
+  });
+});
+
+describe('PlanBoard — Today extras', () => {
+  const today = new Date().toISOString().split('T')[0];
+  const session = (i: number, minutes: number, source: 'pomodoro' | 'break' = 'pomodoro'): PomodoroSession => ({
+    id: `s${i}`, start_at: `${today}T09:00:00.000Z`, end_at: null, duration_minutes: minutes, task_id: '689742', source,
+    comment: null, logged: 0, log_sent_at: null, server_entry_id: null,
+  } as PomodoroSession);
+
+  beforeEach(() => {
+    localStorage.clear();
+    useListsStore.setState({ lists: [], items: [], selectedListId: null, archivedLists: [] });
+    useTimerStore.setState({ status: 'idle', pendingSelection: null });
+  });
+  afterEach(() => localStorage.clear());
+
+  it('capacity line counts non-break sessions only', async () => {
+    window.timerAPI.getSessions = vi.fn(async () => [session(1, 25), session(2, 5, 'break'), session(3, 160)]);
+    renderBoard();
+    expect(await section('Today').findByText('3h 05m focus · 2h 55m to 6h')).toBeInTheDocument();
+  });
+
+  it('capacity line with no sessions', async () => {
+    renderBoard();
+    expect(await section('Today').findByText('0m focus · 6h to 6h')).toBeInTheDocument();
+  });
+
+  it('tracked minutes: today on Today cards, week (wk) on This week cards, — without data, none on Backlog; week line sums the week', async () => {
+    window.logAPI.getTaskMinutesByRange = vi.fn(async (from: string, to: string): Promise<Record<string, number>> =>
+      from === to ? { '689742': 75 } : { '689742': 90, '111': 130 }
+    );
+    renderBoard();
+    expect(await within(card('Title t1')).findByText('1h 15m')).toBeInTheDocument();
+    expect(within(card('Title t2')).getByText('—')).toBeInTheDocument();
+    expect(within(card('Title w1')).getByText('2h 10m wk')).toBeInTheDocument();
+    expect(within(card('Title b1')).queryByText('—')).toBeNull();
+    expect(section('This week').getByText('3h 40m tracked this week')).toBeInTheDocument();
+    expect(window.logAPI.getTaskMinutesByRange).toHaveBeenCalledWith(today, today);
+  });
+
+  it('Start on <id>: first open Today item with an effective id; click hands off to Now', async () => {
+    const { user, onNavigate } = renderBoard();
+    const cta = section('Today').getByRole('button', { name: 'Start on 689742' });
+    await user.click(cta);
+    expect(useTimerStore.getState().pendingSelection).toEqual({ taskId: '689742', title: 'Title t1' });
+    expect(onNavigate).toHaveBeenCalledWith('timer');
+  });
+
+  it('Start on uses the list id when the list is task-bound (§5.3)', () => {
+    renderBoard('all', [item('q', { list_id: 'l2', column: 'today', order: 0 })]);
+    expect(section('Today').getByRole('button', { name: 'Start on 679834' })).toBeInTheDocument();
+  });
+
+  it('no Start on without a candidate, and none while a session runs', () => {
+    renderBoard('all', [item('q', { column: 'today' })]);
+    expect(screen.queryByRole('button', { name: /^Start on/ })).toBeNull();
+  });
+
+  it('Start on hidden while focusing', () => {
+    useTimerStore.setState({ status: 'focus' });
+    renderBoard();
+    expect(screen.queryByRole('button', { name: /^Start on/ })).toBeNull();
   });
 });

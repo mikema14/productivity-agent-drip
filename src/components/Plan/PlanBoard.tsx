@@ -10,14 +10,17 @@ import {
 import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { useListsStore } from '../../stores/listsStore';
 import { useTaskName, resolveTaskNames } from '../../hooks/useTaskName';
+import { getCurrentDate } from '../../utils/time';
 import AddItemInline from '../Lists/AddItemInline';
 import type { ListItem, ListItemColumn, TaskList } from '../../types';
 import type { ViewId } from '../Layout/views';
 import PlanSubheader from './PlanSubheader';
 import BoardColumn, { ColumnSortable, type ColumnGrouping } from './BoardColumn';
 import TaskCard, { type TaskCardActions } from './TaskCard';
+import StartOnCTA from './StartOnCTA';
 import {
-  COLUMNS, ageBadge, getMonday, partition, resolveDrop, type BoardColumnKey, type CompletedMode,
+  COLUMNS, ageBadge, capacityLine, formatMinutesPadded, getMonday, partition, resolveDrop, startCandidate, weekRange,
+  type BoardColumnKey, type CompletedMode,
 } from './boardLogic';
 
 export const SHOW_DONE_KEY = 'allListsOverview_showDone';
@@ -49,7 +52,7 @@ function writeFlag(key: string, value: boolean) {
  * ListPlanningView). Owns the DnD context, the expansion state, the
  * Group / Done / IDs toggles and the list filters; the rules live in boardLogic.
  */
-export default function PlanBoard({ scope }: PlanBoardProps) {
+export default function PlanBoard({ scope, onNavigate }: PlanBoardProps) {
   const {
     lists, items, selectedListId, selectList, createItem, updateItem, updateList, deleteItem, moveItem, archiveList,
   } = useListsStore();
@@ -64,6 +67,9 @@ export default function PlanBoard({ scope }: PlanBoardProps) {
   const [showDone, setShowDone] = useState(() => readFlag(SHOW_DONE_KEY));
   const [showTaskIds, setShowTaskIds] = useState(() => readFlag(SHOW_TASK_IDS_KEY));
   const [activeListFilters, setActiveListFilters] = useState<Set<string>>(new Set());
+  const [focusMinutes, setFocusMinutes] = useState(0);
+  const [todayMinutes, setTodayMinutes] = useState<Record<string, number>>({});
+  const [weekMinutes, setWeekMinutes] = useState<Record<string, number> | null>(null);
 
   const selectedList = scope === 'list' ? lists.find(l => l.id === selectedListId) : undefined;
   const listTaskName = useTaskName(selectedList?.task_id || null);
@@ -83,6 +89,39 @@ export default function PlanBoard({ scope }: PlanBoardProps) {
       if (Object.keys(names).length > 0) setTaskNames(prev => ({ ...prev, ...names }));
     });
   }, [items]);
+
+  // Today's focus minutes (capacity line, P8) and tracked minutes per task (P7):
+  // loaded on mount and whenever the window regains focus.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const today = getCurrentDate();
+      const { from, to } = weekRange(new Date());
+      try {
+        const sessions = await window.timerAPI.getSessions(today);
+        if (!cancelled) setFocusMinutes(sessions.filter(s => s.source !== 'break').reduce((sum, s) => sum + s.duration_minutes, 0));
+      } catch (error) {
+        console.error('Failed to load today\'s sessions:', error);
+      }
+      const byRange = window.logAPI.getTaskMinutesByRange;
+      if (!byRange) return;
+      try {
+        const [day, week] = await Promise.all([byRange(today, today), byRange(from, to)]);
+        if (!cancelled) {
+          setTodayMinutes(day);
+          setWeekMinutes(week);
+        }
+      } catch (error) {
+        console.error('Failed to load tracked minutes:', error);
+      }
+    };
+    load();
+    window.addEventListener('focus', load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', load);
+    };
+  }, []);
 
   // Close the move-to-list dropdown on an outside click.
   useEffect(() => {
@@ -177,6 +216,29 @@ export default function PlanBoard({ scope }: PlanBoardProps) {
     );
   }
 
+  // Tracked time is attributed to the item's own task id only (P7): items that
+  // inherit the list's id would all repeat the list total.
+  const minutesFor = (item: ListItem, column: BoardColumnKey): string | null => {
+    if (column === 'today') {
+      const m = item.task_id ? todayMinutes[item.task_id] ?? 0 : 0;
+      return m > 0 ? formatMinutesPadded(m) : '—';
+    }
+    if (column === 'this_week') {
+      const m = item.task_id && weekMinutes ? weekMinutes[item.task_id] ?? 0 : 0;
+      return m > 0 ? `${formatMinutesPadded(m)} wk` : '—';
+    }
+    return null;
+  };
+
+  const weekTotal = weekMinutes ? Object.values(weekMinutes).reduce((sum, m) => sum + m, 0) : null;
+  const subtitleFor = (column: ListItemColumn): string | null => {
+    if (column === 'today') return capacityLine(focusMinutes);
+    if (column === 'this_week') return weekTotal === null ? null : `${formatMinutesPadded(weekTotal)} tracked this week`;
+    return null;
+  };
+
+  const candidate = startCandidate(part.columns.today.open, lists);
+
   const renderCard = (column: BoardColumnKey) => (item: ListItem) => {
     const list = getList(item);
     const inDoneColumn = column === 'done';
@@ -191,7 +253,7 @@ export default function PlanBoard({ scope }: PlanBoardProps) {
         showId={showId}
         showListTag={scope === 'all' && !groupByList}
         taskName={item.task_id ? taskNames[item.task_id] || null : null}
-        minutesLabel={null}
+        minutesLabel={item.completed === 1 ? null : minutesFor(item, column)}
         ageBadge={column === 'backlog' && !groupByList ? ageBadge(item, now) : null}
         expanded={expandedItemId === item.id}
         checklistOpen={expandedChecklistId === item.id}
@@ -287,9 +349,11 @@ export default function PlanBoard({ scope }: PlanBoardProps) {
                   label={label}
                   open={open}
                   done={done}
+                  subtitle={subtitleFor(key)}
                   progress={scope === 'list' && selectedList ? { done: done.length, total: open.length + done.length, color: selectedList.color } : null}
                   grouping={groupingFor(key)}
                   renderCard={renderCard(key)}
+                  beforeFooter={key === 'today' ? <StartOnCTA candidate={candidate} onNavigate={onNavigate} /> : null}
                   footer={footerFor(key)}
                   isAdding={addingColumn === key}
                 />
