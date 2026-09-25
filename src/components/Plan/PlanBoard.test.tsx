@@ -470,12 +470,12 @@ describe('PlanBoard — Today extras', () => {
   it('capacity line counts non-break sessions only', async () => {
     window.timerAPI.getSessions = vi.fn(async () => [session(1, 25), session(2, 5, 'break'), session(3, 160)]);
     renderBoard();
-    expect(await section('Today').findByText('3h 05m focus · 2h 55m to 6h')).toBeInTheDocument();
+    expect(await section('Today').findByText('3h 05m / 6h focus')).toBeInTheDocument();
   });
 
   it('capacity line with no sessions', async () => {
     renderBoard();
-    expect(await section('Today').findByText('0m focus · 6h to 6h')).toBeInTheDocument();
+    expect(await section('Today').findByText('0m / 6h focus')).toBeInTheDocument();
   });
 
   it('tracked minutes: today on Today cards, week (wk) on This week cards, nothing without data, none on Backlog; week line sums the week', async () => {

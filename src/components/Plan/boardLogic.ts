@@ -237,11 +237,9 @@ export function formatMinutesPadded(minutes: number): string {
   return m === 0 ? `${h}h` : `${h}h ${String(m).padStart(2, '0')}m`;
 }
 
-/** Today capacity line (P8) against the Phase 1 day target. */
+/** Today capacity line (P8, revised): `3h 05m / 6h focus` against the Phase 1 day target, mirroring the Now screen's `0m / 6h`. */
 export function capacityLine(focusMinutes: number): string {
-  const focus = formatMinutesPadded(focusMinutes);
-  if (focusMinutes >= DAY_TARGET_MINUTES) return `${focus} focus · target met`;
-  return `${focus} focus · ${formatMinutesPadded(DAY_TARGET_MINUTES - focusMinutes)} to ${formatMinutesPadded(DAY_TARGET_MINUTES)}`;
+  return `${formatMinutesPadded(focusMinutes)} / ${formatMinutesPadded(DAY_TARGET_MINUTES)} focus`;
 }
 
 /** Monday 00:00 local of the week containing `date` (same rule as TimerDayTimeline.getMonday). */

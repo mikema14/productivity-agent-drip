@@ -217,10 +217,10 @@ describe('provenance', () => {
 
 describe('capacityLine', () => {
   it('formats focus against the 6h target', () => {
-    expect(capacityLine(185)).toBe('3h 05m focus · 2h 55m to 6h');
-    expect(capacityLine(0)).toBe('0m focus · 6h to 6h');
-    expect(capacityLine(360)).toBe('6h focus · target met');
-    expect(capacityLine(400)).toBe('6h 40m focus · target met');
+    expect(capacityLine(185)).toBe('3h 05m / 6h focus');
+    expect(capacityLine(0)).toBe('0m / 6h focus');
+    expect(capacityLine(360)).toBe('6h / 6h focus');
+    expect(capacityLine(400)).toBe('6h 40m / 6h focus');
   });
   it('formatMinutesPadded', () => {
     expect(formatMinutesPadded(75)).toBe('1h 15m');
