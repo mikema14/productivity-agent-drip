@@ -248,4 +248,26 @@ describe('Timer — active states', () => {
     expect(screen.getByTestId('now-pill')).toHaveTextContent('Kickoff');
     expect(key(/\+5 min/i)).toBeInTheDocument();
   });
+
+  it('kickoff: the full label is rendered untruncated and the session counter is compact (no SESSION word)', async () => {
+    setTimer({ status: 'focus', isPaused: false, kickoff: 'warmup', sessionStartTime: new Date(), totalDuration: 120, remainingSeconds: 100, intervalId: 1, durationMinutes: 25, sessionCount: 0 });
+    await renderTimer();
+    const label = screen.getByTestId('countdown-label');
+    expect(label).toHaveTextContent('KICKOFF · ROLLS INTO 25M');
+    expect(label).not.toHaveClass('truncate');
+    expect(label).toHaveClass('shrink-0');
+    expect(label.parentElement).toHaveClass('whitespace-nowrap');
+    expect(screen.queryByText(/^Session/)).toBeNull();
+    expect(screen.getByText('/8', { exact: false })).toHaveTextContent('1/8');
+    expect(screen.getAllByTestId('session-square')).toHaveLength(8);
+  });
+
+  it('running: label untruncated and the counter keeps the SESSION word', async () => {
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(2026, 8, 25, 22, 22, 0), totalDuration: 900, remainingSeconds: 800, intervalId: 1, sessionCount: 0 });
+    await renderTimer();
+    const label = screen.getByTestId('countdown-label');
+    expect(label).toHaveTextContent('FOCUS · 22:22 → 22:37');
+    expect(label).not.toHaveClass('truncate');
+    expect(screen.getByText(/^Session/)).toHaveTextContent('Session 1/8');
+  });
 });

@@ -365,6 +365,7 @@ export default function Timer({ onNavigate }: TimerProps) {
                 sessionCount={sessionCount}
                 sessionLabel={isBreak ? 'done' : 'next'}
                 currentGlows={focusState === 'running'}
+                compactCounter={isKickoff}
                 remainingSeconds={remainingSeconds}
                 running={focusState === 'running'}
                 paused={focusState === 'paused'}

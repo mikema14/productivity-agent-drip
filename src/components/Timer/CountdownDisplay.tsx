@@ -13,6 +13,11 @@ interface Props {
   sessionLabel?: 'next' | 'done';
   /** The current session's square glows (running / kickoff). */
   currentGlows?: boolean;
+  /**
+   * Drop the `SESSION` word (`1/8` + squares) so a long label such as
+   * `KICKOFF · ROLLS INTO 25M` fits the 330px column without truncating.
+   */
+  compactCounter?: boolean;
   remainingSeconds: number;
   /** Colon blinks. */
   running?: boolean;
@@ -29,7 +34,7 @@ interface Props {
 
 /** The left column of the focus block: label row, big digits over ghost segments, minute ruler. */
 export default function CountdownDisplay({
-  label, sessionCount, sessionLabel = 'next', currentGlows = false, remainingSeconds,
+  label, sessionCount, sessionLabel = 'next', currentGlows = false, compactCounter = false, remainingSeconds,
   running = false, paused = false, tone = 'amber', rulerMinutes, elapsedSeconds, active = false, rulerRef,
 }: Props) {
   const [mins, secs] = formatTime(remainingSeconds).split(':');
@@ -38,13 +43,14 @@ export default function CountdownDisplay({
 
   return (
     <div className="flex flex-col gap-3 min-w-0">
-      <div className="flex items-center justify-between now-label text-txt-muted gap-3">
-        <span className="truncate">{label}</span>
+      {/* The state label has priority: it never truncates; the counter shrinks instead (compact in kickoff). */}
+      <div className="flex items-center justify-between now-label text-txt-muted gap-3 whitespace-nowrap">
+        <span data-testid="countdown-label" className="shrink-0">{label}</span>
         <span className="flex items-center gap-2 shrink-0">
           {sessionLabel === 'done' ? (
             <span><span className="text-txt-primary">{sessionCount}</span>/{SESSIONS_PER_DAY} done</span>
           ) : (
-            <span>Session <span className="text-txt-primary">{Math.min(sessionCount + 1, SESSIONS_PER_DAY)}</span>/{SESSIONS_PER_DAY}</span>
+            <span>{!compactCounter && 'Session '}<span className="text-txt-primary">{Math.min(sessionCount + 1, SESSIONS_PER_DAY)}</span>/{SESSIONS_PER_DAY}</span>
           )}
           <span className="flex items-center gap-[3px]" aria-hidden>
             {Array.from({ length: SESSIONS_PER_DAY }).map((_, i) => {
