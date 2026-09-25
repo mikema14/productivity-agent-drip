@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import ListsPanel from '../Layout/ListsPanel';
-import ListPlanningView from '../Lists/ListPlanningView';
 import PlanHeader from './PlanHeader';
 import PlanBoard from './PlanBoard';
 import { useListsStore } from '../../stores/listsStore';
@@ -24,7 +23,7 @@ export default function PlanView({ view, onNavigate, onCreateList }: PlanViewPro
       <div className="flex flex-1 min-h-0">
         <ListsPanel view={view} onNavigate={onNavigate} onCreateList={onCreateList} />
         <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-          {view === 'lists' ? <ListPlanningView /> : <PlanBoard scope="all" onNavigate={onNavigate} />}
+          <PlanBoard scope={view === 'lists' ? 'list' : 'all'} onNavigate={onNavigate} />
         </div>
       </div>
     </div>

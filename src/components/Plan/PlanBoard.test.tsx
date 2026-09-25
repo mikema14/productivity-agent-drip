@@ -313,3 +313,142 @@ describe('PlanBoard — all scope', () => {
     expect(screen.getByText('Title td')).toHaveClass('line-through');
   });
 });
+
+describe('PlanBoard — list scope', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useListsStore.setState({ lists: [], items: [], selectedListId: null, archivedLists: [] });
+    useTimerStore.setState({ status: 'idle' });
+  });
+  afterEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  function renderList(listId: string | null = 'l1', items: ListItem[] = baseItems, lists: TaskList[] = [ops, bound]) {
+    useListsStore.setState({ selectedListId: listId });
+    return renderBoard('list', items, lists);
+  }
+
+  it('selects lists[0] when nothing is selected', () => {
+    renderList(null);
+    expect(useListsStore.getState().selectedListId).toBe('l1');
+  });
+
+  it('empty state when there are no lists', () => {
+    renderList(null, [], []);
+    expect(screen.getByText('No list selected')).toBeInTheDocument();
+    expect(screen.getByText('Create a list from the Lists panel to get started.')).toBeInTheDocument();
+    expect(screen.queryByTestId('plan-subheader')).toBeNull();
+  });
+
+  it('shows only the selected list, three columns, completed items inline (strikethrough) with a done count, no Done column and no toggles', () => {
+    renderList('l1');
+    const regions = screen.getAllByRole('region').map(r => r.getAttribute('aria-label'));
+    expect(regions).toEqual(['Today', 'This week', 'Backlog']);
+    expect(screen.queryByText('Title w1')).toBeNull();
+    expect(section('Today').getByText('Title td')).toHaveClass('line-through');
+    expect(section('Today').getByText('· 1 done')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'IDs' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Group by list' })).toBeNull();
+    expect(screen.queryByTestId('plan-list-filters')).toBeNull();
+  });
+
+  it('sub-header: dot, name, list id without #, BillableToggle → updateList, remaining count', async () => {
+    const { user } = renderList('l2', [...baseItems, item('x', { list_id: 'l2', column: 'backlog', completed: 1 })]);
+    const sub = within(screen.getByTestId('plan-subheader'));
+    expect(sub.getByText('Bound')).toBeInTheDocument();
+    expect(sub.getByText('679834')).toBeInTheDocument();
+    expect(sub.queryByText('#679834')).toBeNull();
+    expect(sub.getByText('1 remaining')).toBeInTheDocument();
+    const toggle = sub.getByRole('switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(toggle).toHaveTextContent('Billable');
+    await user.click(toggle);
+    expect(window.listsAPI.updateList).toHaveBeenCalledWith('l2', { billable: 1 });
+  });
+
+  it('sub-header for a folder list says "Billable default" and "This list has no tasks" when empty', () => {
+    renderList('l1', []);
+    const sub = within(screen.getByTestId('plan-subheader'));
+    expect(sub.getByRole('switch')).toHaveTextContent('Billable default');
+    expect(sub.getByText('This list has no tasks')).toBeInTheDocument();
+    expect(section('Today').getByText('All Clear')).toBeInTheDocument();
+  });
+
+  it('Archive: confirm accepted → archiveList; declined → nothing', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { user } = renderList('l1');
+    await user.click(screen.getByRole('button', { name: 'Archive list' }));
+    expect(confirmSpy).toHaveBeenCalledWith('Archive this list? It will be hidden from Lists.');
+    expect(window.listsAPI.archiveList).not.toHaveBeenCalled();
+
+    confirmSpy.mockReturnValue(true);
+    await user.click(screen.getByRole('button', { name: 'Archive list' }));
+    expect(window.listsAPI.archiveList).toHaveBeenCalledWith('l1');
+  });
+
+  it('per-column progress bar width = done / total', () => {
+    renderList('l1');
+    const bar = section('Today').getByTestId('column-progress');
+    expect(bar).toHaveStyle({ width: '33.33333333333333%', backgroundColor: '#ff0000' });
+    expect(section('This week').queryByTestId('column-progress')).toBeNull();
+  });
+
+  it('"Add a task" opens AddItemInline in the column; submit → createItem with the list billable default and order = open count', async () => {
+    const { user } = renderList('l2', [...baseItems, item('y', { list_id: 'l2', column: 'this_week', order: 1 })]);
+    await user.click(section('This week').getByRole('button', { name: 'Add a task' }));
+    expect(section('This week').getByTestId('add-item')).toHaveTextContent('add:this_week:false');
+    expect(section('Today').queryByTestId('add-item')).toBeNull();
+    await user.click(screen.getByText('submit add'));
+    expect(window.listsAPI.createListItem).toHaveBeenCalledWith(expect.objectContaining({
+      list_id: 'l2', title: 'New task', task_id: '123', column: 'this_week', order: 2, billable: 0, completed: 0, subtasks: '[]',
+    }));
+    await user.click(screen.getByText('submit add unbillable'));
+    expect(window.listsAPI.createListItem).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Not billable task', billable: 0, task_id: null }));
+    await user.click(screen.getByText('cancel add'));
+    expect(screen.queryByTestId('add-item')).toBeNull();
+  });
+
+  it('a billable list seeds AddItemInline with true and the add form overrides win', async () => {
+    const { user } = renderList('l1');
+    await user.click(section('Backlog').getByRole('button', { name: 'Add a task' }));
+    expect(section('Backlog').getByTestId('add-item')).toHaveTextContent('add:backlog:true');
+    await user.click(screen.getByText('submit add unbillable'));
+    expect(window.listsAPI.createListItem).toHaveBeenLastCalledWith(expect.objectContaining({ list_id: 'l1', column: 'backlog', order: 2, billable: 0 }));
+  });
+
+  it('ids always show in list scope; an inherited list id shows nothing instead of "No task ID"', () => {
+    localStorage.setItem(SHOW_TASK_IDS_KEY, 'false');
+    renderList('l2', [...baseItems, item('z', { list_id: 'l2', column: 'today' })]);
+    expect(within(card('Title w1')).getByText('111')).toBeInTheDocument();
+    expect(within(card('Title z')).queryByText('No task ID')).toBeNull();
+    // no list tag in list scope
+    expect(within(card('Title w1')).queryByText('Bound')).toBeNull();
+  });
+
+  it('footer button reads "Drop here" during a drag and drops move within the list', () => {
+    renderList('l1');
+    act(() => dnd().onDragStart!({ active: { id: 'b1' } }));
+    expect(section('Today').getByRole('button', { name: 'Drop here' })).toBeInTheDocument();
+    act(() => dnd().onDragEnd!({ active: { id: 'b1' }, over: { id: 'today' } }));
+    expect(window.listsAPI.updateListItem).toHaveBeenCalledWith('b1', { column: 'today', order: 2 });
+    expect(section('Today').getByRole('button', { name: 'Add a task' })).toBeInTheDocument();
+  });
+
+  it('completed inline cards are not draggable and keep the complete control + Delete', () => {
+    renderList('l1');
+    const done = card('Title td');
+    expect(done.closest('[aria-roledescription="sortable"]')).toBeNull();
+    expect(card('Title t1').closest('[aria-roledescription="sortable"]')).not.toBeNull();
+    expect(within(done).getByRole('button', { name: 'Mark not done' })).toBeInTheDocument();
+    expect(within(done).getByTitle('Delete')).toBeInTheDocument();
+  });
+
+  it('TaskDetailInline in list scope receives the list task id', async () => {
+    const { user } = renderList('l2');
+    await user.click(screen.getByText('Title w1'));
+    expect(screen.getByTestId('task-detail')).toHaveTextContent('detail:w1:679834:false');
+  });
+});

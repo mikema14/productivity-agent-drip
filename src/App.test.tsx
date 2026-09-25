@@ -9,8 +9,10 @@ vi.mock('./components/Timer/Timer', () => ({ default: () => <div>TimerView</div>
 vi.mock('./components/DailyLog/DailyLog', () => ({ default: () => <div>DailyLogView</div> }));
 vi.mock('./components/Progress/ProgressPage', () => ({ default: () => <div>ProgressView</div> }));
 vi.mock('./components/Settings/Settings', () => ({ default: () => <div>SettingsView</div> }));
-vi.mock('./components/Lists/ListPlanningView', () => ({ default: () => <div>ListPlanningView</div> }));
-vi.mock('./components/Plan/PlanBoard', () => ({ default: () => <div>AllListsOverview</div> }));
+// One board for both Plan scopes; the stub keeps the old per-board names so the assertions read the same.
+vi.mock('./components/Plan/PlanBoard', () => ({
+  default: ({ scope }: { scope: 'all' | 'list' }) => <div>{scope === 'list' ? 'ListPlanningView' : 'AllListsOverview'}</div>,
+}));
 vi.mock('./components/Lists/CreateListModal', () => ({ default: () => <div>CreateListModal</div> }));
 
 function rail() {
