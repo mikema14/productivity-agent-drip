@@ -11,6 +11,10 @@ export default {
       fontFamily: {
         display: ['Outfit', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'Menlo', 'monospace'],
+        condensed: ['Barlow Condensed', 'JetBrains Mono', 'sans-serif'],
+      },
+      letterSpacing: {
+        label: '1.5px',
       },
       colors: {
         drip: COLOR.drip,
@@ -35,6 +39,11 @@ export default {
         'glow-idle': '0 0 40px rgba(100, 116, 139, 0.1)',
         'glass': '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
         'glass-sm': '0 4px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03)',
+        // Physical keycap buttons and the 4px LED squares of the Now screen
+        'key-amber': `0 3px 0 ${COLOR.focus.shadow}, inset 0 1px 0 rgba(255,255,255,0.35)`,
+        'key-dark': '0 3px 0 #000',
+        'key-sm': '0 2px 0 #000',
+        'led': '0 0 5px rgba(245,158,11,0.8)',
       },
       animation: {
         'glow-breathe': 'glow-breathe 4s ease-in-out infinite',

@@ -29,6 +29,22 @@
     color: #f0f0f2;
   }
 
+  /* Now screen: the big countdown digits (condensed, tabular) */
+  .now-digits {
+    @apply font-condensed tabular-nums;
+    font-weight: 700;
+    font-size: 160px;
+    line-height: 0.8;
+    letter-spacing: -3px;
+  }
+
+  /* Now screen: mono uppercase micro-label */
+  .now-label {
+    @apply font-mono uppercase tracking-label;
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+
   /* Running LED indicator */
   .led-running {
     animation: led-pulse 1.6s ease-in-out infinite;

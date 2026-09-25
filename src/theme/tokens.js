@@ -11,12 +11,16 @@ export const COLOR = {
     surface: '#141418',
     elevated: '#1c1c22',
     border: '#2a2a32',
+    // Ghost digits behind the Now countdown (the unlit 88:88 segments).
+    ghost: '#16161b',
   },
   focus: {
     DEFAULT: '#f59e0b',
     light: '#fbbf24',
     bright: '#fde68a',
     dark: '#d97706',
+    // Drop edge of the amber keycap button (KeyButton).
+    shadow: '#92560a',
   },
   break: {
     DEFAULT: '#34d399',
