@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Phase 1 e2e smoke: walks the Now screen through every state and screenshots
- * each view at 1200×800 and 800×600 (PHASE1_PLAN.md §3.2), against the real
- * database under the §4 guard. Quit the installed Drip first.
+ * E2E smoke: walks the Now screen through every state (PHASE1_PLAN.md §3.2)
+ * and the Plan screen read-only (PHASE2_PLAN.md §7.1), screenshotting each
+ * view at 1200×800 and 800×600 against the real database under the guard.
+ * Quit the installed Drip first.
  *
  *   npm run e2e:smoke
  */
@@ -52,6 +53,98 @@ async function waitFor(check, timeoutMs, what) {
     await new Promise(r => setTimeout(r, 250));
   }
   throw new Error(`timed out waiting for ${what}`);
+}
+
+/** The three board columns must exist by label in the current scope. */
+async function assertPlanColumns(page) {
+  for (const label of ['Today', 'This week', 'Backlog']) {
+    if (!(await page.getByRole('region', { name: label, exact: true }).count())) throw new Error(`Plan column "${label}" missing`);
+  }
+  // Design rule 6: id pills never carry a '#' prefix
+  const ids = await page.getByTestId('plan-card-id').allTextContents();
+  const hashed = ids.filter(t => t.includes('#'));
+  if (hashed.length) throw new Error(`Plan id pill(s) with '#': ${hashed.join(', ')}`);
+  // P18: the CTA is only ever asserted, never clicked
+  const cta = page.getByRole('button', { name: /^Start on \d+$/ });
+  if (await cta.count()) console.log('[smoke] Start on CTA present (not clicked)');
+}
+
+/**
+ * Plan walk (PHASE2_PLAN.md §7.1), read-only by construction: toggles are
+ * restored, cards are only expanded/hovered. Never drags; never clicks Start
+ * on, Restore, Move left/right, Move to list, Delete, Mark done, Add a task,
+ * Archive, or anything inside TaskDetailInline.
+ */
+async function planWalk(page, shot) {
+  const subheader = page.getByTestId('plan-subheader');
+  const aside = page.locator('aside[aria-label="Lists"]');
+
+  // 1. All tasks
+  await subheader.getByText('All tasks', { exact: true }).waitFor();
+  await assertPlanColumns(page);
+  await shot('plan-all-tasks');
+
+  // 2. Group by list (session state only)
+  const group = subheader.getByRole('button', { name: 'Group by list', exact: true });
+  await group.click();
+  await shot('plan-all-grouped');
+  await group.click();
+
+  // 3. Done / IDs: toggle, screenshot, restore the persisted value (localStorage, outside the DB guard)
+  for (const [name, shotName] of [['Done', 'plan-all-done'], ['IDs', 'plan-all-ids']]) {
+    const pill = subheader.getByRole('button', { name, exact: true });
+    const before = await pill.getAttribute('aria-pressed');
+    await pill.click();
+    await shot(shotName);
+    await pill.click();
+    const after = await pill.getAttribute('aria-pressed');
+    if (after !== before) throw new Error(`${name} toggle not restored (was ${before}, now ${after})`);
+  }
+
+  // 4. Card detail: title toggles TaskDetailInline open and closed (no writes: saves only fire on changed values)
+  const titles = page.getByTestId('plan-card-title');
+  if (await titles.count()) {
+    await titles.first().click();
+    await page.getByPlaceholder('Add a description...').waitFor();
+    await shot('plan-card-detail');
+    await titles.first().click();
+  } else {
+    console.warn('[smoke] no Plan cards; skipping plan-card-detail');
+  }
+
+  // 5. Subtasks checklist (no writes)
+  const badge = page.getByRole('button', { name: /^\d+\/\d+ Subtasks$/ });
+  if (await badge.count()) {
+    await badge.first().click();
+    await shot('plan-card-subtasks');
+    await badge.first().click();
+  }
+
+  // 6. Archived lists toggle (never Restore)
+  const archived = aside.getByRole('button', { name: /^Archived · \d+$/ });
+  if (await archived.count()) {
+    await archived.click();
+    await shot('plan-archived');
+    await archived.click();
+  }
+
+  // 7. First list row → single-list scope
+  const listRows = aside.locator('button').filter({ has: page.getByTestId('list-color') });
+  if (await listRows.count()) {
+    await listRows.first().click();
+    await subheader.getByRole('switch').waitFor();
+    await assertPlanColumns(page);
+    await shot('plan-list');
+
+    // 8. Hover the first open card so the actions show (nothing clicked)
+    const cards = page.getByTestId('plan-card');
+    if (await cards.count()) {
+      await cards.first().hover();
+      await shot('plan-card-hover');
+    }
+  } else {
+    console.warn('[smoke] no lists; skipping plan-list');
+  }
 }
 
 async function main() {
@@ -187,13 +280,7 @@ async function main() {
 
       const nav = page.getByRole('navigation', { name: 'Primary' });
       await nav.getByRole('button', { name: 'Plan' }).click();
-      await page.getByRole('heading', { name: 'All Tasks' }).waitFor();
-      await shot('plan-all-tasks');
-      const listRows = page.locator('ul li button').filter({ has: page.getByTestId('list-color') });
-      if (await listRows.count()) {
-        await listRows.first().click();
-        await shot('plan-list');
-      }
+      await planWalk(page, shot);
       await nav.getByRole('button', { name: 'Review' }).click();
       await page.waitForTimeout(800);
       await shot('review');

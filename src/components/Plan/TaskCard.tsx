@@ -94,6 +94,7 @@ export default function TaskCard(props: TaskCardProps) {
 
           <button
             type="button"
+            data-testid="plan-card-title"
             onClick={() => actions.onToggleExpand(item.id)}
             className={`flex-1 min-w-0 text-left font-display text-[13.5px] truncate transition-colors ${done ? 'text-txt-muted line-through' : 'text-txt-primary hover:text-focus'}`}
           >
@@ -158,7 +159,7 @@ export default function TaskCard(props: TaskCardProps) {
 
         {hasRow2 && (
           <div className="flex items-center gap-2 pl-[22px] mt-[3px] font-display text-[11.5px] text-txt-muted min-w-0">
-            {idSlot}
+            {idSlot && <span data-testid="plan-card-id" className="inline-flex">{idSlot}</span>}
             {showListTag && list && <span className="truncate">{list.name}</span>}
             {from && <span className="truncate">from call · {from.date}</span>}
             {ageBadge && <span className="font-mono text-[11px]">{ageBadge}</span>}

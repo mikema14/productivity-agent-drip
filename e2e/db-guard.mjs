@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Real-database safety protocol for the e2e smoke (PHASE1_PLAN.md §4).
+ * Real-database safety protocol for the e2e smoke (PHASE1_PLAN.md §4,
+ * PHASE2_PLAN.md §7.2).
  *
  *   node e2e/db-guard.mjs prepare                       → backup + snapshot, prints the backup dir
  *   node e2e/db-guard.mjs verify-and-clean <backupDir> <main.log>
@@ -28,7 +29,14 @@ const ROWID_TABLES = [
 /** Tables updated in place; snapshotted by content. */
 const CONTENT_TABLES = ['daily_intentions', 'shutdown_rituals', 'daily_summaries', 'weekly_summaries'];
 /** Tables where a run must never create anything. */
-const MUST_BE_EMPTY = ['pomodoro_sessions', 'adhoc_entries', 'lists', 'list_items', 'task_cache', 'log_templates', 'task_preferences', 'milestones', 'goals'];
+const MUST_BE_EMPTY = ['pomodoro_sessions', 'adhoc_entries', 'lists', 'list_items', 'log_templates', 'task_preferences', 'milestones', 'goals'];
+/**
+ * Cache tables (P17): the Plan walk resolves names for every task id on the
+ * boards, and an uncached id triggers a legitimate GET that fills task_cache.
+ * Inserts are deleted and reported, not violations. Replaced rows are
+ * restored from the backup like everywhere else.
+ */
+const CACHE_TABLES = ['task_cache'];
 const LOGGED_TABLES = ['pomodoro_sessions', 'adhoc_entries', 'calendar_proposals'];
 
 function usage(code = 0) {
@@ -38,7 +46,10 @@ function usage(code = 0) {
   node e2e/db-guard.mjs --help
 
 Preconditions (enforced by smoke.mjs): the installed Drip is quit and no
-"npm run dev" is running, because both share ${DB_PATH}.`);
+"npm run dev" is running, because both share ${DB_PATH}.
+The Plan walk toggles Done / IDs and restores them; localStorage is outside
+the guard. task_cache rows fetched during the run are deleted and reported,
+not violations.`);
   process.exit(code);
 }
 
@@ -152,7 +163,8 @@ export function verifyAndClean(backupDir, logPath) {
       } else {
         sql(`DELETE FROM ${t} WHERE rowid IN (${rows.map(r => r.__rowid).join(',')})`, { json: false });
         deleted = rows.length;
-        if (MUST_BE_EMPTY.includes(t)) violations.push(`${t}: ${rows.length} unexpected insert(s) (deleted)`);
+        if (CACHE_TABLES.includes(t)) console.log(`[db-guard] ${t}: ${rows.length} cache row(s) fetched during the run — deleted`);
+        else if (MUST_BE_EMPTY.includes(t)) violations.push(`${t}: ${rows.length} unexpected insert(s) (deleted)`);
       }
     }
     line(t, rows.length, deleted, 0, 0);
@@ -206,13 +218,30 @@ export function verifyAndClean(backupDir, logPath) {
     line(t, 0, 0, updated, updated);
   }
 
-  // (c) list_items archived/column/order → report only (Q7)
+  // (c) list_items state drift: `archived` flips alone are archiveOldCompleted
+  // (report only, Q7); any column / order / completed change could only come
+  // from a drag, an arrow, or a checkbox, which the walk never uses → violation.
   if (tableExists('list_items')) {
     const before = new Map(snapshot.listItems.map(r => [r.id, r]));
     const drift = sql('SELECT id, archived, completed, "column", "order" FROM list_items')
       .filter(r => before.has(r.id) && JSON.stringify(before.get(r.id)) !== JSON.stringify(r));
-    for (const r of drift) console.log(`[db-guard] list_items: ${r.id} changed (was ${JSON.stringify(before.get(r.id))}, now ${JSON.stringify(r)}) — not reverted (Q7)`);
-    line('list_items (state)', 0, 0, drift.length, 0);
+    let archivedFlips = 0;
+    let moved = 0;
+    for (const r of drift) {
+      const was = before.get(r.id);
+      const stateChanged = was.column !== r.column || was.order !== r.order || was.completed !== r.completed;
+      if (stateChanged) {
+        moved++;
+        console.log(`[db-guard] list_items: ${r.id} column/order/completed changed (was ${JSON.stringify(was)}, now ${JSON.stringify(r)}) — VIOLATION, not reverted`);
+      } else {
+        archivedFlips++;
+        console.log(`[db-guard] list_items: ${r.id} archived flip (was ${was.archived}, now ${r.archived}) — not reverted (Q7)`);
+      }
+    }
+    if (moved) violations.push(`list_items: ${moved} row(s) changed column/order/completed during the run`);
+    console.log(`[db-guard] list_items state drift: ${archivedFlips} archived flip(s), ${moved} column/order/completed change(s)`);
+    line('list_items (archived)', 0, 0, archivedFlips, 0);
+    line('list_items (column/order/completed)', 0, 0, moved, 0);
   }
 
   // (d) No time entry posted
