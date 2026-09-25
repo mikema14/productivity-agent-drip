@@ -55,6 +55,16 @@ function q(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
+function columns(table) {
+  return sql(`PRAGMA table_info(${table})`).map(c => c.name);
+}
+
+/** Not every logged table has log_sent_at / server_entry_id. */
+function loggedQuery(table) {
+  const cols = ['id', 'logged', 'log_sent_at', 'server_entry_id'].filter(c => columns(table).includes(c));
+  return `SELECT ${cols.join(', ')} FROM ${table} WHERE logged=1 ORDER BY id`;
+}
+
 function tableExists(name) {
   return sql(`SELECT name FROM sqlite_master WHERE type='table' AND name=${q(name)}`).length > 0;
 }
@@ -97,7 +107,7 @@ export function prepare() {
     if (tableExists(t)) snapshot.content[t] = sql(`SELECT * FROM ${t}`);
   }
   for (const t of LOGGED_TABLES) {
-    snapshot.logged[t] = sql(`SELECT id, logged, log_sent_at, server_entry_id FROM ${t} WHERE logged=1 ORDER BY id`);
+    snapshot.logged[t] = sql(loggedQuery(t));
   }
 
   writeFileSync(join(backupDir, 'snapshot.json'), JSON.stringify(snapshot, null, 2));
@@ -116,9 +126,19 @@ export function verifyAndClean(backupDir, logPath) {
   const violations = [];
   const line = (table, inserted, deleted, updated, restored) => report.push({ table, inserted, deleted, updated, restored });
 
-  // (c) Inserts
+  // (c) Inserts. A rowid above the snapshot can also be an INSERT OR REPLACE of
+  // an existing key (task_cache): restore those from the backup instead of deleting.
+  const bk = join(backupDir, 'productivity.db');
+  const withBackup = (query) => sql(`ATTACH ${q(bk)} AS bk; ${query}`);
   for (const [t, snap] of Object.entries(snapshot.rowid)) {
-    const rows = sql(`SELECT rowid AS __rowid, * FROM ${t} WHERE rowid > ${snap.maxRowid}`);
+    const pk = primaryKey(t);
+    const replaced = pk === 'rowid' ? [] : withBackup(`SELECT "${pk}" AS k FROM main.${t} WHERE rowid > ${snap.maxRowid} AND "${pk}" IN (SELECT "${pk}" FROM bk.${t})`);
+    for (const { k } of replaced) {
+      withBackup(`DELETE FROM main.${t} WHERE "${pk}"=${q(k)}; INSERT INTO main.${t} SELECT * FROM bk.${t} WHERE "${pk}"=${q(k)}`);
+      console.log(`[db-guard] ${t}: ${k} was replaced → restored from backup`);
+    }
+    const rows = sql(`SELECT rowid AS __rowid, * FROM ${t} WHERE rowid > ${snap.maxRowid}`)
+      .filter(r => !replaced.some(x => String(x.k) === String(r[pk])));
     let deleted = 0;
     if (rows.length) {
       console.log(`[db-guard] ${t}: ${rows.length} inserted row(s)`);
@@ -204,9 +224,10 @@ export function verifyAndClean(backupDir, logPath) {
   if (blocked) violations.push(`main.log: ${blocked} "[Safety] Blocked" line(s) — a POST was attempted`);
   for (const t of LOGGED_TABLES) {
     const max = snapshot.rowid[t]?.maxRowid ?? 0;
-    const [{ n }] = sql(`SELECT count(*) AS n FROM ${t} WHERE log_sent_at >= ${q(snapshot.run_start_utc)} OR (logged=1 AND rowid > ${max})`);
+    const sentAt = columns(t).includes('log_sent_at') ? `log_sent_at >= ${q(snapshot.run_start_utc)} OR ` : '';
+    const [{ n }] = sql(`SELECT count(*) AS n FROM ${t} WHERE ${sentAt}(logged=1 AND rowid > ${max})`);
     if (n) violations.push(`${t}: ${n} row(s) logged during the run`);
-    const loggedNow = sql(`SELECT id, logged, log_sent_at, server_entry_id FROM ${t} WHERE logged=1 ORDER BY id`);
+    const loggedNow = sql(loggedQuery(t));
     if (JSON.stringify(loggedNow) !== JSON.stringify(snapshot.logged[t])) violations.push(`${t}: logged rows differ from the snapshot`);
   }
 

@@ -12,7 +12,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:net';
 import { _electron as electron } from 'playwright';
-import { prepare, verifyAndClean } from './db-guard.mjs';
+import { prepare, verifyAndClean, USER_DATA } from './db-guard.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SIZES = [[1200, 800], [800, 600]];
@@ -56,6 +56,8 @@ async function waitFor(check, timeoutMs, what) {
 
 async function main() {
   await preflight();
+  // Set by VS Code's terminal; it makes Electron start as plain Node.
+  delete process.env.ELECTRON_RUN_AS_NODE;
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const outDir = join(ROOT, 'e2e', 'screenshots', stamp);
@@ -71,26 +73,35 @@ async function main() {
   vite.stderr.on('data', d => logStream.write(`[vite] ${d}`));
 
   let app = null;
+  let page = null;
   let violations = [];
   try {
     execFileSync('npx', ['wait-on', 'http://localhost:5173', '-t', '60000'], { cwd: ROOT, stdio: 'inherit' });
     await waitFor(() => existsSync(join(ROOT, 'dist-electron', 'main.js')), 60_000, 'dist-electron/main.js');
 
     app = await electron.launch({
-      args: [join(ROOT, 'dist-electron', 'main.js')],
+      // The project dir, not main.js: Electron takes the app name (and so the
+      // userData dir) from package.json, otherwise it falls back to "Electron".
+      args: [ROOT],
       cwd: ROOT,
       env: { ...process.env, DRIP_TEST_MODE: '1', DRIP_E2E: '1' },
     });
     app.process().stdout?.on('data', d => logStream.write(`[main] ${d}`));
     app.process().stderr?.on('data', d => logStream.write(`[main] ${d}`));
 
-    const page = await app.firstWindow();
+    // The guard only protects the database it snapshotted
+    const userData = await app.evaluate(({ app }) => app.getPath('userData'));
+    if (userData !== USER_DATA) throw new Error(`app userData is ${userData}, expected ${USER_DATA}`);
+
+    page = await app.firstWindow();
+    page.on('console', m => logStream.write(`[renderer:${m.type()}] ${m.text()}\n`));
+    page.on('pageerror', e => logStream.write(`[renderer:pageerror] ${e.stack || e}\n`));
     await page.waitForSelector('nav[aria-label="Primary"]', { timeout: 60_000 });
 
     for (const [w, h] of SIZES) {
       await app.evaluate(({ BrowserWindow }, [width, height]) => BrowserWindow.getAllWindows()[0].setSize(width, height), [w, h]);
       await page.waitForTimeout(400);
-      const shot = async (name) => page.screenshot({ path: join(outDir, `${name}-${w}x${h}.png`) });
+      const shot = async (name) => (await page.waitForTimeout(350), page.screenshot)({ path: join(outDir, `${name}-${w}x${h}.png`) });
       const key = (name) => page.getByRole('button', { name, exact: false });
       const pill = () => page.getByTestId('now-pill');
       const nowStart = Date.now();
@@ -105,7 +116,9 @@ async function main() {
 
       // Ready-selected: click a recent row only (typing an id would hit the API and write task_cache).
       const options = page.getByRole('option');
-      if (await options.count()) {
+      // Selecting a task collapses the list, so remember whether one was picked
+      const hasTask = (await options.count()) > 0;
+      if (hasTask) {
         await options.first().click();
         await key(/begin focus/i).waitFor();
         await shot('now-ready-selected');
@@ -119,13 +132,19 @@ async function main() {
       await page.keyboard.press('Escape');
       await page.getByText("Today's intentions").waitFor({ state: 'hidden' });
 
-      if (await options.count() === 0) {
+      if (!hasTask) {
         // Need a task to press BEGIN FOCUS; fall back to the previous-session CTA if present.
         const cont = key(/^continue/i);
         if (await cont.count()) await cont.first().click();
       } else {
         await key(/begin focus/i).click();
       }
+      // Outside work hours the boundary check asks first
+      const boundary = page.getByRole('button', { name: 'Yes, Continue' });
+      await boundary.waitFor({ timeout: 2_000 }).then(async () => {
+        await shot('now-boundary-dialog');
+        await boundary.click();
+      }, () => {});
       let t = stepStart();
       await pill().filter({ hasText: 'Focusing' }).waitFor({ timeout: 15_000 });
       await shot('now-running');
@@ -165,7 +184,7 @@ async function main() {
 
       const nav = page.getByRole('navigation', { name: 'Primary' });
       await nav.getByRole('button', { name: 'Plan' }).click();
-      await page.getByText('All Tasks').waitFor();
+      await page.getByRole('heading', { name: 'All Tasks' }).waitFor();
       await shot('plan-all-tasks');
       const listRows = page.locator('ul li button').filter({ has: page.getByTestId('list-color') });
       if (await listRows.count()) {
@@ -188,6 +207,7 @@ async function main() {
     }
   } catch (error) {
     console.error('[smoke] failed:', error);
+    if (page) await page.screenshot({ path: join(outDir, 'failure.png') }).catch(() => {});
     violations.push(String(error));
   } finally {
     if (app) await app.close().catch(() => {});
