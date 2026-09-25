@@ -105,3 +105,27 @@ The rail + Now screen introduce a squarer, hairline language that Phase 2 (Plan 
 | **NOW marker** | 7px `bg-focus` square + 1px amber line + inverted `NOW hh:mm` tag |
 | **Day bar** | 12 × `h-1.5` segments, `bg-focus` filled / `bg-drip-border` empty, against `DAY_TARGET_MINUTES = 360` |
 | **Tokens added** | `drip.ghost #16161b`, `focus.shadow #92560a`, `shadow-key-amber/key-dark/key-sm/led`, `tracking-label`, `font-condensed`, screen `wide` (1000px) |
+
+---
+
+## Plan Screen Tokens (Phase 2 redesign)
+
+Plan reuses the Now language (square corners, hairlines, `.now-label`, `KeyButton`). Owner decisions P1–P21 are recorded in `Redesign/PHASE2_PLAN.md` §9.
+
+| Element | Tailwind / class |
+|---------|------------------|
+| **Plan header** | `Plan/PlanHeader.tsx` — 52px drag region, `h1` 15px/500 + `Week 39 · <mono>21–27 Sep</mono>` (static ISO week, no arrows) |
+| **Lists aside** | `Layout/ListsPanel.tsx` — `aside[aria-label=Lists]` 212px, `p-3 pt-4`, `.now-label` header + 24px `New list` key; rows `rounded-[2px]`, active `bg-focus/10 text-focus`, idle `hover:bg-focus/5`; subtitle `logs to <id>` (mono 10.5px) / `billable` / `not billable`; open count mono 11.5px; bottom `Archived · n` (`aria-pressed`) |
+| **Sub-header** | `Plan/PlanSubheader.tsx` — 48px, `border-b border-drip-elevated`, `px-7`; all scope `All tasks` 13.5px/500 + `N across M lists` muted; list scope dot + name + id pill + `BillableToggle sm` + hairline + remaining + Archive icon key |
+| **Pill toggle** | `Pill` in `PlanSubheader.tsx` — 26px, `border-drip-border rounded-[2px]` 12px, pressed `border-focus/30 bg-focus/10 text-txt-primary`, `aria-pressed` (Group by list / Done / IDs / list filters) |
+| **Board grid** | `p-6 gap-3`; `flex overflow-x-auto` with `min-w-[220px]` columns below `wide:`, `wide:grid wide:grid-cols-3` (`-4` with Done) above |
+| **Column** | `Plan/BoardColumn.tsx` — `section[aria-label]`, `border border-drip-elevated rounded-[2px] p-3.5`; Today `border-focus/30` with an amber `.now-label`; count mono 12px `{open}` + muted `· {done} done`; subtitle 12px muted (capacity / week line); list-scope progress bar `h-1 bg-focus/10` filled in the list colour |
+| **Group row** | `.now-label text-txt-muted` + mono count (list groups carry the colour dot; backlog groups `New this week` / `Older than 14 days` / `Everything else`) |
+| **Card** | `Plan/TaskCard.tsx` — `.plan-card` `border border-drip-elevated hover:border-drip-border rounded-[2px] px-3 py-2.5`; row 1 title 13.5px `hover:text-focus`, row 2 `pl-[22px]` 11.5px muted: id pill (`TaskIdBadge plain`, mono amber, never `#`) or `No task ID` · list · `from call · <date>` · `Nd` · tracked time mono |
+| **Complete control** | 14px `rounded-[2px]` button: 7px dot in the list colour at rest, hairline checkbox on card hover / focus, done = `bg-break/15 text-break` check; done cards `opacity-50` + `line-through` |
+| **Hover actions** | `.plan-card-actions` (`index.css`): `opacity-0`, visible on `group-hover` and `group-focus-within`; 24px icon keys `hover:bg-focus/10`, Delete `hover:text-alert` |
+| **Move-to-list menu** | `role=menu` `bg-drip-elevated border-drip-border rounded-[2px]`, current list `text-focus` + tick |
+| **Dashed footer** | 52px `border border-dashed border-drip-border rounded-[2px]` 12.5px muted: `Add a task` (list scope, opens `AddItemInline` in place) / `Drop a task here` (all scope); `Drop here` + `border-focus/40 text-focus` during a drag |
+| **Start on CTA** | `Plan/StartOnCTA.tsx` — `KeyButton variant=amber size=md` full width under Today's cards, `Start on <id>`; hands the task to Now via `timerStore.pendingSelection` |
+| **Capacity line** | `boardLogic.capacityLine` — `3h 05m focus · 2h 55m to 6h` (`formatMinutesPadded`) against `DAY_TARGET_MINUTES` from `TimerDayTimeline.tsx` |
+| **Drag overlay** | `bg-drip-elevated border-focus/30 rounded-[2px]` with the 7px list dot + title |
