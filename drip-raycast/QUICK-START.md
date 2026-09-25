@@ -8,7 +8,7 @@ npm install
 npm run dev
 ```
 
-This registers the extension in Raycast. After the first `npm run dev`, all 8 commands appear in Raycast (Cmd+Space) with a `[Dev]` badge. They persist between Raycast restarts — you don't need to keep a terminal open.
+This registers the extension in Raycast. After the first `npm run dev`, all 7 commands appear in Raycast (Cmd+Space) with a `[Dev]` badge. They persist between Raycast restarts — you don't need to keep a terminal open.
 
 > If you ever need to re-register (e.g. after moving folders), just run `npm run dev` again.
 
@@ -27,21 +27,7 @@ On first use, Raycast will prompt for preferences. You can also set them later:
 
 All commands are accessible via **Cmd+Space** → type the command name.
 
-### 1. Timer Status (Menu Bar)
-
-**What**: Shows the current Drip timer in your menu bar (top-right of screen).
-
-- Idle → clock icon only
-- Focus → `25:00` countdown
-- Break → `Break 04:30`
-
-**Menu items**: Start/Pause/Resume/Stop, today's total hours, Open Drip.
-
-> Auto-refreshes every 10 seconds. Requires the Drip Electron app to be running.
-
----
-
-### 2. Start Focus Session
+### 1. Start Focus Session
 
 **How**: Cmd+Space → "Start Focus"
 
@@ -53,7 +39,7 @@ All commands are accessible via **Cmd+Space** → type the command name.
 
 ---
 
-### 3. Add Time Entry
+### 2. Add Time Entry
 
 **How**: Cmd+Space → "Add Time Entry"
 
@@ -67,7 +53,7 @@ All commands are accessible via **Cmd+Space** → type the command name.
 
 ---
 
-### 4. Today's Log
+### 3. Today's Log
 
 **How**: Cmd+Space → "Today's Log"
 
@@ -85,7 +71,7 @@ All commands are accessible via **Cmd+Space** → type the command name.
 
 ---
 
-### 5. Search Tasks
+### 4. Search Tasks
 
 **How**: Cmd+Space → "Search Tasks"
 
@@ -100,7 +86,7 @@ All commands are accessible via **Cmd+Space** → type the command name.
 
 ---
 
-### 6. Today's Intentions
+### 5. Today's Intentions
 
 **How**: Cmd+Space → "Today's Intentions"
 
@@ -113,7 +99,7 @@ All commands are accessible via **Cmd+Space** → type the command name.
 
 ---
 
-### 7. Log Unlogged Entries
+### 6. Log Unlogged Entries
 
 **How**: Cmd+Space → "Log Unlogged"
 
@@ -127,7 +113,7 @@ All commands are accessible via **Cmd+Space** → type the command name.
 
 ---
 
-### 8. Weekly Stats
+### 7. Weekly Stats
 
 **How**: Cmd+Space → "Weekly Stats"
 
@@ -157,7 +143,6 @@ Both apps can run simultaneously — SQLite WAL mode handles concurrent access s
 |---------|-----|
 | Commands don't appear in Raycast | Run `npm run dev` in the `drip-raycast` folder |
 | "Database does not exist" error | Make sure the Drip app has been launched at least once |
-| Timer Status shows nothing | Start a timer in the Drip app first (the timer state bridge writes every 10s) |
 | Search Tasks empty | The task cache populates as you use tasks in Drip. Try fetching by ID. |
 | "API key not configured" | Set it in Raycast preferences (Cmd+, on any Drip command) or in Drip's Settings |
 | Start Focus doesn't start timer | Make sure the Drip app is running |

@@ -23,6 +23,12 @@ export const COLOR = {
     light: '#6ee7b7',
     dark: '#10b981',
   },
+  // Semantic error red — Tailwind red-500 / red-400, as used across the app.
+  // Not an accent: only for errors and the idle nudge.
+  alert: {
+    DEFAULT: '#ef4444',
+    light: '#f87171',
+  },
   txt: {
     primary: '#f0f0f2',
     secondary: '#a0a0b0',

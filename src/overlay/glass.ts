@@ -44,6 +44,12 @@ export const BREAK = {
   light: COLOR.break.light,
 } as const;
 
+/** The idle nudge — semantic red, never decorative. */
+export const ALERT = {
+  base: COLOR.alert.DEFAULT,
+  light: COLOR.alert.light,
+} as const;
+
 export const TXT = COLOR.txt;
 
 /**

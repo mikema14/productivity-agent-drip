@@ -18,8 +18,6 @@ type ExtensionPreferences = {
 declare type Preferences = ExtensionPreferences
 
 declare namespace Preferences {
-  /** Preferences accessible in the `timer-status` command */
-  export type TimerStatus = ExtensionPreferences & {}
   /** Preferences accessible in the `start-focus` command */
   export type StartFocus = ExtensionPreferences & {}
   /** Preferences accessible in the `add-entry` command */
@@ -37,8 +35,6 @@ declare namespace Preferences {
 }
 
 declare namespace Arguments {
-  /** Arguments passed to the `timer-status` command */
-  export type TimerStatus = {}
   /** Arguments passed to the `start-focus` command */
   export type StartFocus = {}
   /** Arguments passed to the `add-entry` command */

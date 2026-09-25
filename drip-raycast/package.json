@@ -26,17 +26,16 @@
   ],
   "commands": [
     {
-      "name": "timer-status",
-      "title": "Timer Status",
-      "description": "Show Drip timer status in menu bar",
-      "mode": "menu-bar",
-      "interval": "10s"
-    },
-    {
       "name": "start-focus",
       "title": "Start Focus Session",
       "description": "Start a Pomodoro focus session in Drip",
       "mode": "view"
+    },
+    {
+      "name": "kickoff",
+      "title": "Kickoff",
+      "description": "Start a 2-minute kickoff in Drip that rolls into a full focus session",
+      "mode": "no-view"
     },
     {
       "name": "add-entry",

@@ -19,9 +19,37 @@ interface TimerStore extends TimerState {
   setTimerMode: (mode: 'pomodoro' | 'stopwatch') => void;
   setSessionViewMode: (mode: 'flat' | 'grouped') => void;
   setDurationMinutes: (minutes: number) => void;
+  /**
+   * Set while the session is a kickoff: 'warmup' for its short opening,
+   * 'rolled' once it has extended itself into a full focus session.
+   */
+  kickoff: 'warmup' | 'rolled' | null;
+  /** `kickoffSeconds` turns the session into a kickoff of that length. */
+  startFocus: (taskId?: string, billable?: boolean, fromOverlay?: boolean, kickoffSeconds?: number) => Promise<void>;
+  startKickoff: (seconds: number) => Promise<void>;
+  stopKickoff: () => Promise<void>;
 }
 
 const DEFAULT_DURATION_MINUTES = 25;
+
+/** Comment on a kickoff session with no intention, so it can be told apart. */
+const KICKOFF_COMMENT = 'Kickoff';
+
+/**
+ * The task a kickoff (or the idle nudge's Start focus) attaches to: the
+ * current one, else today's most recent session with a task, else the last
+ * finished one.
+ */
+async function resolveLastTaskId(state: { currentTaskId: string | null; lastTaskId: string | null }): Promise<string | undefined> {
+  if (state.currentTaskId) return state.currentTaskId;
+  try {
+    const session = await window.timerAPI.getLastSessionWithTask(getCurrentDate());
+    if (session?.task_id) return session.task_id;
+  } catch (error) {
+    console.error('[Timer] Failed to look up last session task:', error);
+  }
+  return state.lastTaskId || undefined;
+}
 
 const SESSIONS_UNTIL_LONG_BREAK = 3;
 
@@ -87,6 +115,7 @@ export const useTimerStore = create<TimerStore>()(
       lastTaskId: null,
       lastTaskTitle: null,
       durationMinutes: DEFAULT_DURATION_MINUTES,
+      kickoff: null,
 
       setIntention: (intention: string) => {
         set({ intention });
@@ -109,7 +138,7 @@ export const useTimerStore = create<TimerStore>()(
         set({ currentBillable: billable });
       },
 
-  startFocus: async (taskId?: string, billable?: boolean, fromOverlay?: boolean) => {
+  startFocus: async (taskId?: string, billable?: boolean, fromOverlay?: boolean, kickoffSeconds?: number) => {
     const state = get();
 
     if (state.overlayOpen && !fromOverlay) {
@@ -134,12 +163,21 @@ export const useTimerStore = create<TimerStore>()(
 
     const now = new Date();
     const focusSecs = state.durationMinutes * 60;
+    // A kickoff runs its short opening, then main extends it by focusSecs.
+    const kickoffSecs = kickoffSeconds && kickoffSeconds > 0 ? kickoffSeconds : 0;
+    const timerSecs = kickoffSecs || focusSecs;
     const nextSessionCount = state.sessionCount + 1;
     const isLongBreak = nextSessionCount % SESSIONS_UNTIL_LONG_BREAK === 0;
     const nextBreakMins = getBreakMinutes(state.durationMinutes, isLongBreak) as 5 | 10;
 
     try {
-      await window.timerAPI.startMainTimer(focusSecs, 'focus', nextBreakMins, taskId || undefined);
+      await window.timerAPI.startMainTimer(
+        timerSecs,
+        'focus',
+        nextBreakMins,
+        taskId || undefined,
+        kickoffSecs ? focusSecs : undefined
+      );
     } catch (error) {
       console.error('[Timer] Failed to start main process timer:', error);
       return;
@@ -147,14 +185,66 @@ export const useTimerStore = create<TimerStore>()(
 
     set({
       status: 'focus',
-      remainingSeconds: focusSecs,
-      totalDuration: focusSecs,
+      remainingSeconds: timerSecs,
+      totalDuration: timerSecs,
       currentTaskId: taskId || null,
       currentBillable: resolvedBillable,
       isPaused: false,
       intervalId: 999999,
-      sessionStartTime: now
+      sessionStartTime: now,
+      kickoff: kickoffSecs ? 'warmup' : null
     });
+  },
+
+  startKickoff: async (seconds: number) => {
+    const state = get();
+    if (state.status === 'focus') return;
+    const taskId = await resolveLastTaskId(state);
+    await get().startFocus(taskId, undefined, false, seconds);
+  },
+
+  /** "Stop" on the kickoff prompt: end it and keep what ran as its own session. */
+  stopKickoff: async () => {
+    const { status, kickoff, sessionStartTime, currentTaskId, currentBillable, intention } = get();
+    if (status !== 'focus' || !kickoff || !sessionStartTime) return;
+
+    try {
+      await window.timerAPI.stopMainTimer();
+    } catch (error) {
+      console.error('[Timer] Failed to stop main timer for kickoff:', error);
+    }
+
+    const endTime = new Date();
+    const minutes = Math.max(1, Math.round((endTime.getTime() - sessionStartTime.getTime()) / 60000));
+    try {
+      await window.timerAPI.saveSession({
+        start_at: formatDateTime(sessionStartTime),
+        end_at: formatDateTime(endTime),
+        duration_minutes: minutes,
+        task_id: currentTaskId,
+        source: 'pomodoro',
+        comment: intention.trim() || KICKOFF_COMMENT,
+        logged: 0,
+        log_sent_at: null,
+        server_entry_id: null,
+        billable: currentBillable ? 1 : 0
+      });
+    } catch (error) {
+      console.error('[Timer] Failed to save kickoff session:', error);
+    }
+
+    const focusSecs = get().durationMinutes * 60;
+    set({
+      status: 'idle',
+      remainingSeconds: focusSecs,
+      totalDuration: focusSecs,
+      isPaused: false,
+      intervalId: null,
+      sessionStartTime: null,
+      kickoff: null,
+      lastTaskId: currentTaskId ?? get().lastTaskId
+    });
+    window.timerAPI.updateTrayTime('Ready');
   },
 
   startBreak: async (isLong: boolean, fromOverlay?: boolean) => {
@@ -186,7 +276,8 @@ export const useTimerStore = create<TimerStore>()(
       totalDuration: duration,
       isPaused: false,
       intervalId: 999999,
-      sessionStartTime: new Date()
+      sessionStartTime: new Date(),
+      kickoff: null
     });
 
     // Give the overlay's break pill its real progress denominator
@@ -233,7 +324,11 @@ export const useTimerStore = create<TimerStore>()(
     }
 
     // Determine comment priority: intention > task title > default
-    let comment = state.intention.trim() || 'Focus session';
+    let comment = state.intention.trim() || (state.kickoff ? KICKOFF_COMMENT : 'Focus session');
+    // A kickoff extended itself, so its length is the whole run, not the setting.
+    const sessionMinutes = state.kickoff
+      ? Math.max(1, Math.round(state.totalDuration / 60))
+      : state.durationMinutes;
 
     // Save session to database
     const endTime = new Date();
@@ -243,7 +338,7 @@ export const useTimerStore = create<TimerStore>()(
       sessionId = await window.timerAPI.saveSession({
         start_at: formatDateTime(state.sessionStartTime),
         end_at: formatDateTime(endTime),
-        duration_minutes: state.durationMinutes,
+        duration_minutes: sessionMinutes,
         task_id: state.currentTaskId,
         source: 'pomodoro',
         comment,
@@ -269,7 +364,7 @@ export const useTimerStore = create<TimerStore>()(
         sessionId,
         taskId: state.currentTaskId,
         taskTitle,
-        durationMinutes: state.durationMinutes,
+        durationMinutes: sessionMinutes,
         startedAt: state.sessionStartTime.toISOString(),
         endedAt: endTime.toISOString(),
         note: state.intention.trim(),
@@ -291,6 +386,7 @@ export const useTimerStore = create<TimerStore>()(
       overlayOpen: overlayShown,
       lastTaskId: state.currentTaskId,
       lastTaskTitle: taskTitle,
+      kickoff: null,
     });
 
     // Update tray
@@ -414,7 +510,7 @@ export const useTimerStore = create<TimerStore>()(
   },
 
   finishEarly: async () => {
-    const { status, sessionStartTime, currentTaskId, currentBillable, sessionCount, intervalId, intention } = get();
+    const { status, sessionStartTime, currentTaskId, currentBillable, sessionCount, intervalId, intention, kickoff } = get();
 
     if (status !== 'focus') {
       console.warn('[Timer] Can only finish early during focus session');
@@ -457,7 +553,7 @@ export const useTimerStore = create<TimerStore>()(
     }
 
     // Determine comment: intention > early finish message
-    const comment = intention.trim() || `Finished early (${elapsedMinutes}m)`;
+    const comment = intention.trim() || (kickoff ? KICKOFF_COMMENT : `Finished early (${elapsedMinutes}m)`);
 
     // Create session with actual elapsed time
     const session = {
@@ -511,6 +607,7 @@ export const useTimerStore = create<TimerStore>()(
         intervalId: null,
         sessionStartTime: null,
         overlayOpen: earlyOverlayShown,
+        kickoff: null,
       });
 
       // Update tray
@@ -553,7 +650,8 @@ export const useTimerStore = create<TimerStore>()(
       currentTaskId: null,
       isPaused: false,
       intervalId: null,
-      sessionStartTime: null
+      sessionStartTime: null,
+      kickoff: null
     });
   },
 
@@ -723,7 +821,25 @@ export function setupMainTimerListeners() {
     useTimerStore.setState({
       remainingSeconds: newRemaining,
       totalDuration: state.totalDuration + extended,
+      // The roll-over is the extension that arrives at zero; a manual +5m
+      // during the warmup is not.
+      kickoff: state.kickoff === 'warmup' && state.remainingSeconds <= 1 ? 'rolled' : state.kickoff,
     });
+  });
+
+  // The main-process idle watcher: the red nudge's Start focus, the kickoff
+  // (takeover, nudge button or drip://kickoff), and Stop on the kickoff prompt.
+  window.timerAPI.onIdleCommand?.((command) => {
+    console.log('[Timer] Idle command received:', command);
+    const state = useTimerStore.getState();
+    if (command.type === 'start-focus') {
+      if (state.status === 'focus') return;
+      void resolveLastTaskId(state).then((taskId) => useTimerStore.getState().startFocus(taskId));
+    } else if (command.type === 'kickoff') {
+      void state.startKickoff(command.seconds);
+    } else if (command.type === 'stop-kickoff') {
+      void state.stopKickoff();
+    }
   });
 
   // Listen for URL scheme events (drip:// from Raycast)

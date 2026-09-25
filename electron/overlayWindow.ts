@@ -307,8 +307,12 @@ export function sendOverlayState(payload: SessionOverlayPayload): boolean {
   return true;
 }
 
-export function showOverlay(payload: SessionOverlayPayload): boolean {
-  if (!state.enabled) return false;
+/**
+ * `force` skips the session-end toggle: the idle nudge and the kickoff prompt
+ * have their own switch ("Idle nudge") and must work with the card turned off.
+ */
+export function showOverlay(payload: SessionOverlayPayload, { force = false }: { force?: boolean } = {}): boolean {
+  if (!state.enabled && !force) return false;
   if (!sendOverlayState(payload)) return false;
 
   const win = state.win!;
@@ -355,6 +359,11 @@ export function repositionOverlayIfVisible(): void {
   if (isEdgeGlowVisible()) {
     showEdgeGlow();
   }
+}
+
+/** What the overlay is showing, or null when hidden. */
+export function getVisibleOverlayKind(): SessionOverlayPayload['kind'] | null {
+  return isOverlayVisible() ? state.lastKind : null;
 }
 
 export function isOverlayVisible(): boolean {

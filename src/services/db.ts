@@ -587,7 +587,8 @@ function initializeDefaultSettings(database: Database.Database) {
     { key: 'sessionsUntilLongBreak', value: '3' },
     { key: 'defaultBillable', value: 'true' },
     { key: 'roundingMode', value: 'none' },
-    { key: 'sessionEndOverlay', value: 'true' }
+    { key: 'sessionEndOverlay', value: 'true' },
+    { key: 'raycastFocusEnabled', value: 'true' }
   ];
 
   const insertStmt = database.prepare(

@@ -99,6 +99,7 @@ import {
   extendTimer,
   cleanupTimer
 } from './timer';
+import { initIdleNudge, stopIdleNudge, startKickoff, handleIdleOverlayAction } from './idleNudge';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -198,6 +199,10 @@ function handleDripUrl(url: string) {
         }
         break;
       }
+      case 'kickoff':
+        // 2 minutes of focus on the last task, rolling into a full session
+        startKickoff('manual');
+        break;
       case 'skip-break':
         stopTimer();
         if (mainWindow && !mainWindow.isDestroyed()) {
@@ -264,6 +269,9 @@ app.whenReady().then(() => {
   // Session-end overlay: read the enabled flag once, create the window lazily
   initOverlayEnabled();
 
+  // Red nudge when nothing runs for too long, kickoff when it's ignored
+  initIdleNudge(() => mainWindow);
+
   startCalendarBackgroundRefresh();
 
   // A disconnected or rearranged display would otherwise leave the overlay
@@ -294,6 +302,7 @@ app.on('window-all-closed', () => {
 // Cleanup on quit
 app.on('before-quit', () => {
   app.isQuitting = true;
+  stopIdleNudge();
   cleanupTimer();
   destroyOverlay();
   closeDB();
@@ -466,6 +475,9 @@ ipcMain.handle('overlay:save-note', async (_event, sessionId: string, note: stri
 // Overlay relays its actions to the main window renderer, which owns all timer
 // logic — the overlay never drives the timer itself.
 ipcMain.on('overlay:action', (_event, type: OverlayActionType) => {
+  // Idle nudge and kickoff prompt buttons are handled by the idle watcher
+  if (handleIdleOverlayAction(type)) return;
+
   if (type === 'start-break') {
     // Collapse to the break pill immediately so there is no flash; the exact
     // totalSeconds arrives via overlay:break-started. Without a known break the
@@ -1314,9 +1326,9 @@ ipcMain.handle('call-openrouter', async (_event, apiKey: string, model: string, 
 
 // ==================== MAIN PROCESS TIMER ====================
 
-ipcMain.handle('start-main-timer', async (_event, duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string) => {
+ipcMain.handle('start-main-timer', async (_event, duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string, kickoffRolloverSeconds?: number) => {
   try {
-    startTimer(duration, timerType, nextBreakDuration, taskId);
+    startTimer(duration, timerType, nextBreakDuration, taskId, kickoffRolloverSeconds);
     return { success: true };
   } catch (error) {
     console.error('Failed to start main timer:', error);

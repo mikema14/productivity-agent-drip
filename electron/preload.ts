@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PomodoroSession, TimerAPI, LogAPI, AdhocEntry, CalendarProposal, CalendarFeedResult, TaskCache, RankedTask, ApiTestResult, IssueData, TimeEntryPayload, OverlayActionType } from '../src/types';
+import type { PomodoroSession, TimerAPI, LogAPI, AdhocEntry, CalendarProposal, CalendarFeedResult, TaskCache, RankedTask, ApiTestResult, IssueData, TimeEntryPayload, OverlayActionType, IdleCommand } from '../src/types';
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object
@@ -106,8 +106,8 @@ const timerAPI: TimerAPI = {
   },
 
   // Main process timer control
-  startMainTimer: async (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string): Promise<void> => {
-    const result = await ipcRenderer.invoke('start-main-timer', duration, timerType, nextBreakDuration, taskId);
+  startMainTimer: async (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string, kickoffRolloverSeconds?: number): Promise<void> => {
+    const result = await ipcRenderer.invoke('start-main-timer', duration, timerType, nextBreakDuration, taskId, kickoffRolloverSeconds);
     if (!result.success) {
       throw new Error(result.error || 'Failed to start main timer');
     }
@@ -201,6 +201,10 @@ const timerAPI: TimerAPI = {
 
   onOverlayAction: (callback: (type: OverlayActionType) => void) => {
     ipcRenderer.on('overlay-action', (_event, type) => callback(type));
+  },
+
+  onIdleCommand: (callback: (command: IdleCommand) => void) => {
+    ipcRenderer.on('idle-command', (_event, command: IdleCommand) => callback(command));
   }
 };
 
