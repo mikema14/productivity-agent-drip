@@ -2,9 +2,8 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useTimerStore, KICKOFF_SECONDS } from '../../stores/timerStore';
 import { useIntentionsStore } from '../../stores/intentionsStore';
 import { useTaskName } from '../../hooks/useTaskName';
-import TimerDayTimeline from './TimerDayTimeline';
 import BoundaryConfirmDialog from './BoundaryConfirmDialog';
-import TimerTaskList from '../Lists/TimerTaskList';
+import NowAside from './NowAside';
 import DurationSegments from './DurationSegments';
 import TaskPicker from './TaskPicker';
 import TaskCard from './TaskCard';
@@ -79,7 +78,6 @@ export default function Timer({ onNavigate }: TimerProps) {
   const [pendingTaskId, setPendingTaskId] = useState<string | undefined>(undefined);
   const [workdayEndTime, setWorkdayEndTime] = useState('18:00');
   const [enableBoundaryCheck, setEnableBoundaryCheck] = useState(false);
-  const [rightPanel, setRightPanel] = useState<'timeline' | 'tasks'>('timeline');
 
   const searchRef = useRef<HTMLInputElement>(null);
   const clockRef = useRef<HTMLDivElement>(null);
@@ -463,50 +461,25 @@ export default function Timer({ onNavigate }: TimerProps) {
           )}
         </div>
 
-        {/* ASIDE: Day Timeline or Task List */}
-        <aside aria-label="Day" className="w-[280px] wide:w-[340px] shrink-0 border-l border-drip-elevated relative overflow-hidden flex flex-col">
-          <div className="px-4 pt-3 pb-1 flex justify-end">
-            <div className="inline-flex border border-drip-border">
-              <button
-                onClick={() => setRightPanel('timeline')}
-                className={`px-3 h-7 now-label transition-colors ${
-                  rightPanel === 'timeline' ? 'bg-focus text-drip-bg' : 'text-txt-muted hover:text-txt-primary hover:bg-focus/5'
-                }`}
-              >
-                Timeline
-              </button>
-              <button
-                onClick={() => setRightPanel('tasks')}
-                className={`px-3 h-7 now-label border-l border-drip-border transition-colors ${
-                  rightPanel === 'tasks' ? 'bg-focus text-drip-bg' : 'text-txt-muted hover:text-txt-primary hover:bg-focus/5'
-                }`}
-              >
-                Tasks
-              </button>
-            </div>
-          </div>
-
-          {rightPanel === 'timeline' ? (
-            <div className="flex-1 relative overflow-hidden">
-              <TimerDayTimeline sessions={sessions} calendarProposals={calendarProposals} adhocEntries={adhocEntries} onRefresh={loadSessions} />
-            </div>
-          ) : (
-            <TimerTaskList
-              onSelectTask={(taskId, itemTitle) => {
-                if (taskId) {
-                  window.logAPI.getCachedTask(taskId).then(task => {
-                    if (task) {
-                      setSelectedTask(task);
-                    } else {
-                      setSelectedTask({ task_id: taskId, title: itemTitle, project_id: 0, project_name: null, last_seen_at: new Date().toISOString() });
-                    }
-                  });
+        <NowAside
+          sessions={sessions}
+          calendarProposals={calendarProposals}
+          adhocEntries={adhocEntries}
+          onRefresh={loadSessions}
+          onNavigate={onNavigate}
+          onSelectTask={(taskId, itemTitle) => {
+            if (taskId) {
+              window.logAPI.getCachedTask(taskId).then(task => {
+                if (task) {
+                  setSelectedTask(task);
+                } else {
+                  setSelectedTask({ task_id: taskId, title: itemTitle, project_id: 0, project_name: null, last_seen_at: new Date().toISOString() });
                 }
-                setIntention(itemTitle);
-              }}
-            />
-          )}
-        </aside>
+              });
+            }
+            setIntention(itemTitle);
+          }}
+        />
       </div>
 
       {/* Modals */}

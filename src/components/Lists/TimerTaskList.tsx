@@ -95,15 +95,16 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
       {/* Filters area */}
       <div className="px-4 pt-4 pb-3 space-y-3">
         {/* Segmented control for column filter */}
-        <div className="bg-transparent rounded-xl p-0.5 border border-focus/30 flex">
-          {COLUMN_FILTERS.map(f => (
+        <div className="border border-drip-border flex">
+          {COLUMN_FILTERS.map((f, i) => (
             <button
               key={f.key}
               onClick={() => setColumnFilter(f.key)}
-              className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+              aria-pressed={columnFilter === f.key}
+              className={`flex-1 h-7 now-label transition-colors duration-150 ${i > 0 ? 'border-l border-drip-border' : ''} ${
                 columnFilter === f.key
-                  ? 'bg-focus/15 text-focus'
-                  : 'text-txt-muted hover:text-txt-secondary hover:bg-focus/5'
+                  ? 'bg-focus text-drip-bg'
+                  : 'text-txt-muted hover:text-txt-primary hover:bg-focus/5'
               }`}
             >
               {f.label}
@@ -121,7 +122,7 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search tasks..."
-            className="w-full pl-9 pr-3 py-2 bg-transparent border border-focus/30 rounded-xl text-sm text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-1 focus:ring-focus/30 transition-all"
+            className="w-full pl-9 pr-3 h-9 bg-transparent border border-drip-border text-sm text-txt-primary placeholder-txt-muted focus:outline-none focus:border-focus/40 transition-colors"
           />
         </div>
 
@@ -130,8 +131,8 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
           <div className="flex-1 flex gap-1.5 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setListFilter(null)}
-              className={`px-2.5 py-1 text-xs rounded-lg whitespace-nowrap transition-all ${
-                !listFilter ? 'bg-focus/15 text-focus' : 'text-txt-muted hover:text-txt-secondary hover:bg-focus/5'
+              className={`px-2.5 py-1 text-xs rounded-[2px] border whitespace-nowrap transition-colors ${
+                !listFilter ? 'bg-focus/10 text-focus border-focus/30' : 'border-drip-border text-txt-muted hover:text-txt-primary hover:bg-focus/5'
               }`}
             >
               All Lists
@@ -140,8 +141,8 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
               <button
                 key={list.id}
                 onClick={() => setListFilter(listFilter === list.id ? null : list.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg whitespace-nowrap transition-all ${
-                  listFilter === list.id ? 'bg-focus/15 text-focus' : 'text-txt-muted hover:text-txt-secondary hover:bg-focus/5'
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-[2px] border whitespace-nowrap transition-colors ${
+                  listFilter === list.id ? 'bg-focus/10 text-focus border-focus/30' : 'border-drip-border text-txt-muted hover:text-txt-primary hover:bg-focus/5'
                 }`}
               >
                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: list.color }} />
@@ -151,8 +152,8 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
           </div>
           <button
             onClick={() => setShowCompleted(!showCompleted)}
-            className={`flex-shrink-0 px-2 py-1 text-xs rounded-lg transition-all ${
-              showCompleted ? 'bg-focus/10 text-focus' : 'text-txt-dim hover:text-txt-muted'
+            className={`flex-shrink-0 px-2 py-1 text-xs rounded-[2px] border transition-colors ${
+              showCompleted ? 'bg-focus/10 text-focus border-focus/30' : 'border-drip-border text-txt-dim hover:text-txt-muted'
             }`}
             title="Show completed"
           >
@@ -211,7 +212,7 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
                       <button
                         onClick={() => handleItemClick(item, list)}
                         className={`
-                          w-full text-left rounded-xl p-3 transition-all duration-200
+                          w-full text-left rounded-[2px] p-3 transition-all duration-200
                           border
                           ${selectedItemId === item.id
                             ? 'bg-focus/5 border-focus/20'
@@ -224,7 +225,7 @@ export default function TimerTaskList({ onSelectTask }: TimerTaskListProps) {
                         <div className="flex items-center gap-2.5">
                           <button
                             onClick={(e) => handleToggleComplete(e, item)}
-                            className="w-4 h-4 rounded border border-focus/20 hover:border-focus/50 flex-shrink-0 transition-colors"
+                            className="w-4 h-4 rounded-[2px] border border-drip-border hover:border-focus/50 flex-shrink-0 transition-colors"
                           />
                           <span className="flex-1 text-sm text-txt-primary truncate">{item.title}</span>
                           {(item.task_id && !list.task_id) && (

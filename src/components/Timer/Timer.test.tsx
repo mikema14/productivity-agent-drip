@@ -5,6 +5,7 @@ import Timer from './Timer';
 import { makeTasks } from '../../test/fixtures';
 import { setTimer, resetTimer } from '../../test/timerState';
 import { useIntentionsStore } from '../../stores/intentionsStore';
+import { useLogStore } from '../../stores/logStore';
 import type { PomodoroSession } from '../../types';
 
 vi.mock('./TimerDayTimeline', () => ({ default: () => <div>TimelineStub</div> }));
@@ -131,6 +132,30 @@ describe('Timer — ready states', () => {
     expect(queryKey(/set intention/i)).toBeNull();
     await user.click(key(/edit/i));
     expect(screen.getByText("Today's intentions")).toBeInTheDocument();
+  });
+
+  it('aside footer counts unlogged work and REVIEW DAY opens Review for today', async () => {
+    window.timerAPI.getSessions = vi.fn(async () => [
+      makeSession(1), makeSession(2), makeSession(3, { logged: 1 }), makeSession(4, { source: 'break' }),
+    ]);
+    const loadDay = vi.fn(async () => undefined);
+    useLogStore.setState({ loadDay });
+    const { user, nav } = await renderTimer();
+    expect(await screen.findByText('2 unlogged')).toBeInTheDocument();
+
+    await user.click(key(/review day/i));
+    expect(loadDay).toHaveBeenCalledWith(today);
+    expect(nav).toHaveBeenCalledWith('daily-log');
+  });
+
+  it('aside toggles between the timeline and the task list', async () => {
+    const { user } = await renderTimer();
+    expect(screen.getByText('TimelineStub')).toBeInTheDocument();
+    await user.click(key(/^tasks$/i));
+    expect(screen.getByText('TaskListStub')).toBeInTheDocument();
+    expect(screen.queryByText('TimelineStub')).toBeNull();
+    await user.click(key(/^timeline$/i));
+    expect(screen.getByText('TimelineStub')).toBeInTheDocument();
   });
 
   it('Boundary dialog "Change Settings" navigates to Settings', async () => {
