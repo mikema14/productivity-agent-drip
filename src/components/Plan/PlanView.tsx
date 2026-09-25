@@ -1,6 +1,9 @@
+import { useEffect } from 'react';
 import ListsPanel from '../Layout/ListsPanel';
 import ListPlanningView from '../Lists/ListPlanningView';
 import AllListsOverview from '../Lists/AllListsOverview';
+import PlanHeader from './PlanHeader';
+import { useListsStore } from '../../stores/listsStore';
 import type { ViewId } from '../Layout/views';
 
 interface PlanViewProps {
@@ -9,13 +12,20 @@ interface PlanViewProps {
   onCreateList: () => void;
 }
 
-/** Plan = the lists panel beside either a single list board or the all-lists overview. */
+/** Plan = header on top, then the lists panel beside the board. */
 export default function PlanView({ view, onNavigate, onCreateList }: PlanViewProps) {
+  const loadItems = useListsStore(s => s.loadItems);
+  // ListsPanel loads the lists itself; the items are loaded once here for both scopes.
+  useEffect(() => { loadItems(); }, []);
+
   return (
-    <div className="flex h-full">
-      <ListsPanel view={view} onNavigate={onNavigate} onCreateList={onCreateList} />
-      <div className="flex-1 min-w-0">
-        {view === 'lists' ? <ListPlanningView /> : <AllListsOverview />}
+    <div className="flex flex-col h-full">
+      <PlanHeader />
+      <div className="flex flex-1 min-h-0">
+        <ListsPanel view={view} onNavigate={onNavigate} onCreateList={onCreateList} />
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+          {view === 'lists' ? <ListPlanningView /> : <AllListsOverview />}
+        </div>
       </div>
     </div>
   );
