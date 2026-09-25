@@ -289,6 +289,30 @@ Assertions added: the three column `section`s exist by label in both scopes; `St
 
 Each item: what the mockup shows vs what exists, the options, and my recommendation. I will proceed on the recommendation unless told otherwise.
 
+### Decided (owner, 2026-09-25)
+
+- **P1** Decided: (a) static ISO week label, no arrows.
+- **P2** Decided: (a) drop `Weekly review`.
+- **P3** Decided: (a) drop `⌘K`.
+- **P4** Decided: (a) drop the key legend and the triage row; the hover actions carry every behaviour. Arrow icons and titles unchanged (← still means "towards Backlog").
+- **P5** Decided: (a) group Backlog by `created_at` (`New this week` / `Older than 14 days` / `Everything else`), no schema change.
+- **P6** Decided: (a) parse the Leexi description prefix → `from call · <date>`.
+- **P7** Decided: (a) tracked minutes per card via new `logAPI.getTaskMinutesByRange`, attributed to the item's **own** `task_id` only, `—` otherwise.
+- **P8** Decided: (a) capacity line `Xh Ym focus · Zh Wm to 6h` against `DAY_TARGET_MINUTES` (360) imported from `TimerDayTimeline.tsx` — the Phase 1 constant, not duplicated.
+- **P9** Decided: (a) `{open}` and, when any, `· {done} done`. No caps.
+- **P10** Decided: **OVERRIDE of the recommendation** — preserve today's behaviour exactly. All scope: `Done` on = 4th Done column; `Done` off = completed items hidden, as now. No inline-strikethrough mode in all scope. (Single-list scope keeps its existing inline strikethrough, unchanged.)
+- **P11** Decided: (b) keep the `IDs` toggle, default flipped to `true`; an explicit stored `false` is honoured.
+- **P12** Decided: (a) keep the list filter pills (All + multi-select) as the sub-header's second row.
+- **P13** Decided: (a) `Start on` navigates to Now with the task preselected via `timerStore.pendingSelection`.
+- **P14** Decided: (a) dashed footer — list scope `Add a task` → `AddItemInline` in place, all scope `Drop a task here`; `Drop here` during a drag.
+- **P15** Decided: (a) square `rounded-[2px]` radii and hairlines.
+- **P16** Decided: (a) horizontal scroll below 1000px, columns `min-w-[220px]`.
+- **P17** Decided: (a) `task_cache` becomes a tolerated cache table in the guard.
+- **P18** Decided: (a) the smoke never clicks `Start on`.
+- **P19** Decided: (a) one `PlanBoard`; both legacy boards deleted in the list-scope commit.
+- **P20** Decided: (a) `Archived · n` (`aria-pressed`), tests updated in the same commit.
+- **P21** Decided: (a) rule-based subtitle only (`logs to <id>` | `billable` | `not billable`).
+
 **P1. Week label and ‹ › arrows in the header.** Mockup: `‹ Week 39 · 21–27 Sep ›`. Nothing in Lists has a week concept ("This week" is a timeless column). Options: (a) static label of the current ISO week, no arrows; (b) arrows that do nothing visible (inert, violates the Q4 precedent); (c) drop the label. **Recommend (a).** The label gives "This week" and the tracked-week line a concrete date range.
 
 **P2. `Weekly review` button.** No review UI exists; `computeWeeklySummary` runs from End Day only. Options: (a) drop for Phase 2, roadmap item; (b) open Review on the current week. **Recommend (a).**
