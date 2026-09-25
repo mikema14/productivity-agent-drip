@@ -478,15 +478,17 @@ describe('PlanBoard — Today extras', () => {
     expect(await section('Today').findByText('0m focus · 6h to 6h')).toBeInTheDocument();
   });
 
-  it('tracked minutes: today on Today cards, week (wk) on This week cards, — without data, none on Backlog; week line sums the week', async () => {
+  it('tracked minutes: today on Today cards, week (wk) on This week cards, nothing without data, none on Backlog; week line sums the week', async () => {
     window.logAPI.getTaskMinutesByRange = vi.fn(async (from: string, to: string): Promise<Record<string, number>> =>
       from === to ? { '689742': 75 } : { '689742': 90, '111': 130 }
     );
     renderBoard();
     expect(await within(card('Title t1')).findByText('1h 15m')).toBeInTheDocument();
-    expect(within(card('Title t2')).getByText('—')).toBeInTheDocument();
+    expect(within(card('Title t2')).queryByText('—')).toBeNull();
+    expect(within(card('Title t2')).queryByText(/\d+m/)).toBeNull();
     expect(within(card('Title w1')).getByText('2h 10m wk')).toBeInTheDocument();
     expect(within(card('Title b1')).queryByText('—')).toBeNull();
+    expect(within(card('Title b1')).queryByText(/\d+m/)).toBeNull();
     expect(section('This week').getByText('3h 40m tracked this week')).toBeInTheDocument();
     expect(window.logAPI.getTaskMinutesByRange).toHaveBeenCalledWith(today, today);
   });

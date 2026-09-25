@@ -217,15 +217,16 @@ export default function PlanBoard({ scope, onNavigate }: PlanBoardProps) {
   }
 
   // Tracked time is attributed to the item's own task id only (P7): items that
-  // inherit the list's id would all repeat the list total.
+  // inherit the list's id would all repeat the list total. Nothing is rendered
+  // when there is no tracked time (a placeholder on every card is noise).
   const minutesFor = (item: ListItem, column: BoardColumnKey): string | null => {
     if (column === 'today') {
       const m = item.task_id ? todayMinutes[item.task_id] ?? 0 : 0;
-      return m > 0 ? formatMinutesPadded(m) : '—';
+      return m > 0 ? formatMinutesPadded(m) : null;
     }
     if (column === 'this_week') {
       const m = item.task_id && weekMinutes ? weekMinutes[item.task_id] ?? 0 : 0;
-      return m > 0 ? `${formatMinutesPadded(m)} wk` : '—';
+      return m > 0 ? `${formatMinutesPadded(m)} wk` : null;
     }
     return null;
   };

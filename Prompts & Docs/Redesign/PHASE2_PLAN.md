@@ -297,7 +297,7 @@ Each item: what the mockup shows vs what exists, the options, and my recommendat
 - **P4** Decided: (a) drop the key legend and the triage row; the hover actions carry every behaviour. Arrow icons and titles unchanged (← still means "towards Backlog").
 - **P5** Decided: (a) group Backlog by `created_at` (`New this week` / `Older than 14 days` / `Everything else`), no schema change.
 - **P6** Decided: (a) parse the Leexi description prefix → `from call · <date>`.
-- **P7** Decided: (a) tracked minutes per card via new `logAPI.getTaskMinutesByRange`, attributed to the item's **own** `task_id` only, `—` otherwise.
+- **P7** Decided: (a) tracked minutes per card via new `logAPI.getTaskMinutesByRange`, attributed to the item's **own** `task_id` only. *Revised by owner (post-e2e):* nothing is rendered when there is no tracked time — the `—` placeholder was noise on nearly every card.
 - **P8** Decided: (a) capacity line `Xh Ym focus · Zh Wm to 6h` against `DAY_TARGET_MINUTES` (360) imported from `TimerDayTimeline.tsx` — the Phase 1 constant, not duplicated.
 - **P9** Decided: (a) `{open}` and, when any, `· {done} done`. No caps.
 - **P10** Decided: **OVERRIDE of the recommendation** — preserve today's behaviour exactly. All scope: `Done` on = 4th Done column; `Done` off = completed items hidden, as now. No inline-strikethrough mode in all scope. (Single-list scope keeps its existing inline strikethrough, unchanged.)

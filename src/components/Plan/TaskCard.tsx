@@ -26,7 +26,7 @@ export interface TaskCardProps {
   showId: boolean;
   showListTag: boolean;
   taskName: string | null;
-  /** `1h 15m`, `2h 10m wk`, `—`; null = no minutes slot in this column. */
+  /** `1h 15m`, `2h 10m wk`; null = no tracked time to show (nothing is rendered). */
   minutesLabel: string | null;
   /** `14d` for stale backlog items. */
   ageBadge: string | null;
