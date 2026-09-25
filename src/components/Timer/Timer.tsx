@@ -15,9 +15,12 @@ import ContinuePreviousCTA from './ContinuePreviousCTA';
 import CancelConfirmModal from './CancelConfirmModal';
 import SetIntentionModal from '../shared/SetIntentionModal';
 import BillableToggle from '../shared/BillableToggle';
-import type { PomodoroSession, CalendarProposal, AdhocEntry, TaskCache } from '../../types';
+import type { PomodoroSession, CalendarProposal, AdhocEntry, TaskCache, RankedTask } from '../../types';
 
 type FocusState = 'ready-empty' | 'ready-selected' | 'running' | 'paused';
+
+/** How many ranked recent tasks the picker lists (it scrolls past ~5). */
+const RECENT_TASKS_LIMIT = 20;
 
 const formatTimeRange = (date: Date) =>
   `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
@@ -53,7 +56,7 @@ export default function Timer() {
   // Local state
   const [selectedTask, setSelectedTask] = useState<TaskCache | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [recentTasks, setRecentTasks] = useState<TaskCache[]>([]);
+  const [recentTasks, setRecentTasks] = useState<RankedTask[]>([]);
   const [previousSession, setPreviousSession] = useState<PomodoroSession | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showIntentionModal, setShowIntentionModal] = useState(false);
@@ -98,20 +101,21 @@ export default function Timer() {
     loadBoundarySettings();
   }, []);
 
-  // `/` — open picker from ready states (guard against input fields)
+  // `/` — focus the task search from ready states (guard against input fields).
+  // Only the selected-task card has a collapsed picker to open; the idle picker is always open.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key !== '/') return;
       const tag = (document.activeElement as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-      if (!focusState.startsWith('ready')) return;
+      if (!focusState.startsWith('ready') || status === 'break') return;
       e.preventDefault();
-      setPickerOpen(true);
+      if (focusState === 'ready-selected') setPickerOpen(true);
       setTimeout(() => searchRef.current?.focus(), 0);
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [focusState]);
+  }, [focusState, status]);
 
   // RAF-driven progress arc — writes --progress onto clockRef
   useEffect(() => {
@@ -173,17 +177,14 @@ export default function Timer() {
     }
   }
 
+  // Re-run on sessionCount/status changes (see the effect above), so a completed
+  // session refreshes both the ranking and today's per-task minutes.
   async function loadRecentTasks() {
-    if (window.logAPI?.getCachedTasks) {
-      try {
-        const all = await window.logAPI.getCachedTasks();
-        const sorted = [...all]
-          .sort((a, b) => new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime())
-          .slice(0, 5);
-        setRecentTasks(sorted);
-      } catch (error) {
-        console.error('Failed to load recent tasks:', error);
-      }
+    if (!window.logAPI?.getRankedRecentTasks) return;
+    try {
+      setRecentTasks(await window.logAPI.getRankedRecentTasks(RECENT_TASKS_LIMIT, today));
+    } catch (error) {
+      console.error('Failed to load recent tasks:', error);
     }
   }
 
@@ -301,6 +302,9 @@ export default function Timer() {
   const timeStr = formatTime(remainingSeconds);
   const [timeMins, timeSecs] = timeStr.split(':');
 
+  const showIdlePicker = focusState === 'ready-empty' && status !== 'break';
+  const showCardList = focusState === 'ready-selected' && !!selectedTask && pickerOpen && status !== 'break';
+
   const activeTask: { task_id: string; title: string; project_name: string | null } | null =
     isActive && currentTaskId
       ? { task_id: currentTaskId, title: resolvedTaskName || '', project_name: null }
@@ -310,7 +314,7 @@ export default function Timer() {
     <div className="flex h-full animate-fade-in">
       {/* LEFT PANEL: Focus Panel */}
       <div className="w-1/2 flex flex-col overflow-y-auto">
-        <div className="max-w-[640px] min-w-0 mx-auto w-full px-10 pt-9 pb-8 flex flex-col gap-6">
+        <div className="max-w-[640px] min-w-0 mx-auto w-full px-10 pt-9 grow shrink-0 flex flex-col gap-6">
 
           {/* Header */}
           <div className="flex items-start justify-between">
@@ -481,16 +485,23 @@ export default function Timer() {
             <DurationSegments value={durationMinutes} onChange={handleDurationChange} />
           )}
 
-          {/* Task area */}
-          <div>
-            {focusState === 'ready-empty' && (
+          {/* Task area — while a list is showing it takes the remaining height (the list scrolls
+              inside it); flex-basis 0 keeps that height independent of how many rows match. */}
+          <div
+            className={
+              showIdlePicker ? 'flex-1 min-h-[176px] max-h-[372px] flex flex-col'
+              : showCardList ? 'flex-1 min-h-[232px] max-h-[456px] flex flex-col'
+              : undefined
+            }
+          >
+            {showIdlePicker && (
               <TaskPicker
                 recentTasks={recentTasks}
                 onSelect={handleTaskSelect}
                 searchRef={searchRef}
               />
             )}
-            {focusState === 'ready-selected' && selectedTask && (
+            {focusState === 'ready-selected' && selectedTask && status !== 'break' && (
               <>
                 <TaskCardWithPicker
                   task={selectedTask}
@@ -502,7 +513,7 @@ export default function Timer() {
                   onNoteChange={setIntention}
                   searchRef={searchRef}
                 />
-                <div className="mt-2 flex items-center justify-end">
+                <div className="shrink-0 mt-2 flex items-center justify-end">
                   <BillableToggle checked={currentBillable} onChange={setCurrentBillable} size="sm" />
                 </div>
               </>
@@ -522,8 +533,9 @@ export default function Timer() {
             )}
           </div>
 
-          {/* Action bar */}
-          <div className="flex flex-col items-center gap-3">
+          {/* Action bar — sticky so Begin Focus stays reachable when the panel scrolls;
+              the fade hides list rows sliding underneath. */}
+          <div className="sticky bottom-0 z-10 -mx-10 -mt-3 px-10 pt-3 pb-8 flex flex-col items-center gap-3 pointer-events-none bg-gradient-to-t from-drip-bg from-70% to-transparent [&>*]:pointer-events-auto">
             {focusState.startsWith('ready') && status !== 'break' && (
               <button
                 onClick={handleStart}

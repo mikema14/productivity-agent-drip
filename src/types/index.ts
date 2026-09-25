@@ -53,6 +53,12 @@ export interface TaskCache {
   last_seen_at: string;
 }
 
+/** A cached task as shown in the Timer's recent list: frecency-ordered, with today's tracked time. */
+export interface RankedTask extends TaskCache {
+  /** Minutes tracked on this task today (sessions + adhoc entries + accepted calendar events). */
+  todayMinutes: number;
+}
+
 export interface AdhocEntry {
   id: string;
   created_at: string;
@@ -281,6 +287,8 @@ export interface LogAPI {
   getCachedTask: (taskId: string) => Promise<TaskCache | null>;
   cacheTask?: (taskId: string, title: string, projectId: number, projectName: string) => Promise<void>;
   getRecentTasks: () => Promise<TaskCache[]>;
+  /** Frecency-ranked recent tasks with today's tracked minutes. `today` is YYYY-MM-DD. */
+  getRankedRecentTasks?: (limit: number, today: string) => Promise<RankedTask[]>;
   searchTasks: (query: string, limit?: number) => Promise<TaskCache[]>;
   getTemplates: () => Promise<LogTemplate[]>;
   addTemplate: (template: Omit<LogTemplate, 'id' | 'created_at'>) => Promise<string>;

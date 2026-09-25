@@ -8,6 +8,13 @@ it side-by-side. Baked screenshots in `reference/`.
 
 ## 🔴 #1 — Task picker: list is permanently expanded & not scrollable
 
+> **Superseded (2026-09, branch `feature/task-picker`):** the idle collapse
+> described below is gone. With no task selected, the recent-task list is now
+> always visible and scrolls internally (it fills the remaining panel height,
+> capped at 280 px, with a sticky Begin Focus bar). It ranks by frecency and shows
+> today's tracked time per task. The selected-task card keeps its collapse, because
+> it holds the session note, but it uses the same list component and keyboard nav.
+
 **Repro (shipped screenshot 2, Dropdown-open state):**
 - When the Focus panel first loads, the full 5-row recent-task list
   is already visible below the search input.

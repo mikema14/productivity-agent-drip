@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PomodoroSession, TimerAPI, LogAPI, AdhocEntry, CalendarProposal, CalendarFeedResult, TaskCache, ApiTestResult, IssueData, TimeEntryPayload, OverlayActionType } from '../src/types';
+import type { PomodoroSession, TimerAPI, LogAPI, AdhocEntry, CalendarProposal, CalendarFeedResult, TaskCache, RankedTask, ApiTestResult, IssueData, TimeEntryPayload, OverlayActionType } from '../src/types';
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object
@@ -310,6 +310,14 @@ const logAPI: LogAPI = {
       return result.tasks;
     }
     throw new Error(result.error || 'Failed to get recent tasks');
+  },
+
+  getRankedRecentTasks: async (limit: number, today: string): Promise<RankedTask[]> => {
+    const result = await ipcRenderer.invoke('get-ranked-recent-tasks', limit, today);
+    if (result.success) {
+      return result.tasks;
+    }
+    throw new Error(result.error || 'Failed to get ranked recent tasks');
   },
 
   searchTasks: async (query: string, limit?: number): Promise<TaskCache[]> => {

@@ -106,3 +106,46 @@ export function formatTrayTime(seconds: number): string {
 
   return formatTime(seconds);
 }
+
+/**
+ * Parse a timestamp as stored in SQLite into epoch milliseconds.
+ *
+ * The DB mixes three shapes: ISO strings from JS (`2026-09-25T08:00:00.000Z`),
+ * SQLite `datetime('now')` values (`2026-09-25 08:00:00`, UTC but without a
+ * zone marker, which `new Date()` would wrongly read as local time), and bare
+ * dates (`2026-09-25`, read as local noon). Returns NaN if unparseable.
+ */
+export function parseDbTimestamp(value: string): number {
+  const v = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return new Date(`${v}T12:00:00`).getTime();
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(v)) {
+    return new Date(`${v.replace(' ', 'T')}Z`).getTime();
+  }
+  return new Date(v).getTime();
+}
+
+/**
+ * Compact age of a timestamp: "Just now", "3h", "Yesterday", "4d".
+ */
+export function relativeTime(dateStr: string, now: number = Date.now()): string {
+  const then = parseDbTimestamp(dateStr);
+  if (Number.isNaN(then)) return '';
+  const diffMs = Math.max(0, now - then);
+  const diffH = Math.floor(diffMs / 3600000);
+  const diffD = Math.floor(diffMs / 86400000);
+  if (diffH < 1) return 'Just now';
+  if (diffH < 24) return `${diffH}h`;
+  if (diffD === 1) return 'Yesterday';
+  return `${diffD}d`;
+}
+
+/**
+ * Format a minute count as "25m", "1h", "1h 15m".
+ */
+export function formatMinutes(minutes: number): string {
+  const total = Math.round(minutes);
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+  if (hours > 0) return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  return `${mins}m`;
+}

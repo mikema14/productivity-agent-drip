@@ -4,6 +4,7 @@ import type { MergedEntry } from '../../utils/mergeEntries';
 import TaskIdInput from '../shared/TaskIdInput';
 import TaskDisplay from '../shared/TaskDisplay';
 import BillableToggle from '../shared/BillableToggle';
+import { formatMinutes as formatDuration } from '../../utils/time';
 
 interface EntryRowProps {
   entry: MergedEntry;
@@ -56,15 +57,6 @@ function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAccept, onDismiss,
   const handleCancel = () => {
     setEditedEntry(entry);
     setIsEditing(false);
-  };
-
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours > 0) {
-      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-    }
-    return `${mins}m`;
   };
 
   const getTypeBadge = () => {

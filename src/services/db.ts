@@ -2,7 +2,8 @@ import Database from 'better-sqlite3';
 import { app } from 'electron';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import type { PomodoroSession, Setting, TaskPreference, Milestone, Goal, DailyIntentions, ShutdownRitual, TaskList, ListItem } from '../types';
+import type { PomodoroSession, Setting, TaskPreference, Milestone, Goal, DailyIntentions, ShutdownRitual, TaskList, ListItem, TaskCache, RankedTask } from '../types';
+import { rankTasks, FRECENCY_WINDOW_DAYS, type TaskUsageRow } from '../utils/frecency';
 
 let db: Database.Database | null = null;
 
@@ -836,6 +837,44 @@ export function getRecentTasks() {
   `);
 
   return stmt.all();
+}
+
+/**
+ * Recent tasks for the Timer picker, ranked by frecency (see src/utils/frecency.ts)
+ * and carrying today's tracked minutes.
+ *
+ * SQL only fetches raw usage rows; scoring and the per-day sum are pure TS. A row's
+ * `day` follows the Daily Log's per-table rule (sessions: date(start_at); adhoc and
+ * calendar: their `date` column), so "today" here matches what the Daily Log shows
+ * for the same `today` string. getAllCachedTasks is untouched for its other callers.
+ */
+export function getRankedRecentTasks(limit = 20, today?: string): RankedTask[] {
+  const database = getDB();
+  const now = Date.now();
+  const day = today || new Date(now).toISOString().split('T')[0];
+  const since = new Date(now - FRECENCY_WINDOW_DAYS * 86_400_000).toISOString().split('T')[0];
+
+  const rows = database.prepare(`
+    SELECT task_id, start_at AS at, date(start_at) AS day, duration_minutes AS minutes
+      FROM pomodoro_sessions
+      WHERE task_id IS NOT NULL AND task_id != '' AND source != 'break'
+        AND date(start_at) >= @since
+    UNION ALL
+    SELECT task_id, COALESCE(start_time, date) AS at, date AS day, duration_minutes AS minutes
+      FROM adhoc_entries
+      WHERE task_id IS NOT NULL AND task_id != '' AND date >= @since
+    UNION ALL
+    SELECT task_id, start_at AS at, date AS day, duration_minutes AS minutes
+      FROM calendar_proposals
+      WHERE task_id IS NOT NULL AND task_id != '' AND accepted = 1 AND dismissed = 0
+        AND date >= @since
+  `).all({ since }) as TaskUsageRow[];
+
+  const tasks = database.prepare(`
+    SELECT task_id, title, project_id, project_name, last_seen_at FROM task_cache
+  `).all() as TaskCache[];
+
+  return rankTasks(tasks, rows, { now, today: day, limit });
 }
 
 /**
