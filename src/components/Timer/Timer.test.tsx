@@ -249,6 +249,30 @@ describe('Timer — active states', () => {
     expect(screen.getByText(/done/i)).toHaveTextContent('2/8 done');
   });
 
+  it('break with no previous session: no reserved continue slot (no layout drop vs running)', async () => {
+    window.timerAPI.getLastSessionWithTask = vi.fn(async () => null);
+    setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(), totalDuration: 300, remainingSeconds: 200, intervalId: 1 });
+    await renderTimer();
+    expect(screen.queryByTestId('continue-slot')).toBeNull();
+    expect(screen.queryByText(/continue previous/i)).toBeNull();
+  });
+
+  it('break with a previous session: the continue CTA still renders (Q6)', async () => {
+    window.timerAPI.getLastSessionWithTask = vi.fn(async () => makeSession(1, { comment: 'Yesterday work' }));
+    setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(), totalDuration: 300, remainingSeconds: 200, intervalId: 1 });
+    await renderTimer();
+    expect(await screen.findByText('Yesterday work')).toBeInTheDocument();
+    expect(screen.getByText(/continue previous/i)).toBeInTheDocument();
+  });
+
+  it('running: no continue slot', async () => {
+    window.timerAPI.getLastSessionWithTask = vi.fn(async () => makeSession(1, { comment: 'Yesterday work' }));
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, intervalId: 1 });
+    await renderTimer();
+    expect(screen.queryByTestId('continue-slot')).toBeNull();
+    expect(screen.queryByText('Yesterday work')).toBeNull();
+  });
+
   it('kickoff warmup: label reads KICKOFF · ROLLS INTO 25M and the pill says Kickoff', async () => {
     setTimer({ status: 'focus', isPaused: false, kickoff: 'warmup', sessionStartTime: new Date(), totalDuration: 120, remainingSeconds: 100, intervalId: 1, durationMinutes: 25 });
     await renderTimer();

@@ -349,8 +349,10 @@ export default function Timer({ onNavigate }: TimerProps) {
             <IntentionRow intentions={intentions} onEdit={() => setShowIntentionModal(true)} readonly={isActive} />
           )}
 
-          {/* Continue previous — the 44px slot is reserved in ready states so it never pops in */}
-          {focusState.startsWith('ready') && (
+          {/* Continue previous — the 44px slot is reserved in idle ready states so it never pops in.
+              During a break the CTA still shows when a previous session exists (Q6), but no empty
+              slot is reserved, so the focus block does not drop ~60px when a break starts. */}
+          {(readyState || (isBreak && previousSession)) && (
             <div className="h-[44px] shrink-0" data-testid="continue-slot">
               {previousSession && (
                 <ContinuePreviousCTA previous={previousSession} onContinue={handleContinuePrevious} />
