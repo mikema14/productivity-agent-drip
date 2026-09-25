@@ -24,6 +24,10 @@ interface ListsState {
   moveItem: (id: string, column: ListItemColumn, order: number) => Promise<void>;
   getItemsByColumn: (listId: string, column: ListItemColumn) => ListItem[];
   getTodayItemsAllLists: () => ListItem[];
+  /** Open (not completed, not archived) item count per list id. */
+  openCountByList: () => Record<string, number>;
+  /** Open item count across every list. */
+  openCountAll: () => number;
 }
 
 export const useListsStore = create<ListsState>((set, get) => ({
@@ -47,6 +51,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
     }
   },
 
+  /**
+   * The store always holds every list's items; `getItemsByColumn` filters by
+   * list, so both Plan scopes read the same array. `listId` is kept for
+   * callers that want a narrower load, but the Plan screen never passes one.
+   */
   loadItems: async (listId?: string) => {
     try {
       // Auto-archive old completed items
@@ -98,7 +107,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
   selectList: (id) => {
     set({ selectedListId: id });
-    if (id) get().loadItems(id);
+    get().loadItems();
   },
 
   createItem: async (item) => {
@@ -107,7 +116,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     set(s => ({ items: [...s.items, optimisticItem] }));
     try {
       await window.listsAPI.createListItem(item);
-      await get().loadItems(item.list_id);
+      await get().loadItems();
     } catch {
       set(s => ({ items: s.items.filter(i => i.id !== tempId) }));
     }
@@ -118,7 +127,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     try {
       await window.listsAPI.updateListItem(id, updates);
     } catch {
-      await get().loadItems(get().selectedListId || undefined);
+      await get().loadItems();
     }
   },
 
@@ -137,7 +146,7 @@ export const useListsStore = create<ListsState>((set, get) => ({
     try {
       await window.listsAPI.updateListItem(id, { column, order });
     } catch {
-      await get().loadItems(get().selectedListId || undefined);
+      await get().loadItems();
     }
   },
 
@@ -151,5 +160,18 @@ export const useListsStore = create<ListsState>((set, get) => ({
     return get().items
       .filter(i => i.column === 'today' && !i.archived)
       .sort((a, b) => a.order - b.order);
+  },
+
+  openCountByList: () => {
+    const counts: Record<string, number> = {};
+    for (const i of get().items) {
+      if (i.completed || i.archived) continue;
+      counts[i.list_id] = (counts[i.list_id] ?? 0) + 1;
+    }
+    return counts;
+  },
+
+  openCountAll: () => {
+    return get().items.filter(i => !i.completed && !i.archived).length;
   },
 }));

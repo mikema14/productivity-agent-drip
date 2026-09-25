@@ -58,6 +58,19 @@ export function sumMinutesForDay(rows: TaskUsageRow[], day: string): Map<string,
   return totals;
 }
 
+/**
+ * Sum of tracked minutes per task for an inclusive `YYYY-MM-DD` day range.
+ * Sibling of sumMinutesForDay; string comparison is enough for ISO dates.
+ */
+export function sumMinutesForRange(rows: TaskUsageRow[], from: string, to: string): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    if (row.day < from || row.day > to) continue;
+    totals.set(row.task_id, (totals.get(row.task_id) ?? 0) + (row.minutes || 0));
+  }
+  return totals;
+}
+
 const SCORE_EPSILON = 1e-9;
 
 function lastSeen(task: TaskCache): number {

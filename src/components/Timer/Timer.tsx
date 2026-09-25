@@ -109,6 +109,23 @@ export default function Timer({ onNavigate }: TimerProps) {
     loadBoundarySettings();
   }, []);
 
+  // Hand-off from Plan's "Start on": consume the pending selection once, exactly
+  // as picking the task in the Now aside does. Left untouched while a session runs.
+  useEffect(() => {
+    const { pendingSelection, status: current, setPendingSelection } = useTimerStore.getState();
+    if (!pendingSelection || current !== 'idle') return;
+    const { taskId, title } = pendingSelection;
+    window.logAPI.getCachedTask(taskId).then(task => {
+      if (task) {
+        setSelectedTask(task);
+      } else {
+        setSelectedTask({ task_id: taskId, title, project_id: 0, project_name: null, last_seen_at: new Date().toISOString() });
+      }
+    });
+    setIntention(title);
+    setPendingSelection(null);
+  }, []);
+
   // `/` — focus the task search from ready states (guard against input fields).
   // Only the selected-task card has a collapsed picker to open; the idle picker is always open.
   useEffect(() => {

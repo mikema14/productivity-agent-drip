@@ -3,7 +3,7 @@ import { app } from 'electron';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import type { PomodoroSession, Setting, TaskPreference, Milestone, Goal, DailyIntentions, ShutdownRitual, TaskList, ListItem, TaskCache, RankedTask } from '../types';
-import { rankTasks, FRECENCY_WINDOW_DAYS, type TaskUsageRow } from '../utils/frecency';
+import { rankTasks, sumMinutesForRange, FRECENCY_WINDOW_DAYS, type TaskUsageRow } from '../utils/frecency';
 
 let db: Database.Database | null = null;
 
@@ -849,13 +849,14 @@ export function getRecentTasks() {
  * calendar: their `date` column), so "today" here matches what the Daily Log shows
  * for the same `today` string. getAllCachedTasks is untouched for its other callers.
  */
-export function getRankedRecentTasks(limit = 20, today?: string): RankedTask[] {
+/**
+ * Raw usage rows (non-break sessions, adhoc entries, accepted calendar
+ * proposals) for tasks on or after `since` (YYYY-MM-DD). Shared by the
+ * frecency ranking and the per-range minute totals.
+ */
+function usageRowsSince(since: string): TaskUsageRow[] {
   const database = getDB();
-  const now = Date.now();
-  const day = today || new Date(now).toISOString().split('T')[0];
-  const since = new Date(now - FRECENCY_WINDOW_DAYS * 86_400_000).toISOString().split('T')[0];
-
-  const rows = database.prepare(`
+  return database.prepare(`
     SELECT task_id, start_at AS at, date(start_at) AS day, duration_minutes AS minutes
       FROM pomodoro_sessions
       WHERE task_id IS NOT NULL AND task_id != '' AND source != 'break'
@@ -870,12 +871,29 @@ export function getRankedRecentTasks(limit = 20, today?: string): RankedTask[] {
       WHERE task_id IS NOT NULL AND task_id != '' AND accepted = 1 AND dismissed = 0
         AND date >= @since
   `).all({ since }) as TaskUsageRow[];
+}
+
+export function getRankedRecentTasks(limit = 20, today?: string): RankedTask[] {
+  const database = getDB();
+  const now = Date.now();
+  const day = today || new Date(now).toISOString().split('T')[0];
+  const since = new Date(now - FRECENCY_WINDOW_DAYS * 86_400_000).toISOString().split('T')[0];
+
+  const rows = usageRowsSince(since);
 
   const tasks = database.prepare(`
     SELECT task_id, title, project_id, project_name, last_seen_at FROM task_cache
   `).all() as TaskCache[];
 
   return rankTasks(tasks, rows, { now, today: day, limit });
+}
+
+/**
+ * Tracked minutes per task id for an inclusive YYYY-MM-DD range (Plan screen
+ * card annotations and the "tracked this week" line).
+ */
+export function getTaskMinutesByRange(from: string, to: string): Record<string, number> {
+  return Object.fromEntries(sumMinutesForRange(usageRowsSince(from), from, to));
 }
 
 /**

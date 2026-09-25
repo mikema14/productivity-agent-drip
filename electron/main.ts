@@ -28,6 +28,7 @@ import {
   cacheTask,
   getRecentTasks,
   getRankedRecentTasks,
+  getTaskMinutesByRange,
   searchCachedTasks,
   getTemplates,
   addTemplate,
@@ -678,6 +679,16 @@ ipcMain.handle('get-ranked-recent-tasks', async (_event, limit: number, today: s
     return { success: true, tasks };
   } catch (error) {
     console.error('Failed to get ranked recent tasks:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('get-task-minutes-by-range', async (_event, from: string, to: string) => {
+  try {
+    const minutes = getTaskMinutesByRange(from, to);
+    return { success: true, minutes };
+  } catch (error) {
+    console.error('Failed to get task minutes by range:', error);
     return { success: false, error: (error as Error).message };
   }
 });

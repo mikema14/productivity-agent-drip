@@ -28,6 +28,17 @@ interface TimerStore extends TimerState {
   startFocus: (taskId?: string, billable?: boolean, fromOverlay?: boolean, kickoffSeconds?: number) => Promise<void>;
   startKickoff: (seconds: number) => Promise<void>;
   stopKickoff: () => Promise<void>;
+  /**
+   * A task handed over from another view (Plan's "Start on"), consumed once by
+   * the Timer on mount exactly like picking it in the Now aside. Not persisted.
+   */
+  pendingSelection: PendingSelection | null;
+  setPendingSelection: (selection: PendingSelection | null) => void;
+}
+
+export interface PendingSelection {
+  taskId: string;
+  title: string;
 }
 
 const DEFAULT_DURATION_MINUTES = 25;
@@ -119,9 +130,14 @@ export const useTimerStore = create<TimerStore>()(
       lastTaskTitle: null,
       durationMinutes: DEFAULT_DURATION_MINUTES,
       kickoff: null,
+      pendingSelection: null,
 
       setIntention: (intention: string) => {
         set({ intention });
+      },
+
+      setPendingSelection: (selection) => {
+        set({ pendingSelection: selection });
       },
 
       setTimerMode: (mode: 'pomodoro' | 'stopwatch') => {

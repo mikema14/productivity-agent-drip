@@ -4,9 +4,11 @@ interface TaskIdBadgeProps {
   taskId: string;
   taskName: string | null;
   className?: string;
+  /** Render the bare id without the `#` prefix (design rule 6; Plan surfaces). */
+  plain?: boolean;
 }
 
-export default function TaskIdBadge({ taskId, taskName, className = '' }: TaskIdBadgeProps) {
+export default function TaskIdBadge({ taskId, taskName, className = '', plain = false }: TaskIdBadgeProps) {
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const ref = useRef<HTMLSpanElement>(null);
 
@@ -29,7 +31,7 @@ export default function TaskIdBadge({ taskId, taskName, className = '' }: TaskId
       onMouseEnter={showTooltip}
       onMouseLeave={hideTooltip}
     >
-      <span className="font-mono">#{taskId}</span>
+      <span className="font-mono">{plain ? taskId : `#${taskId}`}</span>
       {tooltipPos && taskName && (
         <span
           className="fixed px-2.5 py-1.5 text-xs text-txt-primary bg-drip-elevated border border-focus/30 rounded-lg shadow-lg z-[9999] pointer-events-none animate-fade-in max-w-[280px] break-words"

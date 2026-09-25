@@ -324,6 +324,14 @@ const logAPI: LogAPI = {
     throw new Error(result.error || 'Failed to get ranked recent tasks');
   },
 
+  getTaskMinutesByRange: async (from: string, to: string): Promise<Record<string, number>> => {
+    const result = await ipcRenderer.invoke('get-task-minutes-by-range', from, to);
+    if (result.success) {
+      return result.minutes;
+    }
+    throw new Error(result.error || 'Failed to get task minutes');
+  },
+
   searchTasks: async (query: string, limit?: number): Promise<TaskCache[]> => {
     const result = await ipcRenderer.invoke('search-cached-tasks', query, limit);
     if (result.success) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rankTasks, scoreTaskUsage, sumMinutesForDay, type TaskUsageRow } from './frecency';
+import { rankTasks, scoreTaskUsage, sumMinutesForDay, sumMinutesForRange, type TaskUsageRow } from './frecency';
 import type { TaskCache } from '../types';
 
 const NOW = Date.parse('2026-09-25T12:00:00.000Z');
@@ -90,5 +90,33 @@ describe('sumMinutesForDay', () => {
     expect(totals.get('a')).toBe(55);
     expect(totals.get('b')).toBe(45);
     expect(totals.has('c')).toBe(false);
+  });
+});
+
+describe('sumMinutesForRange', () => {
+  const rows: TaskUsageRow[] = [
+    { task_id: 'a', at: '2026-09-21T08:00:00.000Z', day: '2026-09-21', minutes: 25 }, // Monday
+    { task_id: 'a', at: '2026-09-27T08:00:00.000Z', day: '2026-09-27', minutes: 30 }, // Sunday
+    { task_id: 'a', at: '2026-09-20T08:00:00.000Z', day: '2026-09-20', minutes: 60 }, // previous Sunday
+    { task_id: 'a', at: '2026-09-28T08:00:00.000Z', day: '2026-09-28', minutes: 60 }, // next Monday
+    { task_id: 'b', at: '2026-09-23', day: '2026-09-23', minutes: 45 },
+  ];
+
+  it('includes both bounds', () => {
+    const totals = sumMinutesForRange(rows, '2026-09-21', '2026-09-27');
+    expect(totals.get('a')).toBe(55);
+  });
+
+  it('ignores rows outside the range', () => {
+    const totals = sumMinutesForRange(rows, '2026-09-22', '2026-09-26');
+    expect(totals.has('a')).toBe(false);
+    expect(totals.get('b')).toBe(45);
+  });
+
+  it('sums per task', () => {
+    const totals = sumMinutesForRange(rows, '2026-09-01', '2026-09-30');
+    expect(totals.get('a')).toBe(175);
+    expect(totals.get('b')).toBe(45);
+    expect(totals.size).toBe(2);
   });
 });

@@ -19,6 +19,7 @@ function installBridgeStubs() {
     getCalendarProposals: vi.fn(async () => []),
     getAdhocEntries: vi.fn(async () => []),
     getSessions: vi.fn(async () => []),
+    getTaskMinutesByRange: vi.fn(async () => ({})),
   } as unknown as Window['logAPI'];
 
   window.timerAPI = {
@@ -59,7 +60,11 @@ function installBridgeStubs() {
     getBillableForTask: vi.fn(async () => true),
     archiveOldCompleted: vi.fn(async () => 0),
     unarchiveList: vi.fn(async () => undefined),
+    archiveList: vi.fn(async () => undefined),
+    updateList: vi.fn(async () => undefined),
+    createListItem: vi.fn(async () => 'new-id'),
     updateListItem: vi.fn(async () => undefined),
+    deleteListItem: vi.fn(async () => undefined),
   } as unknown as Window['listsAPI'];
 
   window.dashboardAPI = {

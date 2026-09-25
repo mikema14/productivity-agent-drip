@@ -327,6 +327,8 @@ export interface LogAPI {
   getRecentTasks: () => Promise<TaskCache[]>;
   /** Frecency-ranked recent tasks with today's tracked minutes. `today` is YYYY-MM-DD. */
   getRankedRecentTasks?: (limit: number, today: string) => Promise<RankedTask[]>;
+  /** Tracked minutes per task id, inclusive YYYY-MM-DD range (Plan card annotations). */
+  getTaskMinutesByRange?: (from: string, to: string) => Promise<Record<string, number>>;
   searchTasks: (query: string, limit?: number) => Promise<TaskCache[]>;
   getTemplates: () => Promise<LogTemplate[]>;
   addTemplate: (template: Omit<LogTemplate, 'id' | 'created_at'>) => Promise<string>;

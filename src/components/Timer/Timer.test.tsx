@@ -6,6 +6,7 @@ import { makeTasks } from '../../test/fixtures';
 import { setTimer, resetTimer } from '../../test/timerState';
 import { useIntentionsStore } from '../../stores/intentionsStore';
 import { useLogStore } from '../../stores/logStore';
+import { useTimerStore } from '../../stores/timerStore';
 import type { PomodoroSession } from '../../types';
 
 vi.mock('./TimerDayTimeline', () => ({ default: () => <div>TimelineStub</div> }));
@@ -130,6 +131,22 @@ describe('Timer — ready states', () => {
     expect(await within(slot).findByText('Yesterday work')).toBeInTheDocument();
     expect(within(slot).getByText('600001')).toBeInTheDocument();
     expect(within(slot).queryByText('#600001')).toBeNull();
+  });
+
+  it('consumes a pendingSelection on mount: task selected, note set, selection cleared', async () => {
+    window.logAPI.getCachedTask = vi.fn(async () => makeTasks(1)[0]);
+    setTimer({ pendingSelection: { taskId: '600001', title: 'Do X' } });
+    await renderTimer();
+    expect(await screen.findByText('Task number 1')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Session note (optional)')).toHaveValue('Do X');
+    expect(useTimerStore.getState().pendingSelection).toBeNull();
+  });
+
+  it('leaves a pendingSelection untouched while a session is running', async () => {
+    setTimer({ status: 'focus', sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, currentTaskId: '600002', pendingSelection: { taskId: '600001', title: 'Do X' } });
+    await renderTimer();
+    expect(window.logAPI.getCachedTask).not.toHaveBeenCalledWith('600001');
+    expect(useTimerStore.getState().pendingSelection).toEqual({ taskId: '600001', title: 'Do X' });
   });
 
   it('IntentionRow shows the intention with EDIT, which opens SetIntentionModal', async () => {
