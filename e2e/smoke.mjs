@@ -101,7 +101,10 @@ async function main() {
     for (const [w, h] of SIZES) {
       await app.evaluate(({ BrowserWindow }, [width, height]) => BrowserWindow.getAllWindows()[0].setSize(width, height), [w, h]);
       await page.waitForTimeout(400);
-      const shot = async (name) => (await page.waitForTimeout(350), page.screenshot)({ path: join(outDir, `${name}-${w}x${h}.png`) });
+      const shot = async (name) => {
+        await page.waitForTimeout(350); // let the view fade-in finish
+        await page.screenshot({ path: join(outDir, `${name}-${w}x${h}.png`) });
+      };
       const key = (name) => page.getByRole('button', { name, exact: false });
       const pill = () => page.getByTestId('now-pill');
       const nowStart = Date.now();
