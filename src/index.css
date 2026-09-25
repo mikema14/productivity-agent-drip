@@ -40,6 +40,11 @@
     font-weight: 500;
   }
 
+  /* Plan cards: hover actions also appear on keyboard focus inside the card */
+  .plan-card-actions {
+    @apply opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100;
+  }
+
   /* Running LED indicator */
   .led-running {
     animation: led-pulse 1.6s ease-in-out infinite;

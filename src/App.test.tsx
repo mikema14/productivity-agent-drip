@@ -10,7 +10,7 @@ vi.mock('./components/DailyLog/DailyLog', () => ({ default: () => <div>DailyLogV
 vi.mock('./components/Progress/ProgressPage', () => ({ default: () => <div>ProgressView</div> }));
 vi.mock('./components/Settings/Settings', () => ({ default: () => <div>SettingsView</div> }));
 vi.mock('./components/Lists/ListPlanningView', () => ({ default: () => <div>ListPlanningView</div> }));
-vi.mock('./components/Lists/AllListsOverview', () => ({ default: () => <div>AllListsOverview</div> }));
+vi.mock('./components/Plan/PlanBoard', () => ({ default: () => <div>AllListsOverview</div> }));
 vi.mock('./components/Lists/CreateListModal', () => ({ default: () => <div>CreateListModal</div> }));
 
 function rail() {
