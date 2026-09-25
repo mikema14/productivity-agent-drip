@@ -36,6 +36,8 @@ let screenLocked = false;
 let suspended = false;
 
 function isEnabled(): boolean {
+  // DRIP_TEST_MODE: agent/QA runs against the real database must not nudge or take over
+  if (process.env.DRIP_TEST_MODE === '1') return false;
   try {
     return getSetting('idleNudgeEnabled') !== 'false';
   } catch {

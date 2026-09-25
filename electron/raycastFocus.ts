@@ -39,6 +39,8 @@ function openInBackground(url: string): void {
 }
 
 function isEnabled(): boolean {
+  // DRIP_TEST_MODE: agent/QA runs must not start Raycast Focus on the user's Mac
+  if (process.env.DRIP_TEST_MODE === '1') return false;
   try {
     return getSetting('raycastFocusEnabled') !== 'false'
       && app.getApplicationNameForProtocol('raycast://') !== '';

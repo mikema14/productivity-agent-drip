@@ -867,6 +867,11 @@ ipcMain.handle('get-issue', async (_event, baseUrl: string, apiKey: string, issu
 
 // Post time entry
 ipcMain.handle('post-time-entry', async (_event, baseUrl: string, apiKey: string, payload: any) => {
+  // Dev builds share the real database and API key, so they must never log time to Easy8
+  if (!app.isPackaged && process.env.DRIP_ALLOW_API_WRITES !== '1') {
+    console.warn('[Safety] Blocked time-entry POST in dev build');
+    return { success: false, error: 'Blocked: posting time entries is disabled in dev builds' };
+  }
   try {
     const url = `${baseUrl}/time_entries.json`;
     console.log('Posting time entry to:', url);
