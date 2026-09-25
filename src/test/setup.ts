@@ -40,6 +40,15 @@ function installBridgeStubs() {
     showNotification: vi.fn(async () => undefined),
     showSessionOverlay: vi.fn(async () => ({ shown: false })),
     hideSessionOverlay: vi.fn(async () => undefined),
+    getDaysSinceLastLog: vi.fn(async () => null),
+    // Main-process event subscriptions registered at App boot
+    onTimerTick: vi.fn(),
+    onTimerComplete: vi.fn(),
+    onTimerExtended: vi.fn(),
+    onIdleCommand: vi.fn(),
+    onUrlStartFocus: vi.fn(),
+    onOverlayAction: vi.fn(),
+    onUrlTimerAction: vi.fn(),
   } as unknown as Window['timerAPI'];
 
   window.listsAPI = {

@@ -16,6 +16,7 @@ import CancelConfirmModal from './CancelConfirmModal';
 import SetIntentionModal from '../shared/SetIntentionModal';
 import BillableToggle from '../shared/BillableToggle';
 import type { PomodoroSession, CalendarProposal, AdhocEntry, TaskCache, RankedTask } from '../../types';
+import type { ViewId } from '../Layout/views';
 
 type FocusState = 'ready-empty' | 'ready-selected' | 'running' | 'paused';
 
@@ -25,7 +26,11 @@ const RECENT_TASKS_LIMIT = 20;
 const formatTimeRange = (date: Date) =>
   `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
 
-export default function Timer() {
+interface TimerProps {
+  onNavigate: (view: ViewId) => void;
+}
+
+export default function Timer({ onNavigate }: TimerProps) {
   const {
     status,
     remainingSeconds,
@@ -696,7 +701,7 @@ export default function Timer() {
           workdayEndTime={workdayEndTime}
           onContinue={handleBoundaryContinue}
           onCancel={() => { setShowBoundaryDialog(false); setPendingTaskId(undefined); }}
-          onOpenSettings={() => { setShowBoundaryDialog(false); window.location.hash = '#/settings'; }}
+          onOpenSettings={() => { setShowBoundaryDialog(false); setPendingTaskId(undefined); onNavigate('settings'); }}
         />
       )}
 
