@@ -265,8 +265,18 @@ Risks: `Timer.tsx` is a 718-line rewrite of JSX with an untested store behind it
 - Q2 Kickoff: accepted. The selected task wins; otherwise the task comes from `startKickoff(120)`. Kickoff bypasses the boundary check.
 - Q3 Ready-selected: accepted, conservative. The Tasks section hides once a task is selected; re-select through the card.
 - Q4 Keycaps 1-3: DROP for Phase 1. No inert affordances. They come back with Today's 3 in the task-hygiene phase.
-- Q5 Day bar: 12 segments against a constant `DAY_TARGET_MINUTES = 360`, labelled `FOCUS / 6H`. It may become a setting later.
+- Q5 Day bar: 12 segments of 30 minutes against a constant `DAY_TARGET_MINUTES = 360`, labelled `FOCUS / 6H` (owner confirmed 6h). It may become a setting later.
 - Q6 Continue CTA during break: preserve as is and flag in the report.
 - Q7 archiveOldCompleted: report, do not revert.
 - Q8 Below 1000px: accepted. Aside 280px, digits 120px, right column wraps.
 - Q9 Labels: accepted. Section headers `01 FOCUS` / `02 TASKS` / `03 DAY`; the block label row shows state + SESSION n/8.
+
+## 8. Roadmap scope (owner, 2026-09-25)
+
+Only surfaces covered by the design proposal get redesigned:
+- Phase 1: rail + Now
+- Phase 2: Plan
+- Phase 3: Review
+- Phase 4: idle nudge + Kickoff overlays
+
+Settings, Insights (Progress) and every other view are out of scope. They stay hosted unchanged behind the rail.
