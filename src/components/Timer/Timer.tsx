@@ -402,13 +402,11 @@ export default function Timer({ onNavigate }: TimerProps) {
                   searchRef={searchRef}
                   beforeNote={<DurationSegments value={durationMinutes} onChange={handleDurationChange} />}
                 />
-                {!pickerOpen && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <KeyButton variant="amber" kbd="↵" onClick={handleStart}>Begin Focus</KeyButton>
-                    <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>
-                    <BillableToggle checked={currentBillable} onChange={setCurrentBillable} size="sm" className="ml-auto" />
-                  </div>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <KeyButton variant="amber" kbd="↵" onClick={handleStart}>Begin Focus</KeyButton>
+                  <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>
+                  <BillableToggle checked={currentBillable} onChange={setCurrentBillable} size="sm" className="ml-auto" />
+                </div>
               </>
             )}
 
