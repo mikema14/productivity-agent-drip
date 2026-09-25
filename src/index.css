@@ -42,7 +42,8 @@
 
   /* Plan cards: hover actions also appear on keyboard focus inside the card */
   .plan-card-actions {
-    @apply opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100;
+    /* Hidden actions must not swallow clicks meant for the title underneath */
+    @apply opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto;
   }
 
   /* Running LED indicator */
