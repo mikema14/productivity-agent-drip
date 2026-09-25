@@ -22,7 +22,9 @@ export function optionId(listId: string, index: number): string {
   return `${listId}-opt-${index}`;
 }
 
-const kbdStyle = { background: 'oklch(1 0 0 / 0.06)', border: '0.5px solid oklch(1 0 0 / 0.08)' };
+function Kbd({ children }: { children: string }) {
+  return <kbd className="font-mono text-[11px] px-1 py-0.5 rounded-[2px] border border-drip-border bg-drip-surface">{children}</kbd>;
+}
 
 export default function TaskResultList({
   id, tasks, query, isSearching, highlighted, scrollTick, onHover, onSelect, currentTaskId,
@@ -42,12 +44,10 @@ export default function TaskResultList({
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* Label row - always rendered so its height never pops in or out */}
-      <div
-        className="shrink-0 px-4 h-6 flex items-center font-medium uppercase text-focus"
-        style={{ fontSize: '10.5px', letterSpacing: '0.08em' }}
-        aria-live="polite"
-      >
-        {label}
+      <div className="shrink-0 px-3 h-8 flex items-center gap-2.5" aria-live="polite">
+        <span className={`now-label ${trimmed ? 'text-txt-muted' : 'text-focus'}`}>{label}</span>
+        <span className="flex-1 border-t border-drip-border" />
+        {!trimmed && <span className="font-display text-[11px] text-txt-muted">by frequency</span>}
       </div>
 
       <div
@@ -55,7 +55,7 @@ export default function TaskResultList({
         id={id}
         role="listbox"
         aria-label="Tasks"
-        className="picker-list flex-1 min-h-0 px-2 pb-2"
+        className="picker-list flex-1 min-h-0 px-1 pb-1"
         style={{ maxHeight: 280, overflowY: 'auto' }}
       >
         {tasks.length > 0 ? (
@@ -74,30 +74,22 @@ export default function TaskResultList({
                 // Keep focus in the search input so keyboard nav continues after a click
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => onSelect(task)}
-                className="relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 py-1 pr-2 rounded-[9px] cursor-pointer transition-colors duration-150"
-                style={{
-                  paddingLeft: isCurrent ? 15 : 8,
-                  background: isHighlighted ? 'oklch(1 0 0 / 0.05)' : 'transparent',
-                }}
+                className={`relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 py-1.5 pr-3 rounded-[2px] border cursor-pointer transition-colors duration-150 ${
+                  isHighlighted ? 'bg-focus/[0.06] border-focus/30' : 'border-transparent'
+                }`}
+                style={{ paddingLeft: isCurrent ? 15 : 12 }}
               >
                 {isCurrent && (
-                  <span
-                    aria-hidden
-                    className="absolute left-0 top-1/2 -translate-y-1/2"
-                    style={{ width: 3, height: 28, background: '#f59e0b', borderRadius: '0 2px 2px 0' }}
-                  />
+                  <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-7 bg-focus" />
                 )}
-                <span
-                  className="font-mono text-[12px] leading-4 text-focus rounded-full px-2 py-0.5"
-                  style={{ background: 'oklch(0.78 0.14 70 / 0.15)' }}
-                >
+                <span className="font-mono text-[12px] leading-4 text-focus bg-focus/10 rounded-[2px] px-1.5 py-0.5">
                   {task.task_id}
                 </span>
-                <span className="text-[13px] leading-4 text-txt-secondary truncate" title={task.title}>
+                <span className="text-[13px] leading-4 text-txt-primary truncate" title={task.title}>
                   {task.title}
                 </span>
                 {today > 0 ? (
-                  <span className="font-mono text-[11px] leading-4 text-txt-secondary" title="Tracked today">
+                  <span className="font-mono text-[11px] leading-4 text-txt-primary" title="Tracked today">
                     {formatMinutes(today)}
                   </span>
                 ) : (
@@ -117,12 +109,12 @@ export default function TaskResultList({
           <div className="px-2 py-3 text-[13px] text-txt-muted text-center">
             No matching tasks.{' '}
             {/^\d+$/.test(trimmed) && (
-              <span>Press <kbd className="font-mono text-[11px] px-1 py-0.5 rounded" style={kbdStyle}>Enter</kbd> to fetch</span>
+              <span>Press <Kbd>Enter</Kbd> to fetch</span>
             )}
           </div>
         ) : (
           <div className="px-2 py-3 text-[13px] text-txt-muted text-center">
-            No recent tasks. Type a task ID and press <kbd className="font-mono text-[11px] px-1 py-0.5 rounded" style={kbdStyle}>Enter</kbd>.
+            No recent tasks. Type a task ID and press <Kbd>Enter</Kbd>.
           </div>
         )}
       </div>

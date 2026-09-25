@@ -1,7 +1,6 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { useTimerStore } from '../../stores/timerStore';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { useTimerStore, KICKOFF_SECONDS } from '../../stores/timerStore';
 import { useIntentionsStore } from '../../stores/intentionsStore';
-import { formatTime } from '../../utils/time';
 import { useTaskName } from '../../hooks/useTaskName';
 import TimerDayTimeline from './TimerDayTimeline';
 import BoundaryConfirmDialog from './BoundaryConfirmDialog';
@@ -11,6 +10,10 @@ import TaskPicker from './TaskPicker';
 import TaskCard from './TaskCard';
 import TaskCardWithPicker from './TaskCardWithPicker';
 import IntentionRow from './IntentionRow';
+import NowHeader, { type NowPillState } from './NowHeader';
+import FocusBlock, { SectionHeader } from './FocusBlock';
+import CountdownDisplay from './CountdownDisplay';
+import KeyButton from './KeyButton';
 import ContinuePreviousCTA from './ContinuePreviousCTA';
 import CancelConfirmModal from './CancelConfirmModal';
 import SetIntentionModal from '../shared/SetIntentionModal';
@@ -53,6 +56,7 @@ export default function Timer({ onNavigate }: TimerProps) {
     currentBillable,
     setCurrentBillable,
     kickoff,
+    startKickoff,
   } = useTimerStore();
 
   const today = new Date().toISOString().split('T')[0];
@@ -122,6 +126,23 @@ export default function Timer({ onNavigate }: TimerProps) {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [focusState, status]);
+
+  // Enter = Begin Focus, only with a task selected, nothing open and no field focused.
+  const anyModalOpen = showBoundaryDialog || showIntentionModal || showCancelConfirm;
+  const handleStartRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      if (focusState !== 'ready-selected' || status !== 'idle' || pickerOpen || anyModalOpen) return;
+      const el = document.activeElement as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
+      e.preventDefault();
+      handleStartRef.current();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [focusState, status, pickerOpen, anyModalOpen]);
 
   // RAF-driven progress arc — writes --progress onto clockRef
   useEffect(() => {
@@ -224,6 +245,16 @@ export default function Timer({ onNavigate }: TimerProps) {
 
     startFocus(taskId, currentBillable);
   };
+  handleStartRef.current = handleStart;
+
+  // Q2: the selected task wins; otherwise the store resolves one. No boundary check.
+  const handleKickoff = () => {
+    if (selectedTask) {
+      startFocus(selectedTask.task_id, currentBillable, false, KICKOFF_SECONDS);
+    } else {
+      startKickoff(KICKOFF_SECONDS);
+    }
+  };
 
   const handleContinuePrevious = async () => {
     if (!previousSession) return;
@@ -272,44 +303,32 @@ export default function Timer({ onNavigate }: TimerProps) {
     setDurationMinutes(minutes);
   };
 
-  // Clock constants
-  const ringSize = 320;
-  const ringRadius = 146;
-  const cx = ringSize / 2;
-  const cy = ringSize / 2;
+  const isBreak = status === 'break';
+  const isKickoff = isActive && kickoff === 'warmup';
+  const readyState = focusState.startsWith('ready') && !isBreak;
 
-  // Tick marks — inward-facing, majors clearly stronger than minors
-  const tickMarks = useMemo(() => {
-    const outerR = ringRadius - 2;
-    return Array.from({ length: 60 }).map((_, i) => {
-      const angle = (i * 6 - 90) * (Math.PI / 180);
-      const isHour = i % 5 === 0;
-      const innerR = outerR - (isHour ? 11 : 6);
-      return (
-        <line
-          key={i}
-          x1={cx + innerR * Math.cos(angle)}
-          y1={cy + innerR * Math.sin(angle)}
-          x2={cx + outerR * Math.cos(angle)}
-          y2={cy + outerR * Math.sin(angle)}
-          stroke={isHour ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.22)'}
-          strokeWidth={isHour ? 1.5 : 1}
-          strokeLinecap="round"
-        />
-      );
-    });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const pillState: NowPillState =
+    isKickoff ? 'kickoff'
+    : focusState === 'running' ? 'focusing'
+    : focusState === 'paused' ? 'paused'
+    : isBreak ? 'break'
+    : 'ready';
 
-  const ringColor = status === 'break' ? '#34d399' : '#f59e0b';
-  const glowColor = status === 'break' ? 'rgba(52, 211, 153, 0.2)' : 'rgba(245, 158, 11, 0.15)';
+  const sessionWindow = sessionStartTime && estimatedEnd
+    ? `${formatTimeRange(sessionStartTime)} → ${formatTimeRange(estimatedEnd)}`
+    : '';
+  const countdownLabel =
+    isKickoff ? `KICKOFF · ROLLS INTO ${durationMinutes}M`
+    : focusState === 'running' ? `FOCUS · ${sessionWindow}`
+    : focusState === 'paused' ? `PAUSED · ${sessionWindow}`
+    : isBreak ? `BREAK · ${sessionWindow}`
+    : 'READY';
 
-  const pillLabel = focusState === 'running' ? 'Focusing' : focusState === 'paused' ? 'Paused' : 'Ready';
+  const tone = isBreak ? 'emerald' : 'amber';
+  const topRule = isBreak ? 'emerald' : focusState === 'paused' ? 'dim' : 'amber';
+  const rulerMinutes = readyState ? durationMinutes : Math.max(1, Math.round(totalDuration / 60));
 
-  const timeStr = formatTime(remainingSeconds);
-  const [timeMins, timeSecs] = timeStr.split(':');
-
-  const showIdlePicker = focusState === 'ready-empty' && status !== 'break';
-  const showCardList = focusState === 'ready-selected' && !!selectedTask && pickerOpen && status !== 'break';
+  const showIdlePicker = focusState === 'ready-empty' && !isBreak;
 
   const activeTask: { task_id: string; title: string; project_name: string | null } | null =
     isActive && currentTaskId
@@ -317,199 +336,62 @@ export default function Timer({ onNavigate }: TimerProps) {
       : null;
 
   return (
-    <div className="flex h-full animate-fade-in">
-      {/* LEFT PANEL: Focus Panel */}
-      <div className="w-1/2 flex flex-col overflow-y-auto">
-        <div className="max-w-[640px] min-w-0 mx-auto w-full px-10 pt-9 grow shrink-0 flex flex-col gap-6">
+    <div className="flex flex-col h-full animate-fade-in">
+      <NowHeader state={pillState} />
 
-          {/* Header */}
-          <div className="flex items-start justify-between">
-            <div>
-              <h1
-                className="font-display font-semibold text-txt-primary truncate max-w-[320px]"
-                style={{ fontSize: 22, letterSpacing: '-0.02em' }}
-              >
-                {isActive ? (kickoff === 'warmup' ? 'Kickoff' : 'Deep work') : status === 'break' ? 'Break' : 'Focus'}
-              </h1>
-              <p className="text-txt-muted mt-0.5 font-display" style={{ fontSize: 13 }}>
-                {isActive
-                  ? kickoff === 'warmup'
-                    ? `Rolls into ${durationMinutes}m`
-                    : `Session ${sessionCount + 1} of 8`
-                  : status === 'break' ? 'Take a breather'
-                  : 'Start your session'}
-              </p>
-            </div>
-            {/* State pill */}
-            <div className={`inline-flex items-center h-7 gap-2 px-3 rounded-full text-[12px] font-medium tracking-[0.02em] ${
-              focusState === 'running' || focusState === 'paused'
-                ? 'bg-focus/[0.18] text-focus'
-                : 'bg-white/[0.06] border border-white/[0.12] text-txt-secondary'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                focusState === 'running' ? 'bg-focus led-running' :
-                focusState === 'paused' ? 'bg-focus' :
-                'bg-txt-muted'
-              }`} />
-              {pillLabel}
-            </div>
-          </div>
+      <div className="flex-1 min-h-0 flex">
+        {/* MAIN COLUMN */}
+        <div className="flex-1 min-w-0 flex flex-col gap-4 px-7 py-5 overflow-y-auto">
 
           {/* Intention row */}
-          {status !== 'break' && (
+          {!isBreak && (
             <IntentionRow intentions={intentions} onEdit={() => setShowIntentionModal(true)} readonly={isActive} />
           )}
 
-          {/* Continue previous CTA */}
-          {focusState.startsWith('ready') && previousSession && (
-            <ContinuePreviousCTA previous={previousSession} onContinue={handleContinuePrevious} />
-          )}
-
-          {/* Clock — 320×320 layered container */}
-          <div className="flex flex-col items-center">
-            <div
-              ref={clockRef}
-              className="relative mx-auto"
-              style={{
-                width: ringSize,
-                height: ringSize,
-                '--arc-color': ringColor,
-              } as React.CSSProperties}
-            >
-              {/* Layer 1: Ambient glow */}
-              <div
-                className="absolute rounded-full blur-3xl pointer-events-none animate-glow-breathe"
-                style={{ inset: 20, backgroundColor: glowColor }}
-              />
-
-              {/* Layer 2: Solid primary ring — always-visible boundary */}
-              <div
-                className="absolute rounded-full pointer-events-none"
-                style={{
-                  inset: 0,
-                  border: isActive
-                    ? `1px solid ${status === 'break' ? 'oklch(0.72 0.18 160 / 0.35)' : 'oklch(0.78 0.14 70 / 0.35)'}`
-                    : '1px solid oklch(1 0 0 / 0.14)',
-                  boxShadow: isActive
-                    ? (status === 'break'
-                        ? '0 0 48px oklch(0.72 0.18 160 / 0.12)'
-                        : '0 0 48px oklch(0.78 0.14 70 / 0.12)')
-                    : undefined,
-                }}
-              />
-
-              {/* Layer 3: Progress arc — RAF-driven via --progress CSS var */}
-              <div
-                className="absolute rounded-full pointer-events-none"
-                style={{
-                  inset: 0,
-                  background: 'conic-gradient(from -90deg, var(--arc-color) calc(var(--progress, 0) * 360deg), transparent 0)',
-                  WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px) calc(100% - 0.5px), transparent calc(100% - 0.25px))',
-                  mask: 'radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px) calc(100% - 0.5px), transparent calc(100% - 0.25px))',
-                  opacity: isActive ? 1 : 0,
-                  transition: 'opacity 200ms',
-                }}
-              />
-
-              {/* Layer 4: SVG tick marks */}
-              <svg
-                width={ringSize}
-                height={ringSize}
-                className="absolute inset-0 pointer-events-none"
-              >
-                {tickMarks}
-              </svg>
-
-              {/* Layer 5: Content — digits + session window + dots inside ring */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                {/* +5 min capsule — running only */}
-                {focusState === 'running' && (
-                  <button
-                    onClick={() => extendSession(5)}
-                    className="text-[11px] font-medium text-txt-secondary transition-all duration-150 hover:text-txt-primary"
-                    style={{
-                      height: 24,
-                      padding: '0 10px',
-                      borderRadius: 999,
-                      background: 'oklch(1 0 0 / 0.06)',
-                      border: '0.5px solid oklch(1 0 0 / 0.1)',
-                      marginBottom: 6,
-                    }}
-                  >
-                    +5 min
-                  </button>
-                )}
-
-                {/* Session window */}
-                {isActive && sessionStartTime && estimatedEnd && (
-                  <span
-                    className="font-mono text-txt-muted"
-                    style={{ fontSize: '11.5px', letterSpacing: '0.04em', marginBottom: 4 }}
-                  >
-                    {formatTimeRange(sessionStartTime)}
-                    {' '}
-                    <span style={{ opacity: 0.55 }}>→</span>
-                    {' '}
-                    {formatTimeRange(estimatedEnd)}
-                  </span>
-                )}
-
-                {/* Timer digits */}
-                <div
-                  role="timer"
-                  aria-label="Time remaining"
-                  className="flex items-baseline leading-none"
-                >
-                  <span className="focus-timer-display">{timeMins}</span>
-                  <span className={`focus-timer-display ${focusState === 'running' ? 'colon-blink' : ''}`}>:</span>
-                  <span className="focus-timer-display">{timeSecs}</span>
-                </div>
-
-                {/* Session dots — inside ring, below digits */}
-                <div className="flex items-center gap-1.5" style={{ marginTop: 12 }}>
-                  {Array.from({ length: 8 }).map((_, i) => {
-                    const isCompleted = i < sessionCount;
-                    const isCurrent = i === sessionCount && focusState === 'running';
-                    return (
-                      <div
-                        key={i}
-                        className="rounded-full transition-all duration-300"
-                        style={{
-                          width: 4,
-                          height: 4,
-                          background: isCompleted || isCurrent ? '#f59e0b' : 'rgba(255,255,255,0.24)',
-                          boxShadow: isCurrent ? '0 0 0 2.5px rgba(245,158,11,0.2)' : undefined,
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
+          {/* Continue previous — the 44px slot is reserved in ready states so it never pops in */}
+          {focusState.startsWith('ready') && (
+            <div className="h-[44px] shrink-0" data-testid="continue-slot">
+              {previousSession && (
+                <ContinuePreviousCTA previous={previousSession} onContinue={handleContinuePrevious} />
+              )}
             </div>
-          </div>
-
-          {/* Duration segments — ready states only */}
-          {focusState.startsWith('ready') && status !== 'break' && (
-            <DurationSegments value={durationMinutes} onChange={handleDurationChange} />
           )}
 
-          {/* Task area — while a list is showing it takes the remaining height (the list scrolls
-              inside it); flex-basis 0 keeps that height independent of how many rows match. */}
-          <div
-            className={
-              showIdlePicker ? 'flex-1 min-h-[176px] max-h-[372px] flex flex-col'
-              : showCardList ? 'flex-1 min-h-[232px] max-h-[456px] flex flex-col'
-              : undefined
+          <SectionHeader>01 Focus</SectionHeader>
+
+          <FocusBlock
+            topRule={topRule}
+            countdown={
+              <CountdownDisplay
+                label={countdownLabel}
+                sessionCount={sessionCount}
+                sessionLabel={isBreak ? 'done' : 'next'}
+                currentGlows={focusState === 'running'}
+                remainingSeconds={remainingSeconds}
+                running={focusState === 'running'}
+                paused={focusState === 'paused'}
+                tone={tone}
+                rulerMinutes={rulerMinutes}
+                elapsedSeconds={isActive || isBreak ? elapsedSeconds : 0}
+                active={isActive}
+                rulerRef={clockRef}
+              />
             }
           >
-            {showIdlePicker && (
-              <TaskPicker
-                recentTasks={recentTasks}
-                onSelect={handleTaskSelect}
-                searchRef={searchRef}
-              />
+            {/* ready-empty */}
+            {focusState === 'ready-empty' && !isBreak && (
+              <>
+                <p className="font-display text-[15px] text-txt-muted">Pick a task below</p>
+                <DurationSegments value={durationMinutes} onChange={handleDurationChange} />
+                <div className="flex flex-wrap gap-2">
+                  <KeyButton variant="amber" kbd="↵" disabled onClick={handleStart}>Begin Focus</KeyButton>
+                  <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>
+                </div>
+              </>
             )}
-            {focusState === 'ready-selected' && selectedTask && status !== 'break' && (
+
+            {/* ready-selected */}
+            {focusState === 'ready-selected' && selectedTask && !isBreak && (
               <>
                 <TaskCardWithPicker
                   task={selectedTask}
@@ -520,179 +402,111 @@ export default function Timer({ onNavigate }: TimerProps) {
                   onSelectTask={(t) => { setSelectedTask(t); setPickerOpen(false); }}
                   onNoteChange={setIntention}
                   searchRef={searchRef}
+                  beforeNote={<DurationSegments value={durationMinutes} onChange={handleDurationChange} />}
                 />
-                <div className="shrink-0 mt-2 flex items-center justify-end">
-                  <BillableToggle checked={currentBillable} onChange={setCurrentBillable} size="sm" />
+                {!pickerOpen && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <KeyButton variant="amber" kbd="↵" onClick={handleStart}>Begin Focus</KeyButton>
+                    <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>
+                    <BillableToggle checked={currentBillable} onChange={setCurrentBillable} size="sm" className="ml-auto" />
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* running / paused / kickoff */}
+            {isActive && (
+              <>
+                {activeTask ? (
+                  <TaskCard task={activeTask} note={intention} isReadonly={true} />
+                ) : intention ? (
+                  <p className="text-[13px] text-txt-secondary border-l-2 border-drip-border pl-3">{intention}</p>
+                ) : (
+                  <p className="font-display text-[15px] text-txt-muted">No task attached</p>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {focusState === 'paused' ? (
+                    <KeyButton variant="amber" onClick={() => resume()}>Resume</KeyButton>
+                  ) : (
+                    <KeyButton variant="outline" onClick={() => pause()}>Pause</KeyButton>
+                  )}
+                  <KeyButton variant="outline" onClick={handleFinish}>Finish</KeyButton>
+                  <KeyButton variant="danger" onClick={handleCancelClick}>Cancel</KeyButton>
+                  {focusState === 'running' && (
+                    <KeyButton variant="ghost" size="sm" className="ml-auto" onClick={() => extendSession(5)}>+5 min</KeyButton>
+                  )}
                 </div>
               </>
             )}
-            {isActive && (
-              activeTask ? (
-                <TaskCard
-                  task={activeTask}
-                  note={intention}
-                  isReadonly={true}
-                />
-              ) : intention ? (
-                <div className="px-4 py-3 bg-focus/5 border border-focus/20 rounded-2xl">
-                  <p className="text-sm text-txt-secondary">{intention}</p>
+
+            {/* break */}
+            {isBreak && (
+              <>
+                <p className="font-display text-[15px] text-txt-muted">Take a breather</p>
+                <div className="flex gap-2">
+                  <KeyButton variant="outline" onClick={() => skip()}>Skip Break</KeyButton>
                 </div>
-              ) : null
+              </>
             )}
-          </div>
+          </FocusBlock>
 
-          {/* Action bar — sticky so Begin Focus stays reachable when the panel scrolls;
-              the fade hides list rows sliding underneath. */}
-          <div className="sticky bottom-0 z-10 -mx-10 -mt-3 px-10 pt-3 pb-8 flex flex-col items-center gap-3 pointer-events-none bg-gradient-to-t from-drip-bg from-70% to-transparent [&>*]:pointer-events-auto">
-            {focusState.startsWith('ready') && status !== 'break' && (
+          {/* 02 TASKS — idle picker only; once a task is selected re-selection goes through the card (Q3) */}
+          {showIdlePicker && (
+            <div className="flex-1 min-h-[176px] max-h-[420px] flex flex-col gap-3">
+              <SectionHeader>02 Tasks</SectionHeader>
+              <TaskPicker
+                recentTasks={recentTasks}
+                onSelect={handleTaskSelect}
+                searchRef={searchRef}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* ASIDE: Day Timeline or Task List */}
+        <aside aria-label="Day" className="w-[280px] wide:w-[340px] shrink-0 border-l border-drip-elevated relative overflow-hidden flex flex-col">
+          <div className="px-4 pt-3 pb-1 flex justify-end">
+            <div className="inline-flex border border-drip-border">
               <button
-                onClick={handleStart}
-                disabled={focusState === 'ready-empty'}
-                className="font-display flex items-center gap-1.5 transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed"
-                style={{
-                  height: 40,
-                  padding: '0 16px',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  borderRadius: 10,
-                  background: '#f59e0b',
-                  opacity: focusState === 'ready-empty' ? 0.4 : 1,
-                  color: 'oklch(0.18 0.01 60)',
-                  boxShadow: focusState === 'ready-empty'
-                    ? 'none'
-                    : 'inset 0 1px 0 oklch(1 0 0 / 0.25), 0 8px 20px -8px rgba(245,158,11,0.55)',
-                  cursor: focusState === 'ready-empty' ? 'not-allowed' : 'pointer',
-                }}
+                onClick={() => setRightPanel('timeline')}
+                className={`px-3 h-7 now-label transition-colors ${
+                  rightPanel === 'timeline' ? 'bg-focus text-drip-bg' : 'text-txt-muted hover:text-txt-primary hover:bg-focus/5'
+                }`}
               >
-                <svg width="10" height="11" viewBox="0 0 10 11" fill="currentColor">
-                  <path d="M0 1.5v8l8-4-8-4z" />
-                </svg>
-                Begin Focus
+                Timeline
               </button>
-            )}
-
-            {status === 'break' && (
-              <div className="flex items-center gap-3 justify-center">
-                <button
-                  onClick={() => skip()}
-                  className="flex items-center gap-2 px-5 h-11 bg-transparent border border-focus/20
-                             text-txt-muted text-sm font-display rounded-xl
-                             hover:bg-focus/5 hover:text-txt-secondary transition-all duration-150"
-                >
-                  Skip Break
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            )}
-
-            {isActive && (
-              <div className="flex justify-center gap-3">
-                {focusState === 'paused' ? (
-                  <button
-                    onClick={() => resume()}
-                    className="flex items-center justify-center gap-2 bg-focus/15 border border-focus/25
-                               text-focus text-sm font-display rounded-xl
-                               hover:bg-focus/20 transition-all duration-150 active:scale-[0.98]"
-                    style={{ height: 44, padding: '0 18px' }}
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                    Resume
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => pause()}
-                    className="flex items-center justify-center gap-2 bg-white/[0.04] border border-white/[0.08]
-                               text-txt-muted text-sm font-display rounded-xl
-                               hover:bg-white/[0.08] hover:text-txt-secondary transition-all duration-150"
-                    style={{ height: 44, padding: '0 18px' }}
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
-                    </svg>
-                    Pause
-                  </button>
-                )}
-
-                <button
-                  onClick={handleFinish}
-                  className="flex items-center justify-center gap-1.5 bg-white/[0.04] border border-white/[0.08]
-                             text-txt-muted text-sm font-display rounded-xl
-                             hover:bg-white/[0.08] hover:text-txt-secondary transition-all duration-150"
-                  style={{ height: 44, padding: '0 18px' }}
-                >
-                  Finish
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 3l4 4-4 4" />
-                  </svg>
-                </button>
-
-                <button
-                  onClick={handleCancelClick}
-                  className="flex items-center justify-center gap-1.5 bg-white/[0.04] border border-white/[0.08]
-                             text-txt-muted text-sm font-display rounded-xl
-                             hover:bg-red-400/[0.12] hover:text-red-400 hover:border-red-400/30 transition-all duration-150"
-                  style={{ height: 44, padding: '0 18px' }}
-                >
-                  <span className="text-xs">✕</span>
-                  Cancel
-                </button>
-              </div>
-            )}
+              <button
+                onClick={() => setRightPanel('tasks')}
+                className={`px-3 h-7 now-label border-l border-drip-border transition-colors ${
+                  rightPanel === 'tasks' ? 'bg-focus text-drip-bg' : 'text-txt-muted hover:text-txt-primary hover:bg-focus/5'
+                }`}
+              >
+                Tasks
+              </button>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* RIGHT PANEL: Day Timeline or Task List */}
-      <div className="w-1/2 relative overflow-hidden flex flex-col">
-        <div className="px-4 pt-3 pb-1 flex justify-end">
-          <div className="inline-flex rounded-xl border border-focus/30 bg-transparent p-1">
-            <button
-              onClick={() => setRightPanel('timeline')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
-                rightPanel === 'timeline'
-                  ? 'bg-focus/15 text-focus border border-focus/30'
-                  : 'text-txt-secondary hover:text-txt-primary hover:bg-focus/5'
-              }`}
-            >
-              Timeline
-            </button>
-            <button
-              onClick={() => setRightPanel('tasks')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
-                rightPanel === 'tasks'
-                  ? 'bg-focus/15 text-focus border border-focus/30'
-                  : 'text-txt-secondary hover:text-txt-primary hover:bg-focus/5'
-              }`}
-            >
-              Tasks
-            </button>
-          </div>
-        </div>
-
-        {rightPanel === 'timeline' ? (
-          <div className="flex-1 relative overflow-hidden">
-            <TimerDayTimeline sessions={sessions} calendarProposals={calendarProposals} adhocEntries={adhocEntries} onRefresh={loadSessions} />
-          </div>
-        ) : (
-          <TimerTaskList
-            onSelectTask={(taskId, itemTitle) => {
-              if (taskId) {
-                window.logAPI.getCachedTask(taskId).then(task => {
-                  if (task) {
-                    setSelectedTask(task);
-                  } else {
-                    setSelectedTask({ task_id: taskId, title: itemTitle, project_id: 0, project_name: null, last_seen_at: new Date().toISOString() });
-                  }
-                });
-              }
-              setIntention(itemTitle);
-            }}
-          />
-        )}
+          {rightPanel === 'timeline' ? (
+            <div className="flex-1 relative overflow-hidden">
+              <TimerDayTimeline sessions={sessions} calendarProposals={calendarProposals} adhocEntries={adhocEntries} onRefresh={loadSessions} />
+            </div>
+          ) : (
+            <TimerTaskList
+              onSelectTask={(taskId, itemTitle) => {
+                if (taskId) {
+                  window.logAPI.getCachedTask(taskId).then(task => {
+                    if (task) {
+                      setSelectedTask(task);
+                    } else {
+                      setSelectedTask({ task_id: taskId, title: itemTitle, project_id: 0, project_name: null, last_seen_at: new Date().toISOString() });
+                    }
+                  });
+                }
+                setIntention(itemTitle);
+              }}
+            />
+          )}
+        </aside>
       </div>
 
       {/* Modals */}

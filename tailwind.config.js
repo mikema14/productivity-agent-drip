@@ -8,6 +8,10 @@ export default {
   ],
   theme: {
     extend: {
+      screens: {
+        // Now screen: the aside narrows and the focus block's right column wraps below this
+        wide: '1000px',
+      },
       fontFamily: {
         display: ['Outfit', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'Menlo', 'monospace'],

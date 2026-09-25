@@ -9,6 +9,15 @@ interface Props {
   searchRef?: React.RefObject<HTMLInputElement>;
 }
 
+function SearchIcon() {
+  return (
+    <svg className="w-3.5 h-3.5 text-txt-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 16 16" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="M10.5 10.5L14 14" />
+    </svg>
+  );
+}
+
 /**
  * Idle task picker: search input plus an always-visible, scrollable task list.
  * It fills whatever height its parent gives it; the list scrolls internally.
@@ -31,21 +40,9 @@ export default function TaskPicker({ recentTasks, onSelect, searchRef }: Props) 
   };
 
   return (
-    <div
-      className="flex-1 min-h-0 flex flex-col rounded-[14px] overflow-hidden"
-      style={{
-        background: 'oklch(1 0 0 / 0.03)',
-        border: '0.5px solid oklch(1 0 0 / 0.08)',
-      }}
-    >
-      <div
-        className="shrink-0 m-2 flex items-center gap-2 px-3 rounded-[10px]"
-        style={{ height: 40, background: 'oklch(1 0 0 / 0.05)' }}
-      >
-        <svg className="w-4 h-4 text-txt-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-          <circle cx="11" cy="11" r="7" strokeWidth="1.8" />
-          <line x1="16.5" y1="16.5" x2="22" y2="22" strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
+    <div className="flex-1 min-h-0 flex flex-col border border-drip-elevated p-2 overflow-hidden">
+      <div className="shrink-0 flex items-center gap-2.5 px-3 h-10 rounded-[2px] bg-drip-surface">
+        <SearchIcon />
         <input
           ref={inputRef}
           value={nav.query}
@@ -65,6 +62,7 @@ export default function TaskPicker({ recentTasks, onSelect, searchRef }: Props) 
         <span className="w-14 shrink-0 text-right text-[11px] text-txt-muted animate-pulse" aria-hidden={!nav.isFetching}>
           {nav.isFetching ? 'Fetching…' : ''}
         </span>
+        <kbd aria-hidden className="font-mono text-[11px] text-txt-secondary border border-drip-border rounded-[2px] px-1.5 leading-4">/</kbd>
       </div>
 
       <TaskResultList

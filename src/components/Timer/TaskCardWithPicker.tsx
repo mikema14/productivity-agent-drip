@@ -1,4 +1,4 @@
-import { useRef, useEffect, useId } from 'react';
+import { useRef, useEffect, useId, type ReactNode } from 'react';
 import { useTimerStore } from '../../stores/timerStore';
 import { useTaskPickerNav } from '../../hooks/useTaskPickerNav';
 import TaskResultList, { optionId } from './TaskResultList';
@@ -13,14 +13,8 @@ interface Props {
   onSelectTask: (task: TaskCache) => void;
   onNoteChange: (note: string) => void;
   searchRef: React.RefObject<HTMLInputElement>;
-}
-
-function NoteIcon({ className }: { className?: string }) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M2 10.5V2.5a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5H4l-2 2z" />
-    </svg>
-  );
+  /** Rendered between the id row and the note input when collapsed (the duration strip). */
+  beforeNote?: ReactNode;
 }
 
 function DownChevron() {
@@ -31,8 +25,17 @@ function DownChevron() {
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg className="w-3.5 h-3.5 text-txt-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 16 16" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="M10.5 10.5L14 14" />
+    </svg>
+  );
+}
+
 export default function TaskCardWithPicker({
-  task, note, recentTasks, pickerOpen, onToggle, onSelectTask, onNoteChange, searchRef,
+  task, note, recentTasks, pickerOpen, onToggle, onSelectTask, onNoteChange, searchRef, beforeNote,
 }: Props) {
   const { sessionCount } = useTimerStore();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -78,11 +81,7 @@ export default function TaskCardWithPicker({
   return (
     <div
       ref={containerRef}
-      className={`rounded-[14px] overflow-hidden ${pickerOpen ? 'flex-1 min-h-0 flex flex-col' : ''}`}
-      style={{
-        background: 'oklch(1 0 0 / 0.03)',
-        border: '0.5px solid oklch(1 0 0 / 0.08)',
-      }}
+      className={`flex flex-col gap-3 ${pickerOpen ? 'flex-1 min-h-0' : ''}`}
     >
       {/* Row 1: clickable id row — always visible, chevron rotates when open */}
       <div
@@ -91,39 +90,28 @@ export default function TaskCardWithPicker({
         onClick={onToggle}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
         aria-expanded={pickerOpen}
-        className="shrink-0 m-2 flex items-center gap-2 px-3 rounded-[10px] cursor-pointer hover:bg-white/[0.02] transition-colors"
-        style={{
-          height: 40,
-          background: 'oklch(1 0 0 / 0.05)',
-          border: '0.5px solid oklch(1 0 0 / 0.06)',
-        }}
+        className="shrink-0 flex flex-col gap-1 cursor-pointer group"
       >
-        <span className="font-mono text-[12px] text-focus shrink-0">{task.task_id}</span>
-        <span className="flex-1" />
-        <span className="text-[12px] text-txt-secondary truncate max-w-[55%]">
-          {[task.title, task.project_name].filter(Boolean).join(' — ')}
+        <span className="now-label text-txt-muted flex items-center gap-2">
+          <span className="text-focus normal-case tracking-normal font-mono text-[12px]">{task.task_id}</span>
+          {task.project_name && <span className="truncate">— {task.project_name}</span>}
+          <span
+            className="ml-auto text-txt-muted group-hover:text-txt-primary transition-transform"
+            style={{ transform: pickerOpen ? 'rotate(180deg)' : 'rotate(0deg)', transitionDuration: '250ms' }}
+          >
+            <DownChevron />
+          </span>
         </span>
-        <span
-          className="text-txt-muted shrink-0 transition-transform"
-          style={{ transform: pickerOpen ? 'rotate(180deg)' : 'rotate(0deg)', transitionDuration: '250ms' }}
-        >
-          <DownChevron />
+        <span className="font-display text-[22px] font-medium leading-tight tracking-[-0.3px] text-txt-primary truncate" title={task.title}>
+          {task.title}
         </span>
       </div>
 
       {pickerOpen ? (
         /* Expanded: search + shared scrollable list */
-        <>
-          <div className="shrink-0" style={{ height: '0.5px', background: 'oklch(1 0 0 / 0.08)', margin: '0 8px' }} />
-
-          <div
-            className="shrink-0 mx-2 mt-2 mb-1 flex items-center gap-2 px-3 rounded-[10px]"
-            style={{ height: 40, background: 'oklch(1 0 0 / 0.05)' }}
-          >
-            <svg className="w-4 h-4 text-txt-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-              <circle cx="11" cy="11" r="7" strokeWidth="1.8" />
-              <line x1="16.5" y1="16.5" x2="22" y2="22" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
+        <div className="flex-1 min-h-0 flex flex-col border border-drip-elevated p-2 overflow-hidden">
+          <div className="shrink-0 flex items-center gap-2.5 px-3 h-10 rounded-[2px] bg-drip-surface">
+            <SearchIcon />
             <input
               ref={inputRef}
               value={nav.query}
@@ -142,6 +130,7 @@ export default function TaskCardWithPicker({
             <span className="w-14 shrink-0 text-right text-[11px] text-txt-muted animate-pulse" aria-hidden={!nav.isFetching}>
               {nav.isFetching ? 'Fetching…' : ''}
             </span>
+            <kbd aria-hidden className="font-mono text-[11px] text-txt-secondary border border-drip-border rounded-[2px] px-1.5 leading-4">/</kbd>
           </div>
 
           <TaskResultList
@@ -155,24 +144,22 @@ export default function TaskCardWithPicker({
             onSelect={nav.select}
             currentTaskId={task.task_id}
           />
-        </>
+        </div>
       ) : (
-        /* Collapsed: note input + footer */
+        /* Collapsed: duration strip, note input, footer */
         <>
-          <div className="flex items-center gap-2 px-4">
-            <NoteIcon className="text-txt-muted shrink-0" />
-            <input
-              ref={noteInputRef}
-              value={note}
-              onChange={e => onNoteChange(e.target.value)}
-              placeholder="Session note (optional)"
-              className="flex-1 h-9 bg-transparent text-[13px] text-txt-primary placeholder:text-txt-muted placeholder:italic focus:outline-none"
-            />
-          </div>
-
-          <div className="flex items-center justify-between px-4 pb-3">
-            <span className="font-mono text-[11.5px] text-txt-muted">{task.project_name || ''}</span>
-            <span className="text-[11.5px] text-txt-muted">
+          {beforeNote}
+          <input
+            ref={noteInputRef}
+            value={note}
+            onChange={e => onNoteChange(e.target.value)}
+            placeholder="Session note (optional)"
+            aria-label="Session note"
+            className="w-full h-9 px-3 bg-transparent border border-drip-border text-[13px] text-txt-primary placeholder:text-txt-muted focus:outline-none focus:border-focus/40"
+          />
+          <div className="flex items-center justify-between font-mono text-[11px] text-txt-muted">
+            <span>{task.project_name || ''}</span>
+            <span>
               Today<span className="text-txt-dim px-1.5">·</span>{sessionCount}/8 sessions
             </span>
           </div>

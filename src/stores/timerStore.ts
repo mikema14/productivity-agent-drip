@@ -32,6 +32,9 @@ interface TimerStore extends TimerState {
 
 const DEFAULT_DURATION_MINUTES = 25;
 
+/** Length of a kickoff started from the Now screen; matches main's `cfg.kickoffSeconds`. */
+export const KICKOFF_SECONDS = 120;
+
 /** Comment on a kickoff session with no intention, so it can be told apart. */
 const KICKOFF_COMMENT = 'Kickoff';
 
