@@ -325,6 +325,9 @@ export default function Timer({ onNavigate }: TimerProps) {
   const tone = isBreak ? 'emerald' : 'amber';
   const topRule = isBreak ? 'emerald' : focusState === 'paused' ? 'dim' : 'amber';
   const rulerMinutes = readyState ? durationMinutes : Math.max(1, Math.round(totalDuration / 60));
+  // Display only: idle shows the selected duration so the digits agree with the strip and the ruler.
+  // The store's remainingSeconds (and what startFocus uses) is untouched.
+  const displaySeconds = readyState ? durationMinutes * 60 : remainingSeconds;
 
   const showIdlePicker = focusState === 'ready-empty' && !isBreak;
 
@@ -366,7 +369,7 @@ export default function Timer({ onNavigate }: TimerProps) {
                 sessionLabel={isBreak ? 'done' : 'next'}
                 currentGlows={focusState === 'running'}
                 compactCounter={isKickoff}
-                remainingSeconds={remainingSeconds}
+                remainingSeconds={displaySeconds}
                 running={focusState === 'running'}
                 paused={focusState === 'paused'}
                 tone={tone}

@@ -57,6 +57,14 @@ describe('Timer — ready states', () => {
     expect(screen.getByRole('timer')).toHaveTextContent('25:00');
   });
 
+  it('ready: digits show the selected duration, not the stale remainingSeconds', async () => {
+    setTimer({ status: 'idle', remainingSeconds: 1500, totalDuration: 1500, durationMinutes: 15 });
+    await renderTimer();
+    expect(screen.getByRole('timer')).toHaveTextContent('15:00');
+    expect(screen.getByRole('button', { name: '15' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('tick-ruler').querySelectorAll('[data-tick]')).toHaveLength(16);
+  });
+
   it('ready-selected: Begin Focus enabled, billable switch, note input, listbox hidden, duration strip inside the card', async () => {
     const { user } = await renderTimer();
     await selectFirstTask(user);
