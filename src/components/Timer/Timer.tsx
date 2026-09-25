@@ -356,8 +356,8 @@ export default function Timer({ onNavigate }: TimerProps) {
           </div>
 
           {/* Intention row */}
-          {intentions.length > 0 && status !== 'break' && (
-            <IntentionRow intentions={intentions} onEdit={() => setShowIntentionModal(true)} />
+          {status !== 'break' && (
+            <IntentionRow intentions={intentions} onEdit={() => setShowIntentionModal(true)} readonly={isActive} />
           )}
 
           {/* Continue previous CTA */}

@@ -1,32 +1,41 @@
+import KeyButton from './KeyButton';
+
 interface Props {
   intentions: string[];
   onEdit: () => void;
+  /** When true the row is display-only (running states). */
+  readonly?: boolean;
 }
 
-export default function IntentionRow({ intentions, onEdit }: Props) {
-  if (intentions.length === 0) return null;
-
+/**
+ * Today's intention above the focus block. With none set it is the entry
+ * point for setting one (the job the old sidebar button had), unless readonly.
+ */
+export default function IntentionRow({ intentions, onEdit, readonly = false }: Props) {
   const primary = intentions[0];
+
+  if (!primary) {
+    if (readonly) return null;
+    return (
+      <div className="flex items-center h-9 border-b border-drip-elevated">
+        <KeyButton variant="ghost" size="sm" onClick={onEdit}>Set intention</KeyButton>
+      </div>
+    );
+  }
 
   return (
     <div
       role="group"
       aria-label={`Today's intention: ${primary}`}
-      className="flex items-center justify-between gap-3 px-4 h-14 bg-focus/5 border border-focus/15 rounded-2xl"
+      className="flex items-center justify-between gap-3 h-9 border-b border-drip-elevated"
     >
-      <div className="flex items-center gap-2.5 min-w-0">
-        <span className="text-focus text-base shrink-0">🎯</span>
-        <div className="min-w-0">
-          <span className="text-[10.5px] uppercase tracking-widest text-txt-muted font-medium block">Today's intention</span>
-          <span className="text-sm text-txt-secondary truncate block">{primary}</span>
-        </div>
+      <div className="flex items-baseline gap-3 min-w-0">
+        <span className="now-label text-txt-muted shrink-0">Intention</span>
+        <span className="text-[13px] text-txt-secondary truncate">{primary}</span>
       </div>
-      <button
-        onClick={onEdit}
-        className="text-xs text-txt-muted hover:text-focus hover:bg-focus/10 px-2.5 py-1 rounded-lg transition-all duration-150 shrink-0"
-      >
-        Edit
-      </button>
+      {!readonly && (
+        <KeyButton variant="ghost" size="sm" onClick={onEdit}>Edit</KeyButton>
+      )}
     </div>
   );
 }
