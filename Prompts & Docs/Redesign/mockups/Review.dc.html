@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Drip — Review</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&amp;family=JetBrains+Mono:wght@300;400;500&amp;display=swap">
+<style>
+body{margin:0;background:#0a0a0c}
+a{color:#f59e0b;text-decoration:none}a:hover{color:#fbbf24}
+textarea::placeholder{color:#8585a0}
+</style>
+</helmet>
+<div style="width: 1200px; height: 800px; display: flex; background: #0a0a0c; color: #f0f0f2; font-family: 'Outfit', system-ui, sans-serif; overflow: hidden">
+
+<nav aria-label="Primary" style="width: 72px; height: 800px; box-sizing: border-box; padding: 52px 0 16px; display: flex; flex-direction: column; align-items: center; gap: 4px; border-right: 1px solid #1c1c22; flex-shrink: 0">
+<a href="Main.dc.html" style="width: 56px; height: 52px; border-radius: 10px; color: #8585a0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 10.5px">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="9" cy="9.5" r="6.5"></circle><path d="M9 9.5V6.5M9 9.5h2.5M9 2v1"></path></svg>
+<span>Now</span>
+</a>
+<a href="Plan.dc.html" style="width: 56px; height: 52px; border-radius: 10px; color: #8585a0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 10.5px">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="2" y="3" width="4" height="12" rx="1"></rect><rect x="7" y="3" width="4" height="8" rx="1"></rect><rect x="12" y="3" width="4" height="5" rx="1"></rect></svg>
+<span>Plan</span>
+</a>
+<a href="Review.dc.html" aria-current="page" style="width: 56px; height: 52px; border-radius: 10px; background: rgba(245,158,11,0.10); color: #f59e0b; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 10.5px">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5l1.5 1.5L7 4M3 11l1.5 1.5L7 10M9.5 5.5H15M9.5 11.5H15"></path></svg>
+<span>Review</span>
+</a>
+<a href="Review.dc.html" style="width: 56px; height: 52px; border-radius: 10px; color: #8585a0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 10.5px">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="2.5" y="9" width="3" height="6.5" rx="0.5"></rect><rect x="7.5" y="5.5" width="3" height="10" rx="0.5"></rect><rect x="12.5" y="2.5" width="3" height="13" rx="0.5"></rect></svg>
+<span>Insights</span>
+</a>
+<div style="flex-grow: 1"></div>
+<a href="Review.dc.html" aria-label="Settings" style="width: 56px; height: 44px; border-radius: 10px; color: #8585a0; display: flex; align-items: center; justify-content: center">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="9" cy="9" r="2.5"></circle><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4"></path></svg>
+</a>
+</nav>
+
+<main style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column">
+<header style="height: 52px; box-sizing: border-box; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1c1c22; flex-shrink: 0">
+<div style="display: flex; align-items: center; gap: 12px">
+<h1 style="margin: 0; font-size: 15px; font-weight: 500">Review</h1>
+<div style="display: flex; align-items: center; gap: 2px">
+<button aria-label="Previous day" style="width: 26px; height: 26px; border: none; border-radius: 7px; background: transparent; color: #8585a0; cursor: pointer; font-size: 14px">‹</button>
+<span style="font-size: 13px; color: #a0a0b0">Fri 25 Sep</span>
+<button aria-label="Next day" style="width: 26px; height: 26px; border: none; border-radius: 7px; background: transparent; color: #8585a0; cursor: pointer; font-size: 14px">›</button>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 18px; font-size: 12px; color: #8585a0">
+<span><span style="font-family: 'JetBrains Mono', monospace; color: #f0f0f2">5h 40m</span> tracked</span>
+<span><span style="font-family: 'JetBrains Mono', monospace; color: #f0f0f2">4h 25m</span> billable</span>
+<span><span style="font-family: 'JetBrains Mono', monospace; color: #f59e0b">3</span> to log</span>
+</div>
+</header>
+
+<div style="flex-grow: 1; min-height: 0; display: flex">
+
+<div style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 24px 28px; display: flex; flex-direction: column; gap: 20px">
+
+<section aria-label="Today's three" style="display: flex; flex-direction: column; gap: 4px; padding: 14px; border: 1px solid rgba(245,158,11,0.3); border-radius: 14px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; padding: 0 4px 6px">
+<h2 style="margin: 0; font-size: 10.5px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase; color: #f59e0b">Today's 3</h2>
+<span style="font-size: 12px; color: #8585a0">Carry-overs land in tomorrow's Today</span>
+</div>
+
+<div style="display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 4px">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f59e0b; background: rgba(245,158,11,0.12); padding: 2px 7px; border-radius: 6px">689742</span>
+<span style="font-size: 14px; flex-grow: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Automatizovať dokumentáciu</span>
+<span style="font-size: 11.5px; color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); border-radius: 999px; padding: 2px 9px; white-space: nowrap">Carried 3× · split or drop?</span>
+<div role="group" aria-label="Outcome" style="display: flex; gap: 2px; padding: 3px; border: 1px solid #2a2a32; border-radius: 10px">
+<button style="padding: 4px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #a0a0b0; font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer">Done</button>
+<button aria-pressed="true" style="padding: 4px 10px; border: 1px solid rgba(245,158,11,0.3); border-radius: 7px; background: rgba(245,158,11,0.15); color: #f59e0b; font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer">Carry</button>
+<button style="padding: 4px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #a0a0b0; font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer">To week</button>
+<button style="padding: 4px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #a0a0b0; font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer">Drop</button>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 4px; border-top: 1px solid #1c1c22">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f59e0b; background: rgba(245,158,11,0.12); padding: 2px 7px; border-radius: 6px">645001</span>
+<span style="font-size: 14px; flex-grow: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Next level - Marek Mikesz</span>
+<div role="group" aria-label="Outcome" style="display: flex; gap: 2px; padding: 3px; border: 1px solid #2a2a32; border-radius: 10px">
+<button aria-pressed="true" style="padding: 4px 10px; border: 1px solid rgba(52,211,153,0.35); border-radius: 7px; background: rgba(52,211,153,0.12); color: #34d399; font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer">Done</button>
+<button style="padding: 4px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #a0a0b0; font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer">Carry</button>
+<button style="padding: 4px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #a0a0b0; font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer">To week</button>
+<button style="padding: 4px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #a0a0b0; font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer">Drop</button>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 4px; border-top: 1px solid #1c1c22">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8585a0; background: rgba(255,255,255,0.05); padding: 2px 7px; border-radius: 6px">679834</span>
+<span style="font-size: 14px; flex-grow: 1; min-width: 0; color: #8585a0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">EWOK Meetings</span>
+<div role="group" aria-label="Outcome" style="display: flex; gap: 2px; padding: 3px; border: 1px solid #2a2a32; border-radius: 10px">
+<button aria-pressed="true" style="padding: 4px 10px; border: 1px solid rgba(52,211,153,0.35); border-radius: 7px; background: rgba(52,211,153,0.12); color: #34d399; font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer">Done</button>
+<button style="padding: 4px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #a0a0b0; font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer">Carry</button>
+<button style="padding: 4px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #a0a0b0; font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer">To week</button>
+<button style="padding: 4px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #a0a0b0; font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer">Drop</button>
+</div>
+</div>
+</section>
+
+<section aria-label="Time entries" style="flex-grow: 1; min-height: 0; display: flex; flex-direction: column; border: 1px solid #1c1c22; border-radius: 14px; overflow: hidden">
+<div style="display: grid; grid-template-columns: 52px 44px 150px minmax(0, 1fr) 84px 28px; gap: 12px; align-items: center; height: 38px; padding: 0 16px; border-bottom: 1px solid #1c1c22; font-size: 10.5px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase; color: #8585a0">
+<span>Time</span><span>Dur</span><span>Task</span><span>Comment</span><span>Billable</span><span>Log</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 52px 44px 150px minmax(0, 1fr) 84px 28px; gap: 12px; align-items: center; height: 48px; padding: 0 16px; border-bottom: 1px solid #1c1c22">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #a0a0b0">09:00</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px">30m</span>
+<span style="display: flex; align-items: center; gap: 6px; min-width: 0"><span style="width: 6px; height: 6px; border-radius: 999px; background: #60a5fa; flex-shrink: 0"></span><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f59e0b">679834</span></span>
+<span style="font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Daily standup</span>
+<button aria-pressed="true" style="justify-self: start; padding: 2px 10px; border: 1px solid rgba(245,158,11,0.3); border-radius: 999px; background: rgba(245,158,11,0.15); color: #f59e0b; font-family: 'Outfit', sans-serif; font-size: 11.5px; cursor: pointer">Billable</button>
+<input type="checkbox" checked aria-label="Log this entry" style="width: 16px; height: 16px; accent-color: #f59e0b; margin: 0">
+</div>
+
+<div style="display: grid; grid-template-columns: 52px 44px 150px minmax(0, 1fr) 84px 28px; gap: 12px; align-items: center; height: 48px; padding: 0 16px; border-bottom: 1px solid #1c1c22">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #a0a0b0">09:40</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px">50m</span>
+<span style="display: flex; align-items: center; gap: 6px; min-width: 0"><span style="width: 6px; height: 6px; border-radius: 999px; background: #f59e0b; flex-shrink: 0"></span><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f59e0b">689742</span></span>
+<span style="font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Doc automation — templates</span>
+<button aria-pressed="true" style="justify-self: start; padding: 2px 10px; border: 1px solid rgba(245,158,11,0.3); border-radius: 999px; background: rgba(245,158,11,0.15); color: #f59e0b; font-family: 'Outfit', sans-serif; font-size: 11.5px; cursor: pointer">Billable</button>
+<input type="checkbox" checked aria-label="Log this entry" style="width: 16px; height: 16px; accent-color: #f59e0b; margin: 0">
+</div>
+
+<div style="display: grid; grid-template-columns: 52px 44px 150px minmax(0, 1fr) 84px 28px; gap: 12px; align-items: center; height: 48px; padding: 0 16px; border-bottom: 1px solid #1c1c22">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #a0a0b0">10:40</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px">25m</span>
+<span style="display: flex; align-items: center; gap: 6px; min-width: 0"><span style="width: 6px; height: 6px; border-radius: 999px; background: #f59e0b; flex-shrink: 0"></span><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f59e0b">645001</span></span>
+<span style="font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Reading — ops playbook</span>
+<button style="justify-self: start; padding: 2px 10px; border: 1px solid rgba(245,158,11,0.2); border-radius: 999px; background: transparent; color: #a0a0b0; font-family: 'Outfit', sans-serif; font-size: 11.5px; cursor: pointer">Billable</button>
+<input type="checkbox" checked aria-label="Log this entry" style="width: 16px; height: 16px; accent-color: #f59e0b; margin: 0">
+</div>
+
+<div style="display: grid; grid-template-columns: 52px 44px 150px minmax(0, 1fr) 84px 28px; gap: 12px; align-items: center; height: 48px; padding: 0 16px; border-bottom: 1px solid #1c1c22; background: rgba(245,158,11,0.04)">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #a0a0b0">13:00</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px">60m</span>
+<button style="justify-self: start; display: flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px dashed rgba(245,158,11,0.45); border-radius: 8px; background: transparent; color: #f59e0b; font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer"><span style="width: 6px; height: 6px; border-radius: 999px; background: #60a5fa"></span>Assign task</button>
+<span style="font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">KKS Kf.t — upsell call</span>
+<button aria-pressed="true" style="justify-self: start; padding: 2px 10px; border: 1px solid rgba(245,158,11,0.3); border-radius: 999px; background: rgba(245,158,11,0.15); color: #f59e0b; font-family: 'Outfit', sans-serif; font-size: 11.5px; cursor: pointer">Billable</button>
+<input type="checkbox" disabled aria-label="Log this entry (needs a task)" style="width: 16px; height: 16px; accent-color: #f59e0b; margin: 0">
+</div>
+
+<div style="display: grid; grid-template-columns: 52px 44px 150px minmax(0, 1fr) 84px 28px; gap: 12px; align-items: center; height: 48px; padding: 0 16px; border-bottom: 1px solid #1c1c22; color: #8585a0">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px">14:10</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px">25m</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px">692580</span>
+<span style="font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Proposal draft</span>
+<span style="font-size: 11.5px">Billable</span>
+<span style="color: #34d399" aria-label="Logged"><svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3 4.7-5"></path></svg></span>
+</div>
+
+<div style="flex-grow: 1"></div>
+<div style="display: flex; align-items: center; justify-content: space-between; height: 60px; padding: 0 16px; border-top: 1px solid #1c1c22">
+<span style="font-size: 12.5px; color: #8585a0"><span style="font-family: 'JetBrains Mono', monospace; color: #f0f0f2">3</span> selected · <span style="font-family: 'JetBrains Mono', monospace; color: #f0f0f2">1h 45m</span> · 1 needs a task</span>
+<div style="display: flex; gap: 10px">
+<button style="height: 38px; padding: 0 16px; background: transparent; color: #a0a0b0; border: 1px solid rgba(245,158,11,0.2); border-radius: 12px; font-family: 'Outfit', sans-serif; font-size: 13.5px; cursor: pointer">+ Entry</button>
+<button style="height: 38px; padding: 0 18px; background: #f59e0b; color: #0a0a0c; border: none; border-radius: 12px; font-family: 'Outfit', sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer">Log 3 to Easy8</button>
+</div>
+</div>
+</section>
+</div>
+
+<aside aria-label="Tomorrow" style="width: 320px; flex-shrink: 0; box-sizing: border-box; padding: 24px; border-left: 1px solid #1c1c22; display: flex; flex-direction: column; gap: 16px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 500">Tomorrow · <span style="color: #8585a0; font-weight: 400">Mon 28 Sep</span></h2>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 10.5px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase; color: #8585a0">Starts in Today</span>
+<div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #1c1c22; border-radius: 10px">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f59e0b">689742</span>
+<span style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Automatizovať dokumentáciu</span>
+</div>
+<div style="display: flex; align-items: center; justify-content: center; height: 40px; border: 1px dashed #2a2a32; border-radius: 10px; font-size: 12.5px; color: #8585a0">2 slots — pick in the morning</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 10.5px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase; color: #8585a0">Calendar</span>
+<span style="font-size: 13px; color: #a0a0b0"><span style="font-family: 'JetBrains Mono', monospace; color: #93c5fd">3</span> meetings · <span style="font-family: 'JetBrains Mono', monospace; color: #f0f0f2">4h 20m</span> free</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="reflection" style="font-size: 10.5px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase; color: #8585a0">One line on today</label>
+<textarea id="reflection" rows="3" placeholder="What moved, what got in the way" style="resize: none; padding: 8px 12px; font-size: 14px; background: transparent; border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; color: #f0f0f2; font-family: 'Outfit', sans-serif; outline: none"></textarea>
+</div>
+<div style="flex-grow: 1"></div>
+<button style="height: 40px; background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.2); color: #f59e0b; border-radius: 12px; font-family: 'Outfit', sans-serif; font-size: 14px; cursor: pointer">End day</button>
+</aside>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
