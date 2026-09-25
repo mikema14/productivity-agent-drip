@@ -232,7 +232,8 @@ export function verifyAndClean(backupDir, logPath) {
       const stateChanged = was.column !== r.column || was.order !== r.order || was.completed !== r.completed;
       if (stateChanged) {
         moved++;
-        console.log(`[db-guard] list_items: ${r.id} column/order/completed changed (was ${JSON.stringify(was)}, now ${JSON.stringify(r)}) — VIOLATION, not reverted`);
+        sql(`UPDATE list_items SET "column"=${q(was.column)}, "order"=${q(was.order)}, completed=${q(was.completed)} WHERE id=${q(r.id)}`, { json: false });
+        console.log(`[db-guard] list_items: ${r.id} column/order/completed changed (was ${JSON.stringify(was)}, now ${JSON.stringify(r)}) — VIOLATION, restored`);
       } else {
         archivedFlips++;
         console.log(`[db-guard] list_items: ${r.id} archived flip (was ${was.archived}, now ${r.archived}) — not reverted (Q7)`);
@@ -241,7 +242,7 @@ export function verifyAndClean(backupDir, logPath) {
     if (moved) violations.push(`list_items: ${moved} row(s) changed column/order/completed during the run`);
     console.log(`[db-guard] list_items state drift: ${archivedFlips} archived flip(s), ${moved} column/order/completed change(s)`);
     line('list_items (archived)', 0, 0, archivedFlips, 0);
-    line('list_items (column/order/completed)', 0, 0, moved, 0);
+    line('list_items (column/order/completed)', 0, 0, moved, moved);
   }
 
   // (d) No time entry posted
