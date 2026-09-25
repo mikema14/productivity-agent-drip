@@ -32,6 +32,12 @@
       "mode": "view"
     },
     {
+      "name": "kickoff",
+      "title": "Kickoff",
+      "description": "Start a 2-minute kickoff in Drip that rolls into a full focus session",
+      "mode": "no-view"
+    },
+    {
       "name": "add-entry",
       "title": "Add Time Entry",
       "description": "Add a manual time entry to today's log",

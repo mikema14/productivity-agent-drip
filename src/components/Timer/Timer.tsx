@@ -44,6 +44,7 @@ export default function Timer() {
     sessionStartTime,
     currentBillable,
     setCurrentBillable,
+    kickoff,
   } = useTimerStore();
 
   const today = new Date().toISOString().split('T')[0];
@@ -319,11 +320,13 @@ export default function Timer() {
                 className="font-display font-semibold text-txt-primary truncate max-w-[320px]"
                 style={{ fontSize: 22, letterSpacing: '-0.02em' }}
               >
-                {isActive ? 'Deep work' : status === 'break' ? 'Break' : 'Focus'}
+                {isActive ? (kickoff === 'warmup' ? 'Kickoff' : 'Deep work') : status === 'break' ? 'Break' : 'Focus'}
               </h1>
               <p className="text-txt-muted mt-0.5 font-display" style={{ fontSize: 13 }}>
                 {isActive
-                  ? `Session ${sessionCount + 1} of 8`
+                  ? kickoff === 'warmup'
+                    ? `Rolls into ${durationMinutes}m`
+                    : `Session ${sessionCount + 1} of 8`
                   : status === 'break' ? 'Take a breather'
                   : 'Start your session'}
               </p>

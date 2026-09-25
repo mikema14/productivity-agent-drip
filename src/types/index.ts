@@ -204,12 +204,49 @@ export interface BreakRunningPayload {
   isLong: boolean;
 }
 
+/** Red nudge: the timer has been idle too long. Raised by the main-process idle watcher. */
+export interface IdleNudgePayload {
+  kind: 'idle';
+  /** ISO time the idle clock started. */
+  idleSince: string;
+  /** ISO time the kickoff takes over if the nudge is ignored. */
+  kickoffAt: string;
+  kickoffSeconds: number;
+  snoozeSeconds: number;
+}
+
+/** A kickoff just rolled over into a full focus session. */
+export interface KickoffContinuePayload {
+  kind: 'kickoff-continue';
+  focusMinutes: number;
+  /** The prompt hides itself after this long; no answer = keep going. */
+  countdownSeconds: number;
+}
+
 export type SessionOverlayPayload =
   | FocusCompletePayload
   | BreakCompletePayload
-  | BreakRunningPayload;
+  | BreakRunningPayload
+  | IdleNudgePayload
+  | KickoffContinuePayload;
 
-export type OverlayActionType = 'start-break' | 'next-focus' | 'dismiss';
+export type OverlayActionType =
+  | 'start-break'
+  | 'next-focus'
+  | 'dismiss'
+  // Idle nudge
+  | 'idle-start-focus'
+  | 'idle-kickoff'
+  | 'idle-snooze'
+  // Kickoff roll-over prompt
+  | 'kickoff-keep'
+  | 'kickoff-stop';
+
+/** Main → main-window renderer: the idle watcher asks the timer store to act. */
+export type IdleCommand =
+  | { type: 'start-focus' }
+  | { type: 'kickoff'; seconds: number }
+  | { type: 'stop-kickoff' };
 
 export interface OverlayAPI {
   onState: (callback: (payload: SessionOverlayPayload) => void) => void;
@@ -238,7 +275,7 @@ export interface TimerAPI {
   getDaysSinceLastLog?: () => Promise<number | null>;
   openExternal?: (url: string) => Promise<void>;
   // Main process timer control
-  startMainTimer: (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string) => Promise<void>;
+  startMainTimer: (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string, kickoffRolloverSeconds?: number) => Promise<void>;
   pauseMainTimer: () => Promise<void>;
   resumeMainTimer: () => Promise<void>;
   stopMainTimer: () => Promise<void>;
@@ -260,6 +297,7 @@ export interface TimerAPI {
   notifyBreakStarted: (totalSeconds: number, isLong: boolean) => Promise<void>;
   setOverlayEnabled: (enabled: boolean) => Promise<void>;
   onOverlayAction: (callback: (type: OverlayActionType) => void) => void;
+  onIdleCommand: (callback: (command: IdleCommand) => void) => void;
 }
 
 export interface LogAPI {

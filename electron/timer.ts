@@ -3,6 +3,7 @@ import { updateTray } from './tray';
 import { sendTickToOverlay, sampleActiveDisplay } from './overlayWindow';
 import { saveSetting } from '../src/services/db';
 import { raycastFocusStart, raycastFocusEnd } from './raycastFocus';
+import { atCountdownZero, raycastSecondsFor } from './kickoff';
 
 interface TimerState {
   status: 'idle' | 'focus' | 'break';
@@ -14,6 +15,8 @@ interface TimerState {
   paused: boolean;
   nextBreakDuration?: 5 | 10; // Duration in minutes for next break
   tickCount: number; // Track ticks for periodic DB writes
+  /** Kickoff only: seconds to extend by at zero instead of completing. */
+  rolloverSeconds: number;
 }
 
 const state: TimerState = {
@@ -25,7 +28,37 @@ const state: TimerState = {
   totalDuration: 0,
   paused: false,
   tickCount: 0,
+  rolloverSeconds: 0,
 };
+
+export type TimerStatus = TimerState['status'];
+
+/**
+ * Status transitions and kickoff roll-overs, for the idle watcher. A single
+ * listener: the watcher is the only consumer.
+ */
+export interface TimerListener {
+  onStatus: (status: TimerStatus, previous: TimerStatus) => void;
+  onKickoffRollover: (rolloverSeconds: number) => void;
+}
+
+let listener: TimerListener | null = null;
+
+export function setTimerListener(next: TimerListener | null): void {
+  listener = next;
+}
+
+function setStatus(status: TimerStatus): void {
+  const previous = state.status;
+  state.status = status;
+  if (previous !== status || status !== 'idle') {
+    try {
+      listener?.onStatus(status, previous);
+    } catch (error) {
+      console.error('[MainTimer] Timer listener failed:', error);
+    }
+  }
+}
 
 function writeTimerState() {
   try {
@@ -82,7 +115,17 @@ function formatTrayTime(seconds: number): string {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function startTimer(duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string) {
+/**
+ * `kickoffRolloverSeconds` (focus only) makes this a kickoff: at zero the
+ * session extends itself by that much instead of completing.
+ */
+export function startTimer(
+  duration: number,
+  timerType: 'focus' | 'break',
+  nextBreakDuration?: 5 | 10,
+  taskId?: string,
+  kickoffRolloverSeconds?: number
+) {
   // Clear any existing interval
   if (state.intervalId) {
     console.log('[MainTimer] Clearing existing interval before starting new timer');
@@ -90,7 +133,6 @@ export function startTimer(duration: number, timerType: 'focus' | 'break', nextB
     state.intervalId = null;
   }
 
-  state.status = timerType;
   state.remainingSeconds = duration;
   state.startTime = new Date();
   state.totalDuration = duration;
@@ -98,6 +140,8 @@ export function startTimer(duration: number, timerType: 'focus' | 'break', nextB
   state.paused = false;
   state.tickCount = 0;
   state.nextBreakDuration = nextBreakDuration;
+  state.rolloverSeconds = timerType === 'focus' ? Math.max(0, kickoffRolloverSeconds || 0) : 0;
+  setStatus(timerType);
 
   console.log(`[MainTimer] Starting ${timerType} timer for ${duration} seconds, taskId: ${taskId || 'none'}`);
   if (nextBreakDuration) {
@@ -113,7 +157,7 @@ export function startTimer(duration: number, timerType: 'focus' | 'break', nextB
 
   // Mirror into Raycast Focus (breaks end any running Focus session)
   if (timerType === 'focus') {
-    raycastFocusStart(duration, taskId);
+    raycastFocusStart(raycastSecondsFor(state), taskId);
   } else {
     raycastFocusEnd();
   }
@@ -126,6 +170,11 @@ export function startTimer(duration: number, timerType: 'focus' | 'break', nextB
 
 function tick() {
   if (state.remainingSeconds <= 0) {
+    const zero = atCountdownZero(state);
+    if (zero.type === 'rollover') {
+      rollOver(zero.next.remainingSeconds, zero.next.totalDuration);
+      return;
+    }
     console.log('[MainTimer] Timer complete');
     handleComplete();
     return;
@@ -155,6 +204,28 @@ function tick() {
   }
 }
 
+/**
+ * Kickoff reached zero: same session, extended by the full focus length.
+ * Raycast was started for the whole thing, so it is left alone.
+ */
+function rollOver(remainingSeconds: number, totalDuration: number) {
+  const added = remainingSeconds;
+  state.remainingSeconds = remainingSeconds;
+  state.totalDuration = totalDuration;
+  state.rolloverSeconds = 0;
+  console.log(`[MainTimer] Kickoff rolled over into ${added}s of focus`);
+
+  updateTray(formatTrayTime(state.remainingSeconds));
+  writeTimerState();
+  sendToRenderer('timer-extended', state.remainingSeconds);
+
+  try {
+    listener?.onKickoffRollover(added);
+  } catch (error) {
+    console.error('[MainTimer] Kickoff listener failed:', error);
+  }
+}
+
 function handleComplete() {
   // Clear interval
   if (state.intervalId) {
@@ -181,13 +252,14 @@ function handleComplete() {
   }
 
   // Reset state
-  state.status = 'idle';
+  setStatus('idle');
   state.remainingSeconds = 0;
   state.startTime = null;
   state.currentTaskId = null;
   state.totalDuration = 0;
   state.paused = false;
   state.nextBreakDuration = undefined; // Clear for next session
+  state.rolloverSeconds = 0;
 
   raycastFocusEnd();
 
@@ -220,7 +292,7 @@ export function resumeTimer() {
     console.log('[MainTimer] Resuming timer');
     state.paused = false;
     writeTimerState();
-    if (state.status === 'focus') raycastFocusStart(state.remainingSeconds, state.currentTaskId);
+    if (state.status === 'focus') raycastFocusStart(raycastSecondsFor(state), state.currentTaskId);
     state.intervalId = setInterval(() => {
       tick();
     }, 1000);
@@ -235,12 +307,13 @@ export function stopTimer() {
     state.intervalId = null;
   }
 
-  state.status = 'idle';
+  setStatus('idle');
   state.remainingSeconds = 0;
   state.startTime = null;
   state.currentTaskId = null;
   state.totalDuration = 0;
   state.paused = false;
+  state.rolloverSeconds = 0;
 
   updateTray('Ready');
   writeTimerState();
@@ -263,7 +336,7 @@ export function extendTimer(additionalSeconds: number) {
     // Update tray immediately
     updateTray(formatTrayTime(state.remainingSeconds));
 
-    if (!state.paused) raycastFocusStart(state.remainingSeconds, state.currentTaskId);
+    if (!state.paused) raycastFocusStart(raycastSecondsFor(state), state.currentTaskId);
 
     // Notify renderer
     sendToRenderer('timer-extended', state.remainingSeconds);
