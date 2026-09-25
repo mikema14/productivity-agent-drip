@@ -18,17 +18,6 @@
     transition: color 0.3s ease;
   }
 
-  /* Focus panel large timer display */
-  .focus-timer-display {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
-    font-size: 86px;
-    font-weight: 300;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.04em;
-    line-height: 1;
-    color: #f0f0f2;
-  }
-
   /* Now screen: the big countdown digits (condensed, tabular) */
   .now-digits {
     @apply font-condensed tabular-nums;

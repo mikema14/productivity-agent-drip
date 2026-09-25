@@ -83,3 +83,25 @@ When updating an older view to the orange accent design language:
 7. Verify dropdowns: container border should be `border-focus/30`, items `hover:bg-focus/5`
 8. Verify progress bars: track should be `bg-focus/10`
 9. Verify checkboxes: border should be `border-focus/20`
+
+---
+
+## Now Screen Tokens (Phase 1 redesign)
+
+The rail + Now screen introduce a squarer, hairline language that Phase 2 (Plan / Review / Insights) should reuse. Corners are `rounded-[2px]` or none; no `rounded-xl` / `rounded-full` on new surfaces.
+
+| Element | Tailwind / class |
+|---------|------------------|
+| **Micro-label** (state words, section headers, rail labels) | `.now-label` — mono 10.5px, 500, `tracking-label` (1.5px), uppercase via CSS (keep source text sentence-case so tests match) |
+| **Section header** | `SectionHeader` in `Timer/FocusBlock.tsx`: `01 Focus` + `border-t border-drip-elevated` hairline, optional right slot |
+| **Countdown digits** | `.now-digits` — `font-condensed` (Barlow Condensed 700) 160px, 120px under 1000px (`wide:` breakpoint); ghost `88:88` behind in `text-drip-ghost` |
+| **Key button** | `KeyButton` (`Timer/KeyButton.tsx`) — `variant` amber / outline / ghost / danger, `size` md (44px) / sm (28px), optional `kbd`. Drop edge `shadow-key-amber` / `shadow-key-dark`, presses in with `active:translate-y-[2px] active:shadow-none` |
+| **LED** | 4px square `bg-focus shadow-led` (active rail item, selected duration, current session square) |
+| **Hairline separator** | `border-drip-elevated` (section separators) / `border-drip-border` (control outlines) |
+| **Focus block top rule** | `border-t-2 border-t-focus`; `border-t-break` in break; `border-t-drip-border` when paused |
+| **Joined segmented control** | `border border-drip-border`, children `border-l border-drip-border`, active `bg-focus text-drip-bg` (DurationSegments, aside tabs, task-list filters) |
+| **Id pill** | `font-mono text-[12px] text-focus bg-focus/10 rounded-[2px] px-1.5` — never a `#` prefix (design rule 6) |
+| **Timeline blocks** | `rounded-[2px]` 1px borders: focus `border-focus/30-40`, break `border-break/40`, calendar `border-blue-500/40` (dashed = proposal), adhoc dashed `border-focus/30` |
+| **NOW marker** | 7px `bg-focus` square + 1px amber line + inverted `NOW hh:mm` tag |
+| **Day bar** | 12 × `h-1.5` segments, `bg-focus` filled / `bg-drip-border` empty, against `DAY_TARGET_MINUTES = 360` |
+| **Tokens added** | `drip.ghost #16161b`, `focus.shadow #92560a`, `shadow-key-amber/key-dark/key-sm/led`, `tracking-label`, `font-condensed`, screen `wide` (1000px) |
