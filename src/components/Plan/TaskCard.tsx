@@ -50,8 +50,9 @@ function parseSubtasks(item: ListItem): Subtask[] {
 }
 
 /**
- * One Plan card (mockup Plan.dc.html:120-131): complete dot + title + hover
- * actions, then id · list · provenance/age · tracked time. Expands into the
+ * One Plan card (mockup Plan.dc.html:120-131): complete dot + title (full
+ * width, clamped to 2 lines) with the hover actions overlaid top-right, then
+ * id · list · provenance/age · subtasks · tracked time. Expands into the
  * unchanged TaskDetailInline or the lightweight subtask checklist.
  */
 export default function TaskCard(props: TaskCardProps) {
@@ -68,7 +69,7 @@ export default function TaskCard(props: TaskCardProps) {
     : item.task_id ? <TaskIdBadge plain taskId={item.task_id} taskName={taskName} className={`font-mono ${done ? 'text-txt-muted' : 'text-focus'}`} />
     : effective ? null
     : <span>No task ID</span>;
-  const hasRow2 = idSlot || (showListTag && list) || from || ageBadge || minutesLabel;
+  const hasRow2 = idSlot || (showListTag && list) || from || ageBadge || subtaskCount || minutesLabel;
 
   const card = (
     <>
@@ -76,12 +77,12 @@ export default function TaskCard(props: TaskCardProps) {
         data-testid="plan-card"
         className={`plan-card group relative border border-drip-elevated hover:border-drip-border rounded-[2px] px-3 py-2.5 transition-colors ${done ? 'opacity-50' : ''}`}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-start gap-2">
           <button
             type="button"
             aria-label={done ? 'Mark not done' : 'Mark done'}
             onClick={(e) => { e.stopPropagation(); actions.onToggleComplete(item); }}
-            className={`w-[14px] h-[14px] shrink-0 flex items-center justify-center rounded-[2px] border transition-colors ${
+            className={`w-[14px] h-[14px] mt-[3px] shrink-0 flex items-center justify-center rounded-[2px] border transition-colors ${
               done ? 'bg-break/15 text-break border-transparent' : 'border-transparent group-hover:border-drip-border focus-visible:border-drip-border'
             }`}
           >
@@ -96,25 +97,14 @@ export default function TaskCard(props: TaskCardProps) {
             type="button"
             data-testid="plan-card-title"
             onClick={() => actions.onToggleExpand(item.id)}
-            className={`flex-1 min-w-0 text-left font-display text-[13.5px] truncate transition-colors ${done ? 'text-txt-muted line-through' : 'text-txt-primary hover:text-focus'}`}
+            title={item.title}
+            className={`flex-1 min-w-0 text-left font-display text-[13.5px] leading-5 transition-colors ${done ? 'text-txt-muted' : 'text-txt-primary hover:text-focus'}`}
           >
-            {item.title}
+            <span className={`block line-clamp-2 break-words ${done ? 'line-through' : ''}`}>{item.title}</span>
           </button>
 
-          {subtaskCount && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); actions.onToggleChecklist(item.id); }}
-              className="shrink-0 flex items-center gap-1 font-mono text-[11px] text-txt-muted hover:text-txt-primary transition-colors"
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className={`transition-transform duration-150 ${checklistOpen ? 'rotate-90' : ''}`}>
-                <path d="M3 1.5l4 3.5-4 3.5" />
-              </svg>
-              {subtaskCount.done}/{subtaskCount.total} Subtasks
-            </button>
-          )}
-
-          <div className="plan-card-actions flex items-center gap-0.5 shrink-0">
+          {/* Overlaid (not in flow) so the title keeps the full card width and never reflows on hover. */}
+          <div className="plan-card-actions absolute top-[7px] right-2 flex items-center gap-0.5 pl-1.5 bg-drip-bg">
             {arrows.left && (
               <button type="button" onClick={(e) => { e.stopPropagation(); actions.onMoveColumn(item, arrows.left!); }} className={ACTION} title="Move left">
                 <svg {...iconProps}><path d="M7 3L4 6l3 3" /></svg>
@@ -163,6 +153,18 @@ export default function TaskCard(props: TaskCardProps) {
             {showListTag && list && <span className="truncate">{list.name}</span>}
             {from && <span className="truncate">from call · {from.date}</span>}
             {ageBadge && <span className="font-mono text-[11px]">{ageBadge}</span>}
+            {subtaskCount && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); actions.onToggleChecklist(item.id); }}
+                className="shrink-0 flex items-center gap-1 font-mono text-[11px] text-txt-muted hover:text-txt-primary transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className={`transition-transform duration-150 ${checklistOpen ? 'rotate-90' : ''}`}>
+                  <path d="M3 1.5l4 3.5-4 3.5" />
+                </svg>
+                {subtaskCount.done}/{subtaskCount.total} Subtasks
+              </button>
+            )}
             <span className="flex-1" />
             {minutesLabel && <span className="font-mono">{minutesLabel}</span>}
           </div>
