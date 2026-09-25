@@ -127,7 +127,8 @@ function createWindow() {
   // Load the app
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    // Docked devtools would shrink the viewport and corrupt e2e screenshots
+    if (process.env.DRIP_TEST_MODE !== '1') mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(join(__dirname, '../dist/index.html'));
   }

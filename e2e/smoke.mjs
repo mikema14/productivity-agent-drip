@@ -1,0 +1,207 @@
+#!/usr/bin/env node
+/**
+ * Phase 1 e2e smoke: walks the Now screen through every state and screenshots
+ * each view at 1200×800 and 800×600 (PHASE1_PLAN.md §3.2), against the real
+ * database under the §4 guard. Quit the installed Drip first.
+ *
+ *   npm run e2e:smoke
+ */
+import { spawn, execFileSync, execSync } from 'node:child_process';
+import { existsSync, mkdirSync, createWriteStream } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createServer } from 'node:net';
+import { _electron as electron } from 'playwright';
+import { prepare, verifyAndClean } from './db-guard.mjs';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const SIZES = [[1200, 800], [800, 600]];
+const NOW_BUDGET_MS = 240_000;
+/** Kickoff rolls over at 120 s, break-complete saves a row after 60 s: leave both well before. */
+const TIMER_STEP_LIMIT_MS = 45_000;
+
+function fail(msg) {
+  console.error(`[smoke] ${msg}`);
+  process.exit(1);
+}
+
+function portFree(port) {
+  return new Promise((resolve) => {
+    const srv = createServer();
+    srv.once('error', () => resolve(false));
+    srv.once('listening', () => srv.close(() => resolve(true)));
+    srv.listen(port, '127.0.0.1');
+  });
+}
+
+async function preflight() {
+  if (process.env.DRIP_ALLOW_API_WRITES !== undefined) fail('DRIP_ALLOW_API_WRITES is set; refusing to run');
+  try {
+    const pids = execSync('pgrep -x Drip', { encoding: 'utf8' }).trim();
+    if (pids) fail(`the installed Drip is running (pid ${pids}); quit it first`);
+  } catch {
+    // pgrep exits 1 when nothing matches
+  }
+  if (!(await portFree(5173))) fail('port 5173 is in use; stop `npm run dev` first');
+}
+
+async function waitFor(check, timeoutMs, what) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (await check()) return;
+    await new Promise(r => setTimeout(r, 250));
+  }
+  throw new Error(`timed out waiting for ${what}`);
+}
+
+async function main() {
+  await preflight();
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const outDir = join(ROOT, 'e2e', 'screenshots', stamp);
+  mkdirSync(outDir, { recursive: true });
+  const logPath = join(outDir, 'main.log');
+  const logStream = createWriteStream(logPath);
+
+  const backupDir = prepare();
+
+  // Vite serves the renderer and emits dist-electron/ without launching Electron.
+  const vite = spawn('npx', ['vite'], { cwd: ROOT, env: { ...process.env, DRIP_E2E: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  vite.stdout.on('data', d => logStream.write(`[vite] ${d}`));
+  vite.stderr.on('data', d => logStream.write(`[vite] ${d}`));
+
+  let app = null;
+  let violations = [];
+  try {
+    execFileSync('npx', ['wait-on', 'http://localhost:5173', '-t', '60000'], { cwd: ROOT, stdio: 'inherit' });
+    await waitFor(() => existsSync(join(ROOT, 'dist-electron', 'main.js')), 60_000, 'dist-electron/main.js');
+
+    app = await electron.launch({
+      args: [join(ROOT, 'dist-electron', 'main.js')],
+      cwd: ROOT,
+      env: { ...process.env, DRIP_TEST_MODE: '1', DRIP_E2E: '1' },
+    });
+    app.process().stdout?.on('data', d => logStream.write(`[main] ${d}`));
+    app.process().stderr?.on('data', d => logStream.write(`[main] ${d}`));
+
+    const page = await app.firstWindow();
+    await page.waitForSelector('nav[aria-label="Primary"]', { timeout: 60_000 });
+
+    for (const [w, h] of SIZES) {
+      await app.evaluate(({ BrowserWindow }, [width, height]) => BrowserWindow.getAllWindows()[0].setSize(width, height), [w, h]);
+      await page.waitForTimeout(400);
+      const shot = async (name) => page.screenshot({ path: join(outDir, `${name}-${w}x${h}.png`) });
+      const key = (name) => page.getByRole('button', { name, exact: false });
+      const pill = () => page.getByTestId('now-pill');
+      const nowStart = Date.now();
+      const stepStart = () => Date.now();
+      const assertStep = (t, label) => {
+        if (Date.now() - t > TIMER_STEP_LIMIT_MS) throw new Error(`${label} exceeded ${TIMER_STEP_LIMIT_MS} ms`);
+      };
+
+      await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Now' }).click();
+      await pill().filter({ hasText: 'Ready' }).waitFor();
+      await shot('now-ready-empty');
+
+      // Ready-selected: click a recent row only (typing an id would hit the API and write task_cache).
+      const options = page.getByRole('option');
+      if (await options.count()) {
+        await options.first().click();
+        await key(/begin focus/i).waitFor();
+        await shot('now-ready-selected');
+      } else {
+        console.warn('[smoke] no recent tasks; skipping now-ready-selected');
+      }
+
+      await key(/set intention/i).or(key(/^edit$/i)).first().click();
+      await page.getByText("Today's intentions").waitFor();
+      await shot('now-intention-modal');
+      await page.keyboard.press('Escape');
+      await page.getByText("Today's intentions").waitFor({ state: 'hidden' });
+
+      if (await options.count() === 0) {
+        // Need a task to press BEGIN FOCUS; fall back to the previous-session CTA if present.
+        const cont = key(/^continue/i);
+        if (await cont.count()) await cont.first().click();
+      } else {
+        await key(/begin focus/i).click();
+      }
+      let t = stepStart();
+      await pill().filter({ hasText: 'Focusing' }).waitFor({ timeout: 15_000 });
+      await shot('now-running');
+      await key(/\+5 min/i).click();
+      await key(/^pause$/i).click();
+      await pill().filter({ hasText: 'Paused' }).waitFor();
+      await shot('now-paused');
+      await key(/^resume$/i).click();
+      await pill().filter({ hasText: 'Focusing' }).waitFor();
+      await key(/^cancel$/i).click();
+      await pill().filter({ hasText: 'Ready' }).waitFor();
+      assertStep(t, 'focus sequence');
+
+      // Kickoff: cancel well before the 120 s roll-over; stopKickoff is never used (it saves a row).
+      t = stepStart();
+      await key(/kickoff 2m/i).click();
+      await pill().filter({ hasText: 'Kickoff' }).waitFor({ timeout: 15_000 });
+      await shot('now-kickoff');
+      await key(/^cancel$/i).click();
+      await pill().filter({ hasText: 'Ready' }).waitFor();
+      assertStep(t, 'kickoff');
+
+      // Break via the drip:// path; skip before the 60 s break-complete save.
+      t = stepStart();
+      await app.evaluate(({ app }) => app.emit('open-url', { preventDefault() {} }, 'drip://start-break?duration=5'));
+      await pill().filter({ hasText: 'Break' }).waitFor({ timeout: 15_000 });
+      await shot('now-break');
+      await key(/skip break/i).click();
+      await pill().filter({ hasText: 'Ready' }).waitFor();
+      assertStep(t, 'break');
+
+      await page.getByRole('button', { name: 'Tasks', exact: true }).click();
+      await shot('now-aside-tasks');
+      await page.getByRole('button', { name: 'Timeline', exact: true }).click();
+
+      if (Date.now() - nowStart > NOW_BUDGET_MS) throw new Error(`Now sequence exceeded ${NOW_BUDGET_MS} ms`);
+
+      const nav = page.getByRole('navigation', { name: 'Primary' });
+      await nav.getByRole('button', { name: 'Plan' }).click();
+      await page.getByText('All Tasks').waitFor();
+      await shot('plan-all-tasks');
+      const listRows = page.locator('ul li button').filter({ has: page.getByTestId('list-color') });
+      if (await listRows.count()) {
+        await listRows.first().click();
+        await shot('plan-list');
+      }
+      await nav.getByRole('button', { name: 'Review' }).click();
+      await page.waitForTimeout(800);
+      await shot('review');
+      await nav.getByRole('button', { name: 'Insights' }).click();
+      await page.waitForTimeout(800);
+      await shot('insights');
+      await nav.getByRole('button', { name: 'Settings' }).click();
+      await page.waitForTimeout(400);
+      await shot('settings');
+
+      await nav.getByRole('button', { name: 'Now' }).click();
+      await key(/review day/i).click();
+      await nav.getByRole('button', { name: 'Review' }).and(page.locator('[aria-current="page"]')).waitFor();
+    }
+  } catch (error) {
+    console.error('[smoke] failed:', error);
+    violations.push(String(error));
+  } finally {
+    if (app) await app.close().catch(() => {});
+    vite.kill('SIGTERM');
+    logStream.end();
+    await new Promise(r => setTimeout(r, 500));
+    violations = violations.concat(verifyAndClean(backupDir, logPath));
+  }
+
+  console.log(`[smoke] screenshots: ${outDir}`);
+  if (violations.length) {
+    console.error(`[smoke] ${violations.length} violation(s)`);
+    process.exit(1);
+  }
+}
+
+main();

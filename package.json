@@ -12,7 +12,8 @@
     "dist": "vite build && electron-builder build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "e2e:smoke": "node e2e/smoke.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

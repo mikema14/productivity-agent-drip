@@ -52,6 +52,7 @@ logs/
 # Testing
 coverage/
 .nyc_output/
+e2e/screenshots/
 
 # Temporary files
 tmp/
