@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, within, act, waitFor } from '@testing-library/react';
+import { render, screen, within, act, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DailyLog from './DailyLog';
 import { useLogStore, type LogEntry } from '../../stores/logStore';
@@ -129,6 +129,38 @@ describe('DailyLog (Review)', () => {
     useLogStore.setState({ entries: [], selectedDate: FIXTURE_DATE, isLoading: true });
     render(<DailyLog />);
     expect(screen.getByText('Loading entries...')).toBeInTheDocument();
+  });
+
+  it('while a new day loads, the previous rows stay visible but inert and the bulk keys are disabled', async () => {
+    const { logSelected, toggleSelectAll, toggleLogMark } = await renderLog([makeEntry('pomodoro'), makeEntry('adhoc', { id: 'a2' })]);
+    expect(screen.queryByTestId('entries-stale')).toBeNull();
+    expect(screen.getByRole('button', { name: /log 2 to easy8/i })).toBeEnabled();
+
+    act(() => { useLogStore.setState({ isLoading: true }); });
+    // No flicker: the rows are still there, no loading text...
+    expect(screen.queryByText('Loading entries...')).toBeNull();
+    expect(screen.getAllByTestId('entry-row')).toHaveLength(2);
+    // ...but the block is inert and busy, and every bulk action is off.
+    const stale = screen.getByTestId('entries-stale');
+    expect(stale).toHaveAttribute('inert');
+    expect(stale).toHaveAttribute('aria-busy', 'true');
+    expect(stale).toHaveClass('pointer-events-none');
+    expect(stale).toContainElement(screen.getAllByTestId('entry-row')[0]);
+    const log = screen.getByRole('button', { name: /log 2 to easy8/i });
+    expect(log).toBeDisabled();
+    expect(within(toolbar()).getByRole('button', { name: 'Unselect all' })).toBeDisabled();
+    expect(within(toolbar()).getByRole('button', { name: 'Move to…' })).toBeDisabled();
+    expect(within(footer()).getByRole('button', { name: '+ Entry' })).toBeDisabled();
+    fireEvent.click(log);
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Unselect all' }));
+    expect(logSelected).not.toHaveBeenCalled();
+    expect(toggleSelectAll).not.toHaveBeenCalled();
+    expect(toggleLogMark).not.toHaveBeenCalled();
+
+    act(() => { useLogStore.setState({ isLoading: false }); });
+    expect(screen.queryByTestId('entries-stale')).toBeNull();
+    expect(screen.getByRole('button', { name: /log 2 to easy8/i })).toBeEnabled();
+    expect(within(footer()).getByRole('button', { name: '+ Entry' })).toBeEnabled();
   });
 
   it('renders work rows before break rows with the column header', async () => {

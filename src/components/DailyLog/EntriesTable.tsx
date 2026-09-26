@@ -19,13 +19,18 @@ interface Props {
   onAddEntry: () => void;
   onLogSelected: () => void;
   isLogging: boolean;
+  /**
+   * A day load is in flight while rows from the previous day are still shown:
+   * the bulk keys are disabled so nothing acts on the wrong day's rows.
+   */
+  busy?: boolean;
   /** Move target popover (single row or bulk), anchored to the toolbar's right group. */
   moveCalendar: { open: boolean; selectedDate: string; onSelect: (date: string) => void; onClose: () => void };
   /** Rows, the timeline, the empty state or the loading text. */
   children: ReactNode;
 }
 
-const TEXT_KEY = 'h-[26px] px-2 rounded-[2px] font-display text-[12px] text-txt-muted hover:text-txt-primary hover:bg-focus/5 transition-colors whitespace-nowrap';
+const TEXT_KEY = 'h-[26px] px-2 rounded-[2px] font-display text-[12px] text-txt-muted hover:text-txt-primary hover:bg-focus/5 transition-colors whitespace-nowrap disabled:opacity-40 disabled:pointer-events-none';
 
 /**
  * The `Time entries` section (mockup Review.dc.html:103-161): a 40px toolbar
@@ -37,7 +42,7 @@ const TEXT_KEY = 'h-[26px] px-2 rounded-[2px] font-display text-[12px] text-txt-
 export default function EntriesTable(props: Props) {
   const {
     viewMode, onViewModeChange, groupByTask, onGroupByTaskToggle, showGroupToggle, stats, summary,
-    onSelectToggle, onMoveEntries, onManageTemplates, onAddEntry, onLogSelected, isLogging, moveCalendar, children,
+    onSelectToggle, onMoveEntries, onManageTemplates, onAddEntry, onLogSelected, isLogging, busy = false, moveCalendar, children,
   } = props;
 
   const tab = (id: 'list' | 'timeline', label: string, extra = '') => (
@@ -53,7 +58,7 @@ export default function EntriesTable(props: Props) {
     </button>
   );
 
-  const canLog = summary.selectedCount > 0 && !isLogging;
+  const canLog = summary.selectedCount > 0 && !isLogging && !busy;
   const logLabel = isLogging ? 'Logging…' : summary.selectedCount > 0 ? `Log ${summary.selectedCount} to Easy8` : 'Log to Easy8';
 
   return (
@@ -78,12 +83,12 @@ export default function EntriesTable(props: Props) {
         </div>
         <div className="relative shrink-0 flex items-center gap-1">
           {stats.toggleableCount > 0 && (
-            <button type="button" onClick={onSelectToggle} className={TEXT_KEY}>
+            <button type="button" onClick={onSelectToggle} disabled={busy} className={TEXT_KEY}>
               {stats.allSelected ? 'Unselect all' : 'Select all'}
             </button>
           )}
           {stats.markedCount > 0 && (
-            <button type="button" onClick={onMoveEntries} className={`${TEXT_KEY} border border-drip-border`}>Move to…</button>
+            <button type="button" onClick={onMoveEntries} disabled={busy} className={`${TEXT_KEY} border border-drip-border`}>Move to…</button>
           )}
           <button type="button" onClick={onManageTemplates} className={`${TEXT_KEY} border border-drip-border`}>Templates</button>
           {moveCalendar.open && (
@@ -118,14 +123,14 @@ export default function EntriesTable(props: Props) {
           )}
         </span>
         <div className="shrink-0 flex items-center gap-2.5">
-          <KeyButton variant="outline" size="md" onClick={onAddEntry} className="whitespace-nowrap">+ Entry</KeyButton>
+          <KeyButton variant="outline" size="md" onClick={onAddEntry} disabled={busy} className="whitespace-nowrap">+ Entry</KeyButton>
           <KeyButton
             variant="amber"
             size="md"
             onClick={onLogSelected}
             disabled={!canLog}
             className="whitespace-nowrap"
-            title={summary.selectedCount === 0 ? 'Mark entries to log' : isLogging ? 'Logging…' : undefined}
+            title={summary.selectedCount === 0 ? 'Mark entries to log' : isLogging ? 'Logging…' : busy ? 'Loading the day…' : undefined}
           >
             {logLabel}
           </KeyButton>

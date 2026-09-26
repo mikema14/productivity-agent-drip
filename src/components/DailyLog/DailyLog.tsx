@@ -373,6 +373,12 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     />
   );
 
+  // A day switch keeps the previous day's rows on screen until the new ones land (no
+  // flicker), but they must not be actionable meanwhile: main replaced the list with the
+  // loading text, so nothing could act on the wrong day. `inert` + no pointer events keeps
+  // that guarantee; the bulk keys are disabled through `busy` below.
+  const rowsStale = isLoading && entries.length > 0;
+
   let body;
   if (isLoading && entries.length === 0) {
     body = <div className="flex-1 flex items-center justify-center text-txt-muted font-display text-[13px]">Loading entries...</div>;
@@ -396,6 +402,18 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
       <div>
         {workEntries.map(renderRow)}
         {breakEntries.map(renderRow)}
+      </div>
+    );
+  }
+  if (rowsStale) {
+    body = (
+      <div
+        data-testid="entries-stale"
+        aria-busy="true"
+        {...{ inert: '' }}
+        className="flex-1 flex flex-col opacity-50 pointer-events-none transition-opacity duration-150"
+      >
+        {body}
       </div>
     );
   }
@@ -441,6 +459,7 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
             onAddEntry={() => setShowAddModal(true)}
             onLogSelected={handleLogSelected}
             isLogging={isLogging}
+            busy={rowsStale}
             moveCalendar={{
               open: showMoveCalendar,
               selectedDate,
