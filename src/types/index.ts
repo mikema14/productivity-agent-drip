@@ -221,6 +221,9 @@ export const RAYCAST_BLOCK_CATEGORIES = ['social', 'streaming', 'gaming'] as con
 /** Where a kickoff was started from; drives the takeover's source line. */
 export type KickoffSource = 'auto' | 'nudge' | 'deeplink' | 'now';
 
+/** How long the idle nudge is paused for: the card's Snooze choices and the tray's "Pause nudges". */
+export type SnoozeChoice = '15m' | '1h' | 'day';
+
 /** Red nudge: the timer has been idle too long. Raised by the main-process idle watcher. */
 export interface IdleNudgePayload {
   kind: 'idle';
@@ -229,7 +232,9 @@ export interface IdleNudgePayload {
   /** ISO time the kickoff takes over if the nudge is ignored. */
   kickoffAt: string;
   kickoffSeconds: number;
+  /** The card's two timed snooze choices (15m / 1h; 30s / 60s under DRIP_IDLE_FAST). */
   snoozeSeconds: number;
+  snoozeLongSeconds: number;
   /** Minutes between the nudge and the automatic kickoff. */
   escalateMinutes: number;
   /** Main's prediction of the kickoff's task (today's last session with a task); null when unknown. */
@@ -266,6 +271,11 @@ export type OverlayActionType =
   | 'kickoff-keep'
   | 'kickoff-stop';
 
+/** Extra data an overlay action may carry: the snooze choice for `idle-snooze`. */
+export interface OverlayActionData {
+  snooze?: SnoozeChoice;
+}
+
 /** Main → main-window renderer: the idle watcher asks the timer store to act. */
 export type IdleCommand =
   | { type: 'start-focus' }
@@ -275,7 +285,7 @@ export type IdleCommand =
 export interface OverlayAPI {
   onState: (callback: (payload: SessionOverlayPayload) => void) => void;
   onTick: (callback: (remainingSeconds: number) => void) => void;
-  action: (type: OverlayActionType) => void;
+  action: (type: OverlayActionType, data?: OverlayActionData) => void;
   saveNote: (sessionId: string, note: string) => Promise<void>;
   setInteractive: (interactive: boolean) => void;
   /** Escalation state — main owns the full-width top-edge attention strip. */

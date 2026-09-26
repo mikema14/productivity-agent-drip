@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, Notification, net, shell, screen } from 'electron';
 import { join } from 'path';
 import { readFileSync, statSync, writeFileSync } from 'fs';
-import type { FocusCompletePayload, BreakCompletePayload, OverlayActionType } from '../src/types';
+import type { FocusCompletePayload, BreakCompletePayload, OverlayActionData, OverlayActionType } from '../src/types';
 import {
   initDB,
   closeDB,
@@ -476,9 +476,9 @@ ipcMain.handle('overlay:save-note', async (_event, sessionId: string, note: stri
 
 // Overlay relays its actions to the main window renderer, which owns all timer
 // logic — the overlay never drives the timer itself.
-ipcMain.on('overlay:action', (_event, type: OverlayActionType) => {
+ipcMain.on('overlay:action', (_event, type: OverlayActionType, data?: OverlayActionData) => {
   // Idle nudge and kickoff prompt buttons are handled by the idle watcher
-  if (handleIdleOverlayAction(type)) return;
+  if (handleIdleOverlayAction(type, data)) return;
 
   if (type === 'start-break') {
     // Collapse to the break pill immediately so there is no flash; the exact

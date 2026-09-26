@@ -4,6 +4,7 @@ import type {
   BreakRunningPayload,
   FocusCompletePayload,
   BreakCompletePayload,
+  OverlayActionData,
   OverlayActionType,
   SessionOverlayPayload
 } from '../types';
@@ -60,6 +61,7 @@ function devPayload(): SessionOverlayPayload | null {
       kickoffAt: new Date(Date.now() + 15 * 60_000).toISOString(),
       kickoffSeconds: 120,
       snoozeSeconds: 900,
+      snoozeLongSeconds: 3600,
       escalateMinutes: 15,
       taskId: '689742',
       taskTitle: 'Automatizovať dokumentáciu',
@@ -157,15 +159,16 @@ export function SessionEndOverlay() {
   }, []);
 
   const act = useCallback(
-    (type: OverlayActionType) => {
+    (type: OverlayActionType, data?: OverlayActionData) => {
       flushNote(true);
       stopEscalation();
       if (!window.overlayAPI) {
         // Dev / e2e fixture window (no preload): nothing can leave the page.
-        console.log(`[Overlay] fixture action: ${type}`);
+        console.log(`[Overlay] fixture action: ${type}${data ? ` ${JSON.stringify(data)}` : ''}`);
         return;
       }
-      window.overlayAPI.action(type);
+      if (data === undefined) window.overlayAPI.action(type);
+      else window.overlayAPI.action(type, data);
     },
     [flushNote, stopEscalation]
   );
@@ -220,10 +223,11 @@ export function SessionEndOverlay() {
         else console.log('[Overlay] fixture action: dismiss');
         return;
       }
-      // The nudge's Start focus ↵ (N3). The note input's own Enter → start-break is untouched.
+      // The nudge's Start focus ↵ (N3). The note input's own Enter → start-break is untouched,
+      // and Enter on a focused key (Tab → Snooze → 1h) is that key's click, nothing more.
       if (event.key === 'Enter' && kindRef.current === 'idle') {
         const target = event.target as HTMLElement | null;
-        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON' || target.isContentEditable)) return;
         act('idle-start-focus');
       }
     };

@@ -25,6 +25,13 @@ export function kickoffLength(seconds: number): string {
   return `${s}-second`;
 }
 
+/** A snooze choice's length: `15m`, `1h` (whole hours), `30s` below a minute. */
+export function pauseLength(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  if (s >= 3600 && s % 3600 === 0) return `${s / 3600}h`;
+  return span(s);
+}
+
 export interface Explanation {
   before: string;
   /** Rendered as its own amber mono span (never a `#`); null when the sentence names no id. */

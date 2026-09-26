@@ -27,7 +27,7 @@ function safe<T>(read: () => T, fallback: T): T {
 
 export function buildNudgePayload(
   action: { idleSince: number; kickoffAt: number },
-  cfg: Pick<IdleConfig, 'kickoffSeconds' | 'snoozeMs' | 'escalateAfterMs'>,
+  cfg: Pick<IdleConfig, 'kickoffSeconds' | 'snoozeMs' | 'snoozeLongMs' | 'escalateAfterMs'>,
   lookup: NudgeLookup
 ): IdleNudgePayload {
   const taskId = safe(() => lookup.lastTask(), null) || null;
@@ -38,6 +38,7 @@ export function buildNudgePayload(
     kickoffAt: new Date(action.kickoffAt).toISOString(),
     kickoffSeconds: cfg.kickoffSeconds,
     snoozeSeconds: Math.round(cfg.snoozeMs / 1000),
+    snoozeLongSeconds: Math.round(cfg.snoozeLongMs / 1000),
     escalateMinutes: Math.round(cfg.escalateAfterMs / 60000),
     taskId,
     taskTitle,

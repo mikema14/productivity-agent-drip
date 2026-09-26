@@ -12,6 +12,7 @@ const base: IdleNudgePayload = {
   kickoffAt: new Date(now + 872_000).toISOString(),
   kickoffSeconds: 120,
   snoozeSeconds: 900,
+  snoozeLongSeconds: 3600,
   escalateMinutes: 15,
   taskId: '689742',
   taskTitle: 'Automatizovať dokumentáciu',
@@ -78,11 +79,14 @@ describe('IdleNudgeCard', () => {
     expect(screen.getByTestId('nudge-copy')).toHaveTextContent(/^Then a 2-minute kickoff starts\.$/);
   });
 
-  it('DRIP_IDLE_FAST lengths: 20-second kickoff, Kickoff 20s, Snooze 30s', () => {
-    draw({ kickoffSeconds: 20, snoozeSeconds: 30, raycastFocus: false });
+  it('DRIP_IDLE_FAST lengths: 20-second kickoff, Kickoff 20s, snooze choices 30s / 1m / Rest of day', () => {
+    draw({ kickoffSeconds: 20, snoozeSeconds: 30, snoozeLongSeconds: 60, raycastFocus: false });
     expect(screen.getByTestId('nudge-copy')).toHaveTextContent('Then a 20-second kickoff starts on 689742.');
     expect(screen.getByRole('button', { name: /Kickoff\s*20s/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Snooze\s*30s/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Snooze' }));
+    expect(screen.getByRole('button', { name: '30s' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '1m' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Rest of day' })).toBeInTheDocument();
   });
 
   it('the ↵ hint is printed only while the window has focus (N3)', () => {
@@ -97,13 +101,51 @@ describe('IdleNudgeCard', () => {
   it.each([
     [/Start focus/, 'idle-start-focus'],
     [/Kickoff\s*2m/, 'idle-kickoff'],
-    [/Snooze\s*15m/, 'idle-snooze'],
     ['Dismiss', 'dismiss'],
   ])('%s relays %s', (name, action) => {
     const { act } = draw();
     fireEvent.click(screen.getByRole('button', { name }));
     expect(act).toHaveBeenCalledWith(action);
     expect(act).toHaveBeenCalledTimes(1);
+  });
+
+  it('Snooze opens the choice row (15m · 1h · Rest of day) without relaying anything, and closes it again', () => {
+    const { act } = draw();
+    expect(screen.queryByTestId('nudge-snooze-choices')).toBeNull();
+    const snooze = screen.getByRole('button', { name: 'Snooze' });
+    expect(snooze).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(snooze);
+    expect(snooze).toHaveAttribute('aria-expanded', 'true');
+    const group = screen.getByRole('group', { name: 'Snooze for' });
+    expect(group).toHaveTextContent('Snooze for15m1hRest of day');
+    expect(act).not.toHaveBeenCalled();
+    fireEvent.click(snooze);
+    expect(screen.queryByTestId('nudge-snooze-choices')).toBeNull();
+  });
+
+  it.each([
+    ['15m', '15m'],
+    ['1h', '1h'],
+    ['Rest of day', 'day'],
+  ])('%s relays idle-snooze with the choice %s', (name, choice) => {
+    const { act } = draw();
+    fireEvent.click(screen.getByRole('button', { name: 'Snooze' }));
+    fireEvent.click(screen.getByRole('button', { name }));
+    expect(act).toHaveBeenCalledWith('idle-snooze', { snooze: choice });
+    expect(act).toHaveBeenCalledTimes(1);
+  });
+
+  it('is keyboard reachable: the first choice takes focus, ← → move between them', () => {
+    draw();
+    fireEvent.click(screen.getByRole('button', { name: 'Snooze' }));
+    const first = screen.getByRole('button', { name: '15m' });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '1h' }));
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowLeft' });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: 'ArrowLeft' });
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Rest of day' }));
   });
 
   it('carries the red hairline and halo on the glass shell', () => {

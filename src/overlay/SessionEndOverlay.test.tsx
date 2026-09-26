@@ -32,6 +32,7 @@ describe('SessionEndOverlay — idle nudge', () => {
     kickoffAt: new Date(Date.now() + 15 * 60_000).toISOString(),
     kickoffSeconds: 120,
     snoozeSeconds: 900,
+    snoozeLongSeconds: 3600,
     escalateMinutes: 15,
     taskId: '689742',
     taskTitle: 'Automatizovať dokumentáciu',
@@ -46,7 +47,7 @@ describe('SessionEndOverlay — idle nudge', () => {
     expect(screen.getByTestId('nudge-takeover')).toHaveTextContent(/^1[45]:\d\d$/);
     expect(screen.getByRole('button', { name: /Start focus/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Kickoff\s*2m/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Snooze\s*15m/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Snooze' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
   });
 
@@ -76,6 +77,18 @@ describe('SessionEndOverlay — idle nudge', () => {
     expect(overlayAPI.action).not.toHaveBeenCalled();
   });
 
+  it('Enter on a focused key is that key alone: Snooze → 1h relays the pause, not idle-start-focus', () => {
+    show(idle);
+    fireEvent.click(screen.getByRole('button', { name: 'Snooze' }));
+    const hour = screen.getByRole('button', { name: '1h' });
+    hour.focus();
+    fireEvent.keyDown(hour, { key: 'Enter' });
+    expect(overlayAPI.action).not.toHaveBeenCalledWith('idle-start-focus');
+    fireEvent.click(hour);
+    expect(overlayAPI.action).toHaveBeenCalledWith('idle-snooze', { snooze: '1h' });
+    expect(overlayAPI.action).toHaveBeenCalledTimes(1);
+  });
+
   it('fixture: renders from ?state=idle and never calls overlayAPI.action when the bridge is absent', () => {
     window.history.replaceState({}, '', '/?state=idle');
     (window as { overlayAPI?: OverlayAPI }).overlayAPI = undefined;
@@ -98,12 +111,18 @@ describe('SessionEndOverlay — idle nudge', () => {
   it.each([
     [/Start focus/, 'idle-start-focus'],
     [/Kickoff/, 'idle-kickoff'],
-    [/Snooze/, 'idle-snooze'],
     [/Dismiss/, 'dismiss'],
   ])('%s sends %s', (name, action) => {
     show(idle);
     fireEvent.click(screen.getByRole('button', { name }));
     expect(overlayAPI.action).toHaveBeenCalledWith(action);
+  });
+
+  it('Snooze → Rest of day sends idle-snooze with the choice', () => {
+    show(idle);
+    fireEvent.click(screen.getByRole('button', { name: 'Snooze' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rest of day' }));
+    expect(overlayAPI.action).toHaveBeenCalledWith('idle-snooze', { snooze: 'day' });
   });
 
   it('does not run the amber escalation (main owns the idle clock)', () => {

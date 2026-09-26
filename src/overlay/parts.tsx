@@ -89,7 +89,8 @@ export function ActionButton({
   solid,
   grow,
   accent,
-  escalated
+  escalated,
+  ariaExpanded
 }: {
   children: ReactNode;
   onClick: () => void;
@@ -100,6 +101,8 @@ export function ActionButton({
   grow?: boolean;
   accent: { base: string; light: string; bright: string } | typeof BREAK;
   escalated?: boolean;
+  /** Set when the key toggles an inline choice (the nudge's Snooze). */
+  ariaExpanded?: boolean;
 }) {
   const light = 'light' in accent ? accent.light : FOCUS.light;
   const bright = 'bright' in accent ? (accent as typeof FOCUS).bright : light;
@@ -141,6 +144,7 @@ export function ActionButton({
   return (
     <button
       onClick={onClick}
+      aria-expanded={ariaExpanded}
       style={base}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = hoverBackground;

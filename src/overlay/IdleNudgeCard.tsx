@@ -1,13 +1,19 @@
-import type { CSSProperties, RefObject } from 'react';
-import type { IdleNudgePayload, OverlayActionType } from '../types';
+import { useEffect, useRef, useState } from 'react';
+import type { CSSProperties, KeyboardEvent, ReactNode, RefObject } from 'react';
+import type { IdleNudgePayload, OverlayActionData, OverlayActionType, SnoozeChoice } from '../types';
 import { ALERT, CARD_W, FOCUS, GLASS, TXT } from './glass';
 import { ActionButton, DismissButton, Dot, label, mono, span, withAlpha } from './parts';
-import { explain, idleFor, takeoverIn } from './nudgeCopy';
+import { explain, idleFor, pauseLength, takeoverIn } from './nudgeCopy';
 
 /**
  * The red idle nudge (mockups/Nudge.dc.html): the session-end card's red
  * sibling — same GLASS shell, plus the mockup's red hairline and halo (N1).
  * Timing and actions belong to main; this only draws the payload.
+ *
+ * Snooze is a choice, not one length: the key opens a quiet row of three
+ * small keys (15m · 1h · Rest of day), the first one focused so Tab / Enter
+ * and ← → work without aiming a mouse. Each relays `idle-snooze` with its
+ * choice; main turns that into the pause.
  */
 export function IdleNudgeCard({
   payload,
@@ -22,9 +28,16 @@ export function IdleNudgeCard({
   /** The `↵` hint is printed only while the window can receive it (N3). */
   windowFocused: boolean;
   shapeRef: RefObject<HTMLDivElement>;
-  act: (type: OverlayActionType) => void;
+  act: (type: OverlayActionType, data?: OverlayActionData) => void;
 }) {
   const copy = explain(payload);
+  const [snoozeOpen, setSnoozeOpen] = useState(false);
+
+  const choices: Array<{ choice: SnoozeChoice; text: ReactNode }> = [
+    { choice: '15m', text: <span style={mono}>{pauseLength(payload.snoozeSeconds)}</span> },
+    { choice: '1h', text: <span style={mono}>{pauseLength(payload.snoozeLongSeconds)}</span> },
+    { choice: 'day', text: 'Rest of day' }
+  ];
 
   const sheen: CSSProperties = {
     position: 'absolute',
@@ -118,12 +131,107 @@ export function IdleNudgeCard({
             <span style={{ ...mono, fontSize: 11.5, opacity: 0.6 }}>{span(payload.kickoffSeconds)}</span>
           </ActionButton>
           <span style={{ flexGrow: 1 }} />
-          <ActionButton accent={FOCUS} onClick={() => act('idle-snooze')}>
+          <ActionButton accent={FOCUS} ariaExpanded={snoozeOpen} onClick={() => setSnoozeOpen((open) => !open)}>
             Snooze
-            <span style={{ ...mono, fontSize: 11.5, opacity: 0.6 }}>{span(payload.snoozeSeconds)}</span>
           </ActionButton>
         </div>
+
+        {snoozeOpen && (
+          <SnoozeChoices
+            choices={choices}
+            onPick={(choice) => act('idle-snooze', { snooze: choice })}
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+/** The inline choice row: a label and three ghost keys, ← → between them. */
+function SnoozeChoices({
+  choices,
+  onPick
+}: {
+  choices: Array<{ choice: SnoozeChoice; text: ReactNode }>;
+  onPick: (choice: SnoozeChoice) => void;
+}) {
+  const groupRef = useRef<HTMLDivElement | null>(null);
+
+  // Opened from the keyboard or the mouse alike, the first key takes focus so
+  // Enter / ← → carry on from there (the window's Enter binding skips buttons).
+  useEffect(() => {
+    groupRef.current?.querySelector('button')?.focus();
+  }, []);
+
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    const keys = Array.from(groupRef.current?.querySelectorAll('button') ?? []);
+    const index = keys.indexOf(document.activeElement as HTMLButtonElement);
+    if (index < 0) return;
+    event.preventDefault();
+    const next = (index + (event.key === 'ArrowRight' ? 1 : keys.length - 1)) % keys.length;
+    keys[next].focus();
+  };
+
+  return (
+    <div
+      ref={groupRef}
+      role="group"
+      aria-label="Snooze for"
+      data-testid="nudge-snooze-choices"
+      onKeyDown={onKeyDown}
+      style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: -2 }}
+    >
+      <span style={{ ...label(TXT.muted), marginRight: 4 }}>Snooze for</span>
+      {choices.map(({ choice, text }) => (
+        <ChoiceKey key={choice} onClick={() => onPick(choice)}>
+          {text}
+        </ChoiceKey>
+      ))}
+    </div>
+  );
+}
+
+function ChoiceKey({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  const rest = `0.5px solid rgba(255,255,255,0.10)`;
+  const lit = `0.5px solid ${withAlpha(FOCUS.base, 0.45)}`;
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        height: 28,
+        padding: '0 10px',
+        borderRadius: 9,
+        fontFamily: "'Outfit', system-ui, sans-serif",
+        fontSize: 12.5,
+        fontWeight: 400,
+        cursor: 'pointer',
+        outline: 'none',
+        transition: 'background-color 160ms ease, border-color 160ms ease, color 160ms ease',
+        background: 'transparent',
+        border: rest,
+        color: TXT.secondary
+      }}
+      onFocus={(e) => {
+        e.currentTarget.style.border = lit;
+        e.currentTarget.style.color = TXT.primary;
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.border = rest;
+        e.currentTarget.style.color = TXT.secondary;
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = withAlpha(FOCUS.base, 0.06);
+        e.currentTarget.style.color = TXT.primary;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent';
+        if (document.activeElement !== e.currentTarget) e.currentTarget.style.color = TXT.secondary;
+      }}
+    >
+      {children}
+    </button>
   );
 }

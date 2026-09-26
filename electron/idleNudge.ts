@@ -1,6 +1,6 @@
 import { BrowserWindow, powerMonitor } from 'electron';
 import { getSetting, getCalendarProposals, getLastSessionWithTask, getCachedTask } from '../src/services/db';
-import type { IdleCommand, KickoffSource, OverlayActionType } from '../src/types';
+import type { IdleCommand, KickoffSource, OverlayActionData, OverlayActionType } from '../src/types';
 import { getVisibleOverlayKind, hideOverlay, sampleActiveDisplay, showOverlay } from './overlayWindow';
 import { getTimerState, setTimerListener } from './timer';
 import { raycastFocusEnd, isRaycastFocusEnabled } from './raycastFocus';
@@ -210,7 +210,7 @@ function onKickoffRollover(rolloverSeconds: number): void {
  * Overlay buttons that belong to the idle nudge or the kickoff prompt. Returns
  * false for everything else, which keeps the existing session-end relay.
  */
-export function handleIdleOverlayAction(type: OverlayActionType): boolean {
+export function handleIdleOverlayAction(type: OverlayActionType, data?: OverlayActionData): boolean {
   switch (type) {
     case 'idle-start-focus':
       hideIdleNudge();
@@ -219,11 +219,14 @@ export function handleIdleOverlayAction(type: OverlayActionType): boolean {
     case 'idle-kickoff':
       startKickoff('nudge');
       return true;
-    case 'idle-snooze':
+    case 'idle-snooze': {
       hideIdleNudge();
-      state = onSnooze(state, Date.now(), snoozeUntilFor('15m', Date.now(), cfg));
-      console.log(`[IdleNudge] Snoozed for ${Math.round(cfg.snoozeMs / 60000)}m`);
+      const choice = data?.snooze ?? '15m';
+      const now = Date.now();
+      state = onSnooze(state, now, snoozeUntilFor(choice, now, cfg));
+      console.log(`[IdleNudge] Snoozed (${choice}) until ${new Date(state.snoozeUntil ?? now).toISOString()}`);
       return true;
+    }
     case 'kickoff-keep':
       finishKickoffPrompt('keep-going');
       return true;

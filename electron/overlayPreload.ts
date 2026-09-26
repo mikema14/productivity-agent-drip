@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { OverlayAPI, OverlayActionType, SessionOverlayPayload } from '../src/types';
+import type { OverlayAPI, OverlayActionData, OverlayActionType, SessionOverlayPayload } from '../src/types';
 
 /**
  * Minimal bridge for the overlay window. Deliberately separate from
@@ -15,8 +15,8 @@ const overlayAPI: OverlayAPI = {
     ipcRenderer.on('overlay:tick', (_event, remainingSeconds: number) => callback(remainingSeconds));
   },
 
-  action: (type: OverlayActionType): void => {
-    ipcRenderer.send('overlay:action', type);
+  action: (type: OverlayActionType, data?: OverlayActionData): void => {
+    ipcRenderer.send('overlay:action', type, data);
   },
 
   saveNote: async (sessionId: string, note: string): Promise<void> => {

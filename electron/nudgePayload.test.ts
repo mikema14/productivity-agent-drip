@@ -19,17 +19,19 @@ describe('buildNudgePayload', () => {
     expect(p.kickoffAt).toBe(new Date(T0 + 15 * 60_000).toISOString());
   });
 
-  it('takes kickoffSeconds / snoozeSeconds / escalateMinutes from IDLE_DEFAULTS (120 / 900 / 15)', () => {
+  it('takes kickoffSeconds / snoozeSeconds / snoozeLongSeconds / escalateMinutes from IDLE_DEFAULTS (120 / 900 / 3600 / 15)', () => {
     const p = buildNudgePayload(action, IDLE_DEFAULTS, known);
     expect(p.kickoffSeconds).toBe(120);
     expect(p.snoozeSeconds).toBe(900);
+    expect(p.snoozeLongSeconds).toBe(3600);
     expect(p.escalateMinutes).toBe(15);
   });
 
-  it('and from IDLE_FAST (20 / 30 / 1)', () => {
+  it('and from IDLE_FAST (20 / 30 / 60 / 1)', () => {
     const p = buildNudgePayload(action, IDLE_FAST, known);
     expect(p.kickoffSeconds).toBe(20);
     expect(p.snoozeSeconds).toBe(30);
+    expect(p.snoozeLongSeconds).toBe(60);
     expect(p.escalateMinutes).toBe(1);
   });
 

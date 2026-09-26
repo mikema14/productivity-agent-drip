@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { explain, idleFor, kickoffLength, takeoverIn } from './nudgeCopy';
+import { explain, idleFor, kickoffLength, pauseLength, takeoverIn } from './nudgeCopy';
 
 const now = new Date(2026, 8, 23, 10, 0).getTime();
 const at = (deltaSec: number) => new Date(now + deltaSec * 1000).toISOString();
@@ -22,6 +22,17 @@ describe('nudgeCopy.idleFor', () => {
   it('shows minutes, or seconds below a minute', () => {
     expect(idleFor(at(-12 * 60), now)).toBe('12m');
     expect(idleFor(at(-40), now)).toBe('40s');
+  });
+});
+
+describe('nudgeCopy.pauseLength', () => {
+  it('15m, 1h for whole hours, seconds below a minute (DRIP_IDLE_FAST)', () => {
+    expect(pauseLength(900)).toBe('15m');
+    expect(pauseLength(3600)).toBe('1h');
+    expect(pauseLength(7200)).toBe('2h');
+    expect(pauseLength(30)).toBe('30s');
+    expect(pauseLength(60)).toBe('1m');
+    expect(pauseLength(5400)).toBe('90m');
   });
 });
 
