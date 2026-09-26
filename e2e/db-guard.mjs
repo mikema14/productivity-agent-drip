@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Real-database safety protocol for the e2e smoke (PHASE1_PLAN.md §4,
- * PHASE2_PLAN.md §7.2, PHASE3_PLAN.md §7.2).
+ * PHASE2_PLAN.md §7.2, PHASE3_PLAN.md §7.2, PHASE4_PLAN.md §7.2).
  *
  *   node e2e/db-guard.mjs prepare                       → backup + snapshot, prints the backup dir
  *   node e2e/db-guard.mjs verify-and-clean <backupDir> <main.log>
@@ -67,7 +67,11 @@ not violations. The Review walk navigates one day back and forth (calendar
 sync inserts for those days are deleted), opens and cancels the Add Entry /
 Templates / End Day modals, and never marks, edits, logs or ends a day: any
 change to a pre-existing entry row, shutdown ritual or daily intention is a
-violation (restored from the backup).`);
+violation (restored from the backup). The kickoff steps stop the timer with
+Escape (reset, no row) well before the 120-s roll-over; overlay states are
+screenshotted from preload-less fixture windows that cannot reach IPC. Any
+"[RaycastFocus] Started", "[IdleNudge] off → counting" or "Kickoff rolled
+over" line in main.log is a violation.`);
   process.exit(code);
 }
 
@@ -318,6 +322,13 @@ export function verifyAndClean(backupDir, logPath) {
   const blocked = (log.match(/\[Safety\] Blocked/g) || []).length;
   if (posted) violations.push(`main.log: ${posted} "Posting time entry to:" line(s)`);
   if (blocked) violations.push(`main.log: ${blocked} "[Safety] Blocked" line(s) — a POST was attempted`);
+  // (d) Phase 4: the test-mode gates held and no kickoff reached its roll-over
+  const raycastStarted = (log.match(/\[RaycastFocus\] Started/g) || []).length;
+  if (raycastStarted) violations.push(`main.log: ${raycastStarted} "[RaycastFocus] Started" line(s) — a Raycast Focus session was started during a test run`);
+  const idleRan = (log.match(/\[IdleNudge\] (off → counting|\w+ → nudged)/g) || []).length;
+  if (idleRan) violations.push(`main.log: ${idleRan} "[IdleNudge] … → counting/nudged" line(s) — the idle watcher ran during a test run`);
+  const rolled = (log.match(/Kickoff rolled over/g) || []).length;
+  if (rolled) violations.push(`main.log: ${rolled} "Kickoff rolled over" line(s) — a kickoff reached its roll-over; stopKickoff or the prompt may have run`);
   for (const t of LOGGED_TABLES) {
     const max = snapshot.rowid[t]?.maxRowid ?? 0;
     const sentAt = columns(t).includes('log_sent_at') ? `log_sent_at >= ${q(snapshot.run_start_utc)} OR ` : '';

@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
  * E2E smoke: walks the Now screen through every state (PHASE1_PLAN.md §3.2),
- * the Plan screen read-only (PHASE2_PLAN.md §7.1) and the Review screen
- * read-only (PHASE3_PLAN.md §7.1), screenshotting each
- * view at 1200×800 and 800×600 against the real database under the guard.
- * Quit the installed Drip first.
+ * the Plan screen read-only (PHASE2_PLAN.md §7.1), the Review screen
+ * read-only (PHASE3_PLAN.md §7.1) and the kickoff takeover + deeplink kickoff
+ * (PHASE4_PLAN.md §7.1), screenshotting each view at 1200×800 and 800×600
+ * against the real database under the guard. The overlay states are
+ * screenshotted from preload-less fixture windows that cannot reach IPC, the
+ * DB or raycast:// (PHASE4_PLAN.md E1). Quit the installed Drip first.
  *
  *   npm run e2e:smoke
  */
@@ -54,6 +56,94 @@ async function waitFor(check, timeoutMs, what) {
     await new Promise(r => setTimeout(r, 250));
   }
   throw new Error(`timed out waiting for ${what}`);
+}
+
+/**
+ * The kickoff takeover (PHASE4_PLAN.md §7.1): fills the window, says Raycast
+ * is off (the DRIP_TEST_MODE gate), names its source, keeps Now's Kickoff pill
+ * intact underneath (K3) and offers Stop — asserted, never clicked (E3: the exit
+ * is Escape → reset, no row).
+ */
+async function assertTakeover(page, sourceText) {
+  const raycast = await page.getByTestId('kickoff-raycast').textContent();
+  if ((raycast || '').trim() !== 'Raycast Focus off') throw new Error(`takeover Raycast pill reads "${raycast}", expected "Raycast Focus off"`);
+  const source = await page.getByTestId('kickoff-source').textContent();
+  if ((source || '').trim() !== sourceText) throw new Error(`takeover source reads "${source}", expected "${sourceText}"`);
+  if (!(await page.getByTestId('now-pill').filter({ hasText: 'Kickoff' }).count())) throw new Error('Now pill under the takeover is not "Kickoff"');
+  if (!(await page.getByRole('button', { name: /^Stop/ }).count())) throw new Error('takeover Stop key missing');
+  for (const name of ['Pause', 'Finish', '+5 min']) {
+    if (!(await page.getByRole('button', { name, exact: true }).count())) throw new Error(`takeover secondary key "${name}" missing`);
+  }
+  const ids = await page.getByTestId('kickoff-task-id').allTextContents();
+  const hashed = ids.filter(t => t.includes('#'));
+  if (hashed.length) throw new Error(`takeover id pill with '#': ${hashed.join(', ')}`);
+  console.log(`[smoke] takeover: ${sourceText} (Stop present, not clicked)`);
+}
+
+/** Exit a kickoff the no-row way: Escape → reset (E3). */
+async function leaveTakeover(page) {
+  const takeover = page.getByRole('dialog', { name: 'Kickoff' });
+  await page.keyboard.press('Escape');
+  await takeover.waitFor({ state: 'hidden', timeout: 10_000 });
+  await page.getByTestId('now-pill').filter({ hasText: 'Ready' }).waitFor();
+}
+
+/**
+ * Overlay states from fixture windows (PHASE4_PLAN.md §7.1 step 3, E1): plain
+ * BrowserWindows with NO preload, so window.overlayAPI is undefined and nothing
+ * can leave the page — no IPC, no DB, no raycast://. The real overlay module
+ * (electron/overlayWindow.ts) is never involved. Main refuses to create them
+ * outside DRIP_TEST_MODE / DRIP_E2E.
+ */
+const OVERLAY_STATES = [
+  ['idle', '[data-testid="idle-nudge"]'],
+  ['kickoff', '[data-testid="kickoff-prompt"]'],
+  ['card', 'text=Focus complete'],
+  ['break-complete', 'text=Break over'],
+  ['break', 'text=/^Break$/'],
+];
+
+async function overlayFixtures(app, outDir, logStream) {
+  for (const [state, selector] of OVERLAY_STATES) {
+    const opened = app.waitForEvent('window', { timeout: 15_000 }).catch(() => null);
+    await app.evaluate(({ BrowserWindow }, s) => {
+      if (process.env.DRIP_TEST_MODE !== '1' || process.env.DRIP_E2E !== '1') throw new Error('overlay fixtures exist only under DRIP_TEST_MODE / DRIP_E2E');
+      const win = new BrowserWindow({
+        width: 560, height: 400, show: true, frame: false, transparent: false, backgroundColor: '#1a1a2e',
+        title: `overlay-fixture-${s}`,
+        webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+      });
+      win.loadURL(`http://localhost:5173/overlay.html?state=${s}`);
+    }, state);
+    let fx = await opened;
+    if (!fx) fx = app.windows().find(p => p.url().includes(`overlay.html?state=${state}`)) ?? null;
+    if (!fx) throw new Error(`fixture window for ?state=${state} never appeared`);
+    const consoleLines = [];
+    fx.on('console', m => { consoleLines.push(m.text()); logStream.write(`[overlay-fixture:${state}:${m.type()}] ${m.text()}\n`); });
+    fx.on('pageerror', e => logStream.write(`[overlay-fixture:${state}:pageerror] ${e.stack || e}\n`));
+    await fx.waitForSelector(selector, { timeout: 15_000 });
+    const bridge = await fx.evaluate(() => typeof window.overlayAPI);
+    if (bridge !== 'undefined') throw new Error(`fixture ${state} has an overlayAPI bridge (${bridge}); it must be preload-less`);
+    await fx.waitForTimeout(400); // drip-arrive
+    await fx.screenshot({ path: join(outDir, `overlay-${state}.png`) });
+    if (state === 'idle') {
+      const ids = await fx.locator('[data-testid="nudge-copy"] span').allTextContents();
+      if (ids.some(t => t.includes('#'))) throw new Error('nudge copy id carries a #');
+      await fx.getByRole('button', { name: /Start focus/ }).click();
+      await fx.waitForTimeout(200);
+      const actions = consoleLines.filter(l => l.includes('[Overlay] fixture action:'));
+      if (actions.length !== 1 || !actions[0].includes('idle-start-focus')) {
+        throw new Error(`expected exactly one fixture action line (idle-start-focus), got: ${JSON.stringify(actions)}`);
+      }
+      console.log('[smoke] overlay fixture idle: Start focus logged, nothing left the page');
+    }
+    await app.evaluate(({ BrowserWindow }, s) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (w.webContents.getURL().includes(`overlay.html?state=${s}`)) w.destroy();
+      }
+    }, state);
+    await waitFor(async () => !app.windows().some(p => p.url().includes(`overlay.html?state=${state}`)), 10_000, `fixture ${state} to close`);
+  }
 }
 
 /** The three board columns must exist by label in the current scope. */
@@ -397,14 +487,26 @@ async function main() {
       await pill().filter({ hasText: 'Ready' }).waitFor();
       assertStep(t, 'focus sequence');
 
-      // Kickoff: cancel well before the 120 s roll-over; stopKickoff is never used (it saves a row).
+      // Kickoff: the takeover fills the window; leave with Escape (reset, no row) well
+      // before the 120 s roll-over. stopKickoff is never used (it saves a row).
+      const takeover = page.getByRole('dialog', { name: 'Kickoff' });
       t = stepStart();
       await key(/kickoff 2m/i).click();
-      await pill().filter({ hasText: 'Kickoff' }).waitFor({ timeout: 15_000 });
+      await takeover.waitFor({ timeout: 15_000 });
+      await pill().filter({ hasText: 'Kickoff' }).waitFor();
+      await assertTakeover(page, 'Started from Now');
       await shot('now-kickoff');
-      await key(/^cancel$/i).click();
-      await pill().filter({ hasText: 'Ready' }).waitFor();
+      await leaveTakeover(page);
       assertStep(t, 'kickoff');
+
+      // Deeplink kickoff (E2): main → idleNudge.startKickoff('deeplink') → IdleCommand → timerStore.startKickoff.
+      t = stepStart();
+      await app.evaluate(({ app }) => app.emit('open-url', { preventDefault() {} }, 'drip://kickoff'));
+      await takeover.waitFor({ timeout: 15_000 });
+      await assertTakeover(page, 'Started from Raycast');
+      await shot('now-kickoff-deeplink');
+      await leaveTakeover(page);
+      assertStep(t, 'kickoff deeplink');
 
       // Break via the drip:// path; skip before the 60 s break-complete save.
       t = stepStart();
@@ -440,6 +542,9 @@ async function main() {
       await page.getByTestId('review-date').waitFor();
       await assertReviewInvariants(page); // R1: Review day → lands on today
     }
+
+    // Overlay states (once; the fixture windows are 560×400 whatever the main window is)
+    await overlayFixtures(app, outDir, logStream);
   } catch (error) {
     console.error('[smoke] failed:', error);
     if (page) await page.screenshot({ path: join(outDir, 'failure.png') }).catch(() => {});
