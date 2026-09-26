@@ -102,6 +102,15 @@ describe('TodaysThree', () => {
     expect(screen.queryByTestId('today-item')).toBeNull();
   });
 
+  it('below wide the row wraps and the outcome group takes its own line under the title', () => {
+    seed([item()]);
+    render(<TodaysThree />);
+    const row = screen.getByTestId('today-item');
+    expect(row).toHaveClass('flex-wrap', 'wide:flex-nowrap');
+    expect(screen.getByRole('group', { name: 'Outcome' })).toHaveClass('w-full', 'wide:w-auto');
+    expect(screen.getByText('Write proposal')).toHaveClass('flex-1', 'min-w-0', 'truncate');
+  });
+
   it('archived today items are not shown', () => {
     seed([item({ archived: 1 })]);
     const { container } = render(<TodaysThree />);

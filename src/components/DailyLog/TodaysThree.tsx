@@ -29,7 +29,7 @@ export default function TodaysThree() {
   const outcome = (item: ListItem) => {
     const done = item.completed === 1;
     return (
-      <span role="group" aria-label="Outcome" className="flex items-center gap-1 shrink-0">
+      <span role="group" aria-label="Outcome" className="w-full wide:w-auto flex items-center gap-1 shrink-0">
         <Pill pressed={done} onClick={() => void updateItem(item.id, { completed: done ? 0 : 1 })} className="h-[24px] px-2 text-[11.5px]">Done</Pill>
         <Pill pressed={!done} onClick={() => {}} title="Stays in Today" className="h-[24px] px-2 text-[11.5px]">Carry</Pill>
         <Pill pressed={false} onClick={() => void moveItem(item.id, 'this_week', nextOrder('this_week'))} className="h-[24px] px-2 text-[11.5px]">To week</Pill>
@@ -52,7 +52,8 @@ export default function TodaysThree() {
           const taskId = effectiveTaskId(item, list);
           const done = item.completed === 1;
           return (
-            <div key={item.id} data-testid="today-item" className="h-12 flex items-center gap-3 border-t border-drip-elevated first:border-t-0">
+            // Below `wide:` the title keeps the row and the outcome group wraps under it (w-full); at wide it is one 48px line.
+            <div key={item.id} data-testid="today-item" className="min-h-[48px] py-2 wide:py-0 flex flex-wrap wide:flex-nowrap items-center gap-x-3 gap-y-1.5 border-t border-drip-elevated first:border-t-0">
               {taskId ? (
                 <TaskIdBadge taskId={taskId} taskName={null} plain className={`shrink-0 ${done ? 'opacity-50' : ''}`} />
               ) : (
