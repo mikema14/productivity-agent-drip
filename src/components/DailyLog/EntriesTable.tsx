@@ -88,7 +88,7 @@ export default function EntriesTable(props: Props) {
       {/* Column header + body; below `wide:` the grid keeps its width and scrolls sideways (P16 precedent).
           The min height keeps the empty / loading states and the timeline grid visible. */}
       <div data-testid="entries-body" className="overflow-x-auto">
-        <div className="min-w-[640px] wide:min-w-0 min-h-[240px] flex flex-col">
+        <div className="min-w-[680px] wide:min-w-0 min-h-[240px] flex flex-col">
           {viewMode === 'list' && (
             <div className={`${ROW_GRID} h-[38px] shrink-0 border-b border-drip-elevated now-label text-txt-muted`} data-testid="entries-columns">
               <span>Time</span><span>Dur</span><span>Task</span><span>Comment</span><span>Billable</span><span>Log</span><span />

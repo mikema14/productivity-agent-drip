@@ -24,8 +24,12 @@ export interface EntryRowProps {
   onOpenSettings?: () => void;
 }
 
-/** Column template shared with the EntriesTable header: Time · Dur · Task · Comment · Billable · Log · actions. */
-export const ROW_GRID = 'grid grid-cols-[52px_44px_150px_minmax(0,1fr)_84px_28px_88px] gap-3 px-4 items-center';
+/**
+ * Column template shared with the EntriesTable header: Time · Dur · Task · Comment · Billable · Log · actions.
+ * The actions track is fixed at the width of the widest hover group (`Edit · Move · Delete`) so it never
+ * overflows leftwards over the Log checkbox; Comment is the only track that gives way (and truncates).
+ */
+export const ROW_GRID = 'grid grid-cols-[52px_44px_150px_minmax(0,1fr)_84px_28px_132px] gap-3 px-4 items-center';
 
 const INPUT = 'h-8 px-3 text-sm bg-transparent border border-drip-border rounded-[2px] text-txt-primary placeholder-txt-dim focus:outline-none focus:border-focus/40';
 const ACTION = 'h-6 px-1.5 rounded-[2px] font-display text-[11.5px] text-txt-muted hover:text-txt-primary hover:bg-focus/10 transition-colors';
@@ -262,7 +266,7 @@ function EntryRow(props: EntryRowProps) {
         </span>
 
         {/* Actions (hover / focus-within) */}
-        <span className="row-actions flex items-center justify-end gap-0.5">
+        <span className="row-actions flex items-center justify-end gap-0.5 whitespace-nowrap">
           {isProposal && onAccept && onDismiss && (
             <>
               <button type="button" onClick={() => onAccept(entry.id)} className={`${ACTION} text-break hover:text-break`}>Accept</button>
