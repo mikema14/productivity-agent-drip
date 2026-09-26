@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLogStore } from '../../stores/logStore';
+import { todayString } from './reviewLogic';
 
 interface DayData {
   date: string;
@@ -83,7 +84,7 @@ export default function CalendarPopover({ selectedDate, onSelectDate, onClose }:
   const now = new Date();
   const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth() + 1;
   const canGoNext = !isCurrentMonth;
-  const todayStr = now.toISOString().split('T')[0];
+  const todayStr = todayString(now);
   const isOnToday = selectedDate === todayStr;
 
   const handlePrevMonth = () => {

@@ -3,6 +3,7 @@ import TimerDayTimeline from './TimerDayTimeline';
 import TimerTaskList from '../Lists/TimerTaskList';
 import { SectionHeader } from './FocusBlock';
 import { useLogStore } from '../../stores/logStore';
+import { todayString } from '../DailyLog/reviewLogic';
 import type { PomodoroSession, CalendarProposal, AdhocEntry } from '../../types';
 import type { ViewId } from '../Layout/views';
 
@@ -32,8 +33,8 @@ export default function NowAside({ sessions, calendarProposals, adhocEntries, on
 
   const openReview = () => {
     // R1: select today (which loads it) so Review lands on this day, not the last viewed one.
-    const today = new Date().toISOString().split('T')[0];
-    useLogStore.getState().setSelectedDate(today);
+    // Local date, the same `todayString` Review's header uses (the UTC split was a day off after midnight CEST).
+    useLogStore.getState().setSelectedDate(todayString());
     onNavigate('daily-log');
   };
 

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { PomodoroSession, AdhocEntry, CalendarProposal } from '../types';
 import { easyProjectAPI } from '../services/api';
 import { syncCalendarProposals } from '../services/calendar';
+import { getCurrentDate } from '../utils/time';
 
 // Combined entry type for the daily log view
 export interface LogEntry {
@@ -64,7 +65,8 @@ export const useLogStore = create<LogState>()(
   persist(
     (set, get) => ({
       entries: [],
-      selectedDate: new Date().toISOString().split('T')[0],
+      // Local calendar date: the UTC split opened yesterday between 00:00 and 02:00 CEST.
+      selectedDate: getCurrentDate(),
       isLoading: false,
       viewMode: 'list',
 
