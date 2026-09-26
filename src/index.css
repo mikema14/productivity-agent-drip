@@ -40,8 +40,9 @@
     font-weight: 500;
   }
 
-  /* Plan cards: hover actions also appear on keyboard focus inside the card */
-  .plan-card-actions {
+  /* Plan cards / Review rows: hover actions also appear on keyboard focus inside the row */
+  .plan-card-actions,
+  .row-actions {
     /* Hidden actions must not swallow clicks meant for the title underneath */
     @apply opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto;
   }

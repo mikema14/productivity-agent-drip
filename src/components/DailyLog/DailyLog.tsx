@@ -2,25 +2,23 @@ import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useLogStore } from '../../stores/logStore';
 import { useShutdownStore } from '../../stores/shutdownStore';
 import EntryRow from './EntryRow';
+import EntriesTable from './EntriesTable';
 import AddEntryModal from './AddEntryModal';
-import ControlBar from './ControlBar';
 import TemplateManagerModal from './TemplateManagerModal';
-import ViewToggle from './ViewToggle';
 import TimelineView from './TimelineView';
-import TimelineItem from '../shared/TimelineItem';
 import EndDayModal from './EndDayModal';
-import CalendarPopover from './CalendarPopover';
 import ReviewHeader from './ReviewHeader';
-import { dayStats, shiftDate, todayString, buildEPLink } from './reviewLogic';
+import { dayStats, selectionSummary, shiftDate, todayString, buildEPLink } from './reviewLogic';
 import type { ViewId } from '../Layout/views';
 import { mergeEntriesByTaskId } from '../../utils/mergeEntries';
-import { forceSyncCalendar, getLastSyncTime, invalidateCalendarCache } from '../../services/calendar';
+import { forceSyncCalendar, invalidateCalendarCache } from '../../services/calendar';
 
 interface DailyLogProps {
   /** R18: the 401 banner's `Open Settings` navigates through the App router. */
   onNavigate?: (view: ViewId) => void;
 }
 
+/** The Review screen: header, entries table, modals and the success toast. */
 export default function DailyLog({ onNavigate }: DailyLogProps) {
   const {
     entries,
@@ -46,7 +44,6 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
   const [showEndDayModal, setShowEndDayModal] = useState(false);
   const [isLogging, setIsLogging] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [successCount, setSuccessCount] = useState(0);
   const [isGrouped, setIsGrouped] = useState(false);
@@ -75,8 +72,6 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
 
   useEffect(() => {
     loadDay(selectedDate);
-    const syncTime = getLastSyncTime(selectedDate);
-    setLastSyncTime(syncTime);
   }, [selectedDate, loadDay]);
 
   // The main process refreshes the ICS feed in the background; the first one
@@ -85,7 +80,6 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     return window.timerAPI.onCalendarFeedUpdated?.(async () => {
       invalidateCalendarCache();
       await loadDay(selectedDate);
-      setLastSyncTime(getLastSyncTime(selectedDate));
     });
   }, [selectedDate, loadDay]);
 
@@ -106,8 +100,8 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     await addManualEntry({ ...entry, startTime: entry.startTime });
   };
 
-  const handleAcceptProposal = async (id: string) => {
-    await window.logAPI.acceptCalendarProposal?.(id);
+  const handleAcceptProposal = async (id: string, taskId?: string) => {
+    await window.logAPI.acceptCalendarProposal?.(id, taskId);
     await loadDay(selectedDate, true); // Skip sync - local operation only
   };
 
@@ -182,23 +176,32 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     deleteEntry(entryId);
   };
 
+  // R7: the live Billable pill writes through the same merged update path
+  const handleToggleBillable = (entryId: string, billable: boolean) => {
+    void handleUpdateMerged(entryId, { billable });
+  };
+
   // Stable refs — always point to the latest handler without changing identity
   const handleUpdateMergedRef    = useRef(handleUpdateMerged);
   const handleDeleteMergedRef    = useRef(handleDeleteMerged);
   const handleToggleLogMergedRef = useRef(handleToggleLogMerged);
   const handleAcceptProposalRef  = useRef(handleAcceptProposal);
   const handleDismissProposalRef = useRef(handleDismissProposal);
+  const handleToggleBillableRef  = useRef(handleToggleBillable);
   handleUpdateMergedRef.current    = handleUpdateMerged;
   handleDeleteMergedRef.current    = handleDeleteMerged;
   handleToggleLogMergedRef.current = handleToggleLogMerged;
   handleAcceptProposalRef.current  = handleAcceptProposal;
   handleDismissProposalRef.current = handleDismissProposal;
+  handleToggleBillableRef.current  = handleToggleBillable;
 
-  const stableUpdate  = useCallback((id: string, changes: any) => handleUpdateMergedRef.current(id, changes), []);
-  const stableDelete  = useCallback((id: string)               => handleDeleteMergedRef.current(id),          []);
-  const stableToggle  = useCallback((id: string)               => handleToggleLogMergedRef.current(id),       []);
-  const stableAccept  = useCallback((id: string)               => handleAcceptProposalRef.current(id),        []);
-  const stableDismiss = useCallback((id: string)               => handleDismissProposalRef.current(id),       []);
+  const stableUpdate   = useCallback((id: string, changes: any)      => handleUpdateMergedRef.current(id, changes), []);
+  const stableDelete   = useCallback((id: string)                    => handleDeleteMergedRef.current(id),          []);
+  const stableToggle   = useCallback((id: string)                    => handleToggleLogMergedRef.current(id),       []);
+  const stableAccept   = useCallback((id: string)                    => handleAcceptProposalRef.current(id),        []);
+  const stableDismiss  = useCallback((id: string)                    => handleDismissProposalRef.current(id),       []);
+  const stableAssign   = useCallback((id: string, taskId: string)    => handleAcceptProposalRef.current(id, taskId), []);
+  const stableBillable = useCallback((id: string, billable: boolean) => handleToggleBillableRef.current(id, billable), []);
 
   // Move entries handlers
   const handleMoveSingleRef = useRef((id: string) => {
@@ -252,8 +255,6 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     try {
       await forceSyncCalendar(selectedDate);
       await loadDay(selectedDate, true); // Reload entries, skip redundant sync
-      const syncTime = getLastSyncTime(selectedDate);
-      setLastSyncTime(syncTime);
       window.timerAPI.showNotification('Calendar Refreshed', 'Latest events synced');
     } catch (error) {
       console.error('Failed to sync calendar:', error);
@@ -277,10 +278,56 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
   };
 
   const stats = useMemo(() => dayStats(mergedEntries), [mergedEntries]);
-  const { workEntries } = useMemo(() => ({
+  const summary = useMemo(() => selectionSummary(mergedEntries), [mergedEntries]);
+  const { workEntries, breakEntries } = useMemo(() => ({
     workEntries: mergedEntries.filter(e => e.source !== 'break'),
+    breakEntries: mergedEntries.filter(e => e.source === 'break'),
   }), [mergedEntries]);
-  const { markedCount, toggleableCount, allSelected } = stats;
+
+  const openSettings = onNavigate ? () => onNavigate('settings') : undefined;
+
+  const renderRow = (entry: (typeof mergedEntries)[number]) => (
+    <EntryRow
+      key={entry.id}
+      entry={entry}
+      onUpdate={stableUpdate}
+      onDelete={stableDelete}
+      onToggleLog={stableToggle}
+      onAccept={stableAccept}
+      onDismiss={stableDismiss}
+      onMove={stableMove}
+      onAssignTask={stableAssign}
+      onToggleBillable={stableBillable}
+      onOpenSettings={openSettings}
+    />
+  );
+
+  let body;
+  if (isLoading && entries.length === 0) {
+    body = <div className="flex-1 flex items-center justify-center text-txt-muted font-display text-[13px]">Loading entries...</div>;
+  } else if (entries.length === 0) {
+    body = (
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 text-txt-muted">
+        <p className="font-display text-[14px]">No entries for this day</p>
+        <button
+          type="button"
+          onClick={() => setShowAddModal(true)}
+          className="h-8 px-3 rounded-[2px] font-display text-[13px] text-focus hover:bg-focus/10 transition-colors"
+        >
+          Add your first entry
+        </button>
+      </div>
+    );
+  } else if (viewMode === 'timeline') {
+    body = <TimelineView entries={entries} />;
+  } else {
+    body = (
+      <div>
+        {workEntries.map(renderRow)}
+        {breakEntries.map(renderRow)}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -295,86 +342,32 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
         stats={stats}
       />
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-txt-muted">Loading entries...</div>
-          </div>
-        ) : entries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-txt-muted">
-            <p className="text-lg">No entries for this day</p>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="mt-4 px-4 py-2 text-sm text-focus hover:bg-focus/10 rounded"
-            >
-              Add your first entry
-            </button>
-          </div>
-        ) : (
-          <div className="p-4 h-full overflow-auto">
-            <div className="max-w-6xl mx-auto">
-              <ControlBar
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-                groupByTask={isGrouped}
-                onGroupByTaskToggle={() => setIsGrouped(!isGrouped)}
-                showGroupToggle={viewMode === 'list' && entries.length > 0}
-                onAddEntry={() => setShowAddModal(true)}
-                onManageTemplates={() => setShowTemplateModal(true)}
-                onSyncCalendar={handleSyncCalendar}
-                onEndDay={handleEndDay}
-                onSelectToggle={toggleSelectAll}
-                onLogSelected={handleLogSelected}
-                onMoveEntries={() => { setMoveSingleId(null); setShowMoveCalendar(true); }}
-                isDayLocked={dayLocked}
-                isSyncing={isSyncing}
-                markedCount={markedCount}
-                toggleableCount={toggleableCount}
-                allSelected={allSelected}
-                isLogging={isLogging}
-              />
-
-              {showMoveCalendar && (
-                <div className="relative z-50">
-                  <CalendarPopover
-                    selectedDate={selectedDate}
-                    onSelectDate={handleMoveConfirm}
-                    onClose={() => setShowMoveCalendar(false)}
-                  />
-                </div>
-              )}
-
-              {viewMode === 'timeline' ? (
-                <TimelineView entries={entries} />
-              ) : (
-                <div className="overflow-hidden">
-                  {workEntries.map((entry, index) => (
-                    <TimelineItem
-                      key={entry.id}
-                      timestamp={entry.startTime}
-                      isFirst={index === 0}
-                      isLast={index === workEntries.length - 1}
-                      isMerged={entry.isMerged}
-                      sourceCount={entry.sourceCount}
-                    >
-                      <EntryRow
-                        entry={entry}
-                        inTimeline={true}
-                        onUpdate={stableUpdate}
-                        onDelete={stableDelete}
-                        onToggleLog={stableToggle}
-                        onAccept={stableAccept}
-                        onDismiss={stableDismiss}
-                        onMove={stableMove}
-                      />
-                    </TimelineItem>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+      <div className="flex flex-1 min-h-0">
+        <div className="flex-1 min-w-0 p-7 gap-5 flex flex-col overflow-hidden">
+          <EntriesTable
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            groupByTask={isGrouped}
+            onGroupByTaskToggle={() => setIsGrouped(!isGrouped)}
+            showGroupToggle={viewMode === 'list' && entries.length > 0}
+            stats={stats}
+            summary={summary}
+            onSelectToggle={toggleSelectAll}
+            onMoveEntries={() => { setMoveSingleId(null); setShowMoveCalendar(true); }}
+            onManageTemplates={() => setShowTemplateModal(true)}
+            onAddEntry={() => setShowAddModal(true)}
+            onLogSelected={handleLogSelected}
+            isLogging={isLogging}
+            moveCalendar={{
+              open: showMoveCalendar,
+              selectedDate,
+              onSelect: handleMoveConfirm,
+              onClose: () => { setShowMoveCalendar(false); setMoveSingleId(null); },
+            }}
+          >
+            {body}
+          </EntriesTable>
+        </div>
       </div>
 
       {/* Add Entry Modal */}
@@ -402,17 +395,20 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
 
       {/* Success Toast */}
       {showSuccessToast && (
-        <div className="fixed bottom-4 right-4 bg-emerald-500/90 backdrop-blur-sm border border-emerald-500/30 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-4 z-50">
+        <div className="fixed bottom-4 right-4 bg-drip-elevated border border-break/40 text-break px-4 py-3 rounded-[2px] shadow-glass-sm flex items-center gap-4 z-50 font-display text-[13px]">
           <span>✓ {successCount} {successCount === 1 ? 'entry' : 'entries'} logged</span>
           <button
+            type="button"
             onClick={() => window.timerAPI?.openExternal?.(buildEPLink(selectedDate))}
-            className="underline font-medium hover:text-emerald-100"
+            className="underline font-medium hover:text-txt-primary"
           >
             View in Easy Project →
           </button>
           <button
+            type="button"
             onClick={() => setShowSuccessToast(false)}
-            className="text-emerald-200 hover:text-white text-xl leading-none"
+            aria-label="Dismiss"
+            className="text-txt-muted hover:text-txt-primary text-lg leading-none"
           >
             ✕
           </button>

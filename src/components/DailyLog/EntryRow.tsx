@@ -1,12 +1,13 @@
-import { useState, useEffect, memo } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import type { LogEntry } from '../../stores/logStore';
 import type { MergedEntry } from '../../utils/mergeEntries';
 import TaskIdInput from '../shared/TaskIdInput';
-import TaskDisplay from '../shared/TaskDisplay';
 import BillableToggle from '../shared/BillableToggle';
-import { formatMinutes as formatDuration } from '../../utils/time';
+import KeyButton from '../Timer/KeyButton';
+import { Pill } from '../shared/Pill';
+import { errorHint, rowModel } from './reviewLogic';
 
-interface EntryRowProps {
+export interface EntryRowProps {
   entry: MergedEntry;
   onUpdate: (id: string, changes: Partial<LogEntry>) => void;
   onDelete: (id: string) => void;
@@ -14,12 +15,49 @@ interface EntryRowProps {
   onAccept?: (id: string) => void;
   onDismiss?: (id: string) => void;
   onMove?: (id: string) => void;
-  inTimeline?: boolean;  // Adjusts styling when in timeline
+  /** R8: saving a proposal with a task id accepts it with that id. */
+  onAssignTask?: (id: string, taskId: string) => void;
+  /** R7: the live Billable pill writes straight through. */
+  onToggleBillable?: (id: string, billable: boolean) => void;
+  /** R18: last log error for this row (server message). */
+  error?: string;
+  onOpenSettings?: () => void;
 }
 
-function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAccept, onDismiss, onMove, inTimeline = false }: EntryRowProps) {
+/** Column template shared with the EntriesTable header: Time · Dur · Task · Comment · Billable · Log · actions. */
+export const ROW_GRID = 'grid grid-cols-[52px_44px_150px_minmax(0,1fr)_84px_28px_88px] gap-3 px-4 items-center';
+
+const INPUT = 'h-8 px-3 text-sm bg-transparent border border-drip-border rounded-[2px] text-txt-primary placeholder-txt-dim focus:outline-none focus:border-focus/40';
+const ACTION = 'h-6 px-1.5 rounded-[2px] font-display text-[11.5px] text-txt-muted hover:text-txt-primary hover:bg-focus/10 transition-colors';
+
+/** Cached title for the id pill tooltip; cache only, never the API. */
+function useCachedTitle(taskId: string | null): string | null {
+  const [title, setTitle] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setTitle(null);
+    if (!taskId) return;
+    window.logAPI.getCachedTask?.(taskId)
+      .then(task => { if (alive && task) setTitle(task.title); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [taskId]);
+  return title;
+}
+
+/**
+ * One 48px Review row (mockup Review.dc.html:108-151): time · dur · dot + id ·
+ * comment · Billable pill · log checkbox, hover actions in a 7th column, and
+ * the inline editor of the old EntryRow when editing.
+ */
+function EntryRow(props: EntryRowProps) {
+  const { entry, onUpdate, onDelete, onToggleLog, onAccept, onDismiss, onMove, onAssignTask, onToggleBillable, error, onOpenSettings } = props;
   const [isEditing, setIsEditing] = useState(false);
-  const [editedEntry, setEditedEntry] = useState(entry);
+  const [focusTask, setFocusTask] = useState(false);
+  const [editedEntry, setEditedEntry] = useState<MergedEntry>(entry);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const model = rowModel(entry);
+  const cachedTitle = useCachedTitle(entry.taskId);
 
   // Keep the edit buffer in sync with the latest entry prop. The row is memo-ized
   // and persists across reloads, so without this the buffer would be a stale
@@ -28,29 +66,43 @@ function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAccept, onDismiss,
     if (!isEditing) setEditedEntry(entry);
   }, [entry, isEditing]);
 
-  const isBreak = entry.source === 'break';
+  // `Assign task` opens the editor with the task field focused (R8)
+  useEffect(() => {
+    if (isEditing && focusTask) {
+      editorRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+      setFocusTask(false);
+    }
+  }, [isEditing, focusTask]);
 
   const handleTaskSelect = (taskId: string, title: string) => {
     if (entry.type === 'calendar') {
       // Keep original event name; copy it to comment if comment is empty
-      setEditedEntry({
-        ...editedEntry,
-        taskId,
-        comment: editedEntry.comment || editedEntry.title,
-      });
+      setEditedEntry(prev => ({ ...prev, taskId, comment: prev.comment || prev.title }));
     } else {
-      setEditedEntry({ ...editedEntry, taskId, title });
+      setEditedEntry(prev => ({ ...prev, taskId, title }));
     }
   };
 
   const handleSave = () => {
-    onUpdate(entry.id, {
-      taskId: editedEntry.taskId,
-      title: editedEntry.title,
-      comment: editedEntry.comment,
-      durationMinutes: editedEntry.durationMinutes,
-      billable: editedEntry.billable,
-    });
+    const taskId = editedEntry.taskId?.trim() || null;
+    if (entry.isProposal && taskId && onAssignTask) {
+      // R8: accept + assign in one; the other fields go through the normal update first
+      onUpdate(entry.id, {
+        title: editedEntry.title,
+        comment: editedEntry.comment,
+        durationMinutes: editedEntry.durationMinutes,
+        billable: editedEntry.billable,
+      });
+      onAssignTask(entry.id, taskId);
+    } else {
+      onUpdate(entry.id, {
+        taskId,
+        title: editedEntry.title,
+        comment: editedEntry.comment,
+        durationMinutes: editedEntry.durationMinutes,
+        billable: editedEntry.billable,
+      });
+    }
     setIsEditing(false);
   };
 
@@ -59,230 +111,191 @@ function EntryRow({ entry, onUpdate, onDelete, onToggleLog, onAccept, onDismiss,
     setIsEditing(false);
   };
 
-  const getTypeBadge = () => {
-    const badgeLabel = isBreak ? 'break' : entry.type;
-    switch (badgeLabel) {
-      case 'pomodoro':
-        return 'bg-focus/10 text-focus border border-focus/20';
-      case 'break':
-        return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
-      case 'adhoc':
-        return 'bg-focus/5 text-txt-secondary border border-focus/20';
-      case 'calendar':
-        return 'bg-purple-500/10 text-purple-400 border border-purple-500/20';
-      default:
-        return 'bg-focus/5 text-txt-secondary border border-focus/20';
-    }
+  const openEditor = (focusTaskField = false) => {
+    setFocusTask(focusTaskField);
+    setIsEditing(true);
   };
 
-  const getBadgeLabel = () => {
-    return isBreak ? 'break' : entry.type;
-  };
+  const isBreak = model.kind === 'break';
+  const isLogged = model.kind === 'logged';
+  const isProposal = model.kind === 'proposal';
+  const muted = isBreak || isLogged;
+  const canAssign = !entry.taskId && (model.kind === 'open' || isProposal);
 
-  if (isEditing) {
-    const editContainerClass = inTimeline
-      ? 'py-2 bg-focus/5 border border-focus/20 rounded-xl'
-      : 'px-6 py-4 bg-focus/5 border border-focus/20 rounded-xl';
-    return (
-      <div className={editContainerClass}>
-        <div className="space-y-3">
-          {/* Row 1: Inputs for Task ID and Title */}
-          <div className="flex gap-3">
-            <div className="w-32">
-              <TaskIdInput
-                value={editedEntry.taskId || ''}
-                onChange={(value) => setEditedEntry({ ...editedEntry, taskId: value })}
-                onTaskSelect={handleTaskSelect}
-                placeholder="Task ID"
-              />
-            </div>
-            <input
-              type="text"
-              value={editedEntry.title}
-              onChange={(e) => setEditedEntry({ ...editedEntry, title: e.target.value })}
-              placeholder="Title"
-              className="flex-1 px-3 py-2 text-sm bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
-            />
-            <input
-              type="number"
-              value={editedEntry.durationMinutes}
-              onChange={(e) => setEditedEntry({ ...editedEntry, durationMinutes: parseInt(e.target.value) || 0 })}
-              min="1"
-              placeholder="Duration"
-              className="w-24 px-3 py-2 text-sm bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
-            />
-          </div>
+  const dot = <span data-testid="entry-dot" className={`w-1.5 h-1.5 rounded-full shrink-0 ${model.dotClass}`} />;
 
-          {/* Row 2: Comment */}
-          <input
-            type="text"
-            value={editedEntry.comment || ''}
-            onChange={(e) => setEditedEntry({ ...editedEntry, comment: e.target.value })}
-            placeholder="Comment"
-            className="w-full px-3 py-2 text-sm bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30"
+  const editor = isEditing && (
+    <div ref={editorRef} data-testid="entry-editor" className="px-4 py-3 bg-focus/5 border-y border-focus/20 flex flex-col gap-2">
+      <div className="flex gap-2">
+        <div className="w-36">
+          <TaskIdInput
+            value={editedEntry.taskId || ''}
+            onChange={(value) => setEditedEntry(prev => ({ ...prev, taskId: value }))}
+            onTaskSelect={handleTaskSelect}
+            placeholder="Task ID"
           />
-
-          {/* Row 3: Billable and Actions */}
-          <div className="flex items-center justify-between">
-            <BillableToggle
-              checked={editedEntry.billable ?? true}
-              onChange={(v) => setEditedEntry({ ...editedEntry, billable: v })}
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={handleSave}
-                className="px-4 py-2 text-sm bg-focus text-drip-bg font-display font-medium rounded-xl hover:bg-focus/90"
-              >
-                Save
-              </button>
-              <button
-                onClick={handleCancel}
-                className="px-4 py-2 text-sm bg-transparent border border-focus/20 text-txt-muted rounded-xl hover:bg-focus/5 transition-all"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
         </div>
+        <input
+          type="text"
+          value={editedEntry.title}
+          onChange={(e) => setEditedEntry(prev => ({ ...prev, title: e.target.value }))}
+          placeholder="Title"
+          aria-label="Title"
+          className={`flex-1 ${INPUT}`}
+        />
+        <input
+          type="number"
+          value={editedEntry.durationMinutes}
+          onChange={(e) => setEditedEntry(prev => ({ ...prev, durationMinutes: parseInt(e.target.value) || 0 }))}
+          min="1"
+          placeholder="Duration"
+          aria-label="Duration"
+          className={`w-24 ${INPUT}`}
+        />
       </div>
-    );
-  }
+      <div className="flex gap-2 items-center">
+        <input
+          type="text"
+          value={editedEntry.comment || ''}
+          onChange={(e) => setEditedEntry(prev => ({ ...prev, comment: e.target.value }))}
+          placeholder="Comment"
+          aria-label="Comment"
+          className={`flex-1 ${INPUT}`}
+        />
+        <BillableToggle
+          size="sm"
+          checked={editedEntry.billable ?? true}
+          onChange={(v) => setEditedEntry(prev => ({ ...prev, billable: v }))}
+        />
+        <KeyButton variant="amber" size="sm" onClick={handleSave}>Save</KeyButton>
+        <KeyButton variant="ghost" size="sm" onClick={handleCancel}>Cancel</KeyButton>
+      </div>
+    </div>
+  );
 
-  // Card layout for non-edit mode
-  const containerClass = inTimeline
-    ? `py-2 hover:bg-focus/5 rounded ${entry.logged ? 'bg-emerald-500/5' : ''} ${isBreak ? 'bg-emerald-500/5' : ''}`
-    : `px-6 py-4 border-b border-focus/20 hover:bg-focus/5 ${entry.logged ? 'bg-emerald-500/5' : ''} ${isBreak ? 'bg-emerald-500/5' : ''}`;
+  const hint = error ? errorHint(error) : null;
 
   return (
-    <div className={containerClass}>
-      {/* Row 1: Checkbox/Check | Title + Badges | Duration | Time */}
-      <div className="flex items-start gap-4 mb-2">
-        {/* Checkbox or Checkmark */}
-        <div className="flex-shrink-0 pt-1">
-          {isBreak ? (
-            <span className="text-emerald-400 text-lg opacity-50">~</span>
-          ) : entry.logged ? (
-            <span className="text-emerald-400 text-lg">✓</span>
-          ) : entry.isProposal ? (
-            <span className="text-txt-dim">-</span>
-          ) : (
+    <div
+      data-testid="entry-row"
+      data-kind={model.kind}
+      className={`group border-b border-drip-elevated ${isProposal ? 'bg-focus/[0.04]' : ''} ${muted ? 'text-txt-muted' : 'text-txt-primary'} ${isEditing ? '' : 'hover:bg-focus/[0.03]'}`}
+    >
+      <div className={`${ROW_GRID} min-h-[48px]`}>
+        {/* Time */}
+        <span className={`font-mono text-[12px] ${entry.startTime ? 'text-txt-secondary' : 'text-txt-dim'}`}>{model.timeText}</span>
+
+        {/* Dur */}
+        <span className="font-mono text-[12px]">{model.durText}</span>
+
+        {/* Task */}
+        <span className="flex items-center gap-1.5 min-w-0">
+          {dot}
+          {entry.taskId ? (
+            <span
+              data-testid="entry-task-id"
+              title={cachedTitle ?? undefined}
+              className={`font-mono text-[12px] truncate ${isLogged ? 'text-txt-muted' : 'text-focus'}`}
+            >
+              {entry.taskId}
+            </span>
+          ) : canAssign ? (
+            <button
+              type="button"
+              onClick={() => openEditor(true)}
+              className="h-6 px-2 border border-dashed border-focus/45 rounded-[2px] font-display text-[12px] text-focus hover:bg-focus/10 transition-colors whitespace-nowrap"
+            >
+              Assign task
+            </button>
+          ) : !isBreak ? (
+            <span className="font-display text-[11.5px] text-txt-dim">No task</span>
+          ) : null}
+        </span>
+
+        {/* Comment */}
+        <span className="min-w-0 flex items-center gap-2" title={model.secondaryText ? `${model.primaryText} · ${model.secondaryText}` : model.primaryText}>
+          <span className="font-display text-[13.5px] truncate">
+            {model.primaryText}
+            {model.secondaryText && <span className="text-txt-muted"> · {model.secondaryText}</span>}
+          </span>
+          {entry.isMerged && (
+            <span className="shrink-0 font-mono text-[10.5px] text-txt-muted border border-drip-border rounded-[2px] px-1.5 leading-4">
+              {entry.sourceCount} sessions
+            </span>
+          )}
+        </span>
+
+        {/* Billable */}
+        <span className="justify-self-start">
+          {model.billableInteractive ? (
+            <Pill
+              pressed={model.billable}
+              onClick={() => onToggleBillable?.(entry.id, !model.billable)}
+              aria-label="Billable"
+              title={model.billable ? 'Billable' : 'Not billable'}
+              className="h-[22px] px-2 text-[11.5px] rounded-full"
+            >
+              Billable
+            </Pill>
+          ) : !isBreak ? (
+            <span className="font-display text-[11.5px] text-txt-muted">{model.billable ? 'Billable' : 'Not billable'}</span>
+          ) : null}
+        </span>
+
+        {/* Log */}
+        <span className="flex items-center justify-center">
+          {isLogged ? (
+            <span className="text-break" aria-label="Logged" title="Logged to Easy Project" role="img">
+              <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 6.2l2.3 2.3 4.7-5" /></svg>
+            </span>
+          ) : isProposal ? (
+            <input type="checkbox" disabled aria-label="Log this entry (needs accepting)" className="w-4 h-4 accent-focus opacity-40" />
+          ) : model.canToggle ? (
             <input
               type="checkbox"
               checked={entry.markedToLog}
-              onChange={(e) => {
-                e.stopPropagation();
-                onToggleLog(entry.id);
-              }}
-              className="w-5 h-5 cursor-pointer accent-focus"
+              onChange={(e) => { e.stopPropagation(); onToggleLog(entry.id); }}
+              aria-label="Log this entry"
+              className="w-4 h-4 cursor-pointer accent-focus"
             />
-          )}
-        </div>
+          ) : null}
+        </span>
 
-        {/* Title + Badges */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-txt-primary truncate">{entry.title}</span>
-            <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${getTypeBadge()}`}>
-              {getBadgeLabel()}
-            </span>
-            {entry.isMerged && (
-              <span className="inline-block px-2 py-1 text-xs bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded font-medium">
-                {entry.sourceCount} sessions
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Duration */}
-        <div className="flex-shrink-0">
-          <span className="font-mono font-medium text-txt-primary">{formatDuration(entry.durationMinutes)}</span>
-        </div>
-      </div>
-
-      {/* Row 2: Comment */}
-      {!isBreak && (
-        <div className="ml-9 mb-2">
-          <span className="text-sm text-txt-muted italic">
-            {entry.comment || 'No comment'}
-          </span>
-        </div>
-      )}
-
-      {/* Row 3: Task ID | Billable | Actions */}
-      <div className="ml-9 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {/* Task ID - hide for breaks */}
-          {!isBreak && <TaskDisplay taskId={entry.taskId} />}
-
-          {/* Billable Badge - hide for breaks */}
-          {!isBreak && (
-            entry.billable ? (
-              <span className="text-xs text-emerald-400">✓ Billable</span>
-            ) : (
-              <span className="text-xs text-txt-dim">Not billable</span>
-            )
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-2">
-          {!entry.logged && (
+        {/* Actions (hover / focus-within) */}
+        <span className="row-actions flex items-center justify-end gap-0.5">
+          {isProposal && onAccept && onDismiss && (
             <>
-              {entry.isProposal && onAccept && onDismiss && (
-                <>
-                  <button
-                    onClick={() => onAccept(entry.id)}
-                    className="px-3 py-1 text-sm bg-emerald-500/80 text-white rounded hover:bg-emerald-500"
-                  >
-                    Accept
-                  </button>
-                  <button
-                    onClick={() => onDismiss(entry.id)}
-                    className="px-3 py-1 text-sm bg-transparent border border-focus/20 text-txt-muted rounded-xl hover:bg-focus/5 transition-all"
-                  >
-                    Dismiss
-                  </button>
-                </>
-              )}
-              {!entry.isProposal && (
-                <>
-                  {!isBreak && (
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="px-3 py-1 text-sm text-focus hover:bg-focus/10 rounded"
-                    >
-                      Edit
-                    </button>
-                  )}
-                  {onMove && !entry.logged && (
-                    <button
-                      onClick={() => onMove(entry.id)}
-                      className="px-3 py-1 text-sm text-txt-muted hover:bg-focus/5 rounded"
-                    >
-                      Move
-                    </button>
-                  )}
-                  <button
-                    onClick={() => onDelete(entry.id)}
-                    className="px-3 py-1 text-sm text-red-400 hover:bg-red-500/10 rounded"
-                    title={entry.isMerged ? `Delete all ${entry.sourceCount} sessions` : 'Delete this entry'}
-                  >
-                    Delete
-                  </button>
-                  {entry.isMerged && !isBreak && (
-                    <span className="text-xs text-txt-dim italic">
-                      {entry.sourceCount} sessions
-                    </span>
-                  )}
-                </>
-              )}
+              <button type="button" onClick={() => onAccept(entry.id)} className={`${ACTION} text-break hover:text-break`}>Accept</button>
+              <button type="button" onClick={() => onDismiss(entry.id)} className={ACTION}>Dismiss</button>
             </>
           )}
-          {entry.logged && (
-            <span className="text-sm text-emerald-400 font-medium">Logged to Easy Project</span>
+          {model.kind === 'open' && !isEditing && (
+            <>
+              <button type="button" onClick={() => openEditor(false)} className={ACTION}>Edit</button>
+              {onMove && <button type="button" onClick={() => onMove(entry.id)} className={ACTION}>Move</button>}
+              <button
+                type="button"
+                onClick={() => onDelete(entry.id)}
+                className={`${ACTION} hover:text-alert`}
+                title={entry.isMerged ? `Delete all ${entry.sourceCount} sessions` : 'Delete this entry'}
+              >
+                Delete
+              </button>
+            </>
+          )}
+        </span>
+      </div>
+
+      {editor}
+
+      {error && (
+        <div role="alert" className="h-6 px-4 flex items-center gap-3 font-display text-[11.5px] text-alert">
+          <span className="truncate">{error}</span>
+          {hint?.action === 'settings' && onOpenSettings && (
+            <button type="button" onClick={onOpenSettings} className="shrink-0 underline hover:text-txt-primary">Open Settings</button>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -293,11 +306,18 @@ export default memo(EntryRow, (prev, next) =>
   prev.entry.type            === next.entry.type &&
   prev.entry.title           === next.entry.title &&
   prev.entry.taskId          === next.entry.taskId &&
+  prev.entry.startTime       === next.entry.startTime &&
   prev.entry.durationMinutes === next.entry.durationMinutes &&
   prev.entry.comment         === next.entry.comment &&
   prev.entry.billable        === next.entry.billable &&
   prev.entry.markedToLog     === next.entry.markedToLog &&
   prev.entry.logged          === next.entry.logged &&
   prev.entry.isProposal      === next.entry.isProposal &&
-  prev.onMove                === next.onMove
+  prev.entry.isMerged        === next.entry.isMerged &&
+  prev.entry.sourceCount     === next.entry.sourceCount &&
+  prev.error                 === next.error &&
+  prev.onMove                === next.onMove &&
+  prev.onAssignTask          === next.onAssignTask &&
+  prev.onToggleBillable      === next.onToggleBillable &&
+  prev.onOpenSettings        === next.onOpenSettings
 );

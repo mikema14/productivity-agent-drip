@@ -104,18 +104,19 @@ export default function TimelineView({ entries }: TimelineViewProps) {
   // Block styling based on entry type/source
   const getBlockClasses = (entry: LogEntry) => {
     const isBreak = entry.source === 'break';
-    if (isBreak) return 'bg-emerald-500/15 border-emerald-500/30';
+    if (isBreak) return 'bg-break/10 border-break/40';
     if (entry.type === 'calendar') {
-      if (entry.isProposal) return 'bg-blue-500/5 border-blue-500/15 border-dashed';
-      return 'bg-blue-500/15 border-blue-500/30';
+      if (entry.isProposal) return 'bg-blue-500/5 border-blue-500/40 border-dashed';
+      return 'bg-blue-500/15 border-blue-500/40';
     }
-    if (entry.logged) return 'bg-focus/15 border-focus/30';
-    return 'bg-focus/10 border-focus/20';
+    if (entry.type === 'adhoc') return 'bg-focus/5 border-focus/30 border-dashed';
+    if (entry.logged) return 'bg-focus/15 border-focus/40';
+    return 'bg-focus/10 border-focus/30';
   };
 
   // Text color for duration label
   const getDurationColor = (entry: LogEntry) => {
-    if (entry.source === 'break') return 'text-emerald-400';
+    if (entry.source === 'break') return 'text-break';
     if (entry.type === 'calendar') return 'text-blue-400';
     return 'text-focus';
   };
@@ -174,7 +175,7 @@ export default function TimelineView({ entries }: TimelineViewProps) {
               return (
                 <div
                   key={id}
-                  className={`absolute left-14 right-4 rounded-lg border transition-colors overflow-hidden ${getBlockClasses(entry)}`}
+                  className={`absolute left-14 right-4 rounded-[2px] border transition-colors overflow-hidden ${getBlockClasses(entry)}`}
                   style={{ top, height }}
                 >
                   <div className="px-2 py-1 flex items-center gap-2 h-full">
@@ -182,10 +183,10 @@ export default function TimelineView({ entries }: TimelineViewProps) {
                       {entry.durationMinutes}m
                     </span>
                     {isBreak && (
-                      <span className="text-xs text-emerald-400/70">Break</span>
+                      <span className="text-xs text-break/70">Break</span>
                     )}
                     {!isBreak && entry.taskId && (
-                      <span className="text-xs font-mono text-txt-muted">#{entry.taskId}</span>
+                      <span className="text-xs font-mono text-txt-muted">{entry.taskId}</span>
                     )}
                     {!isBreak && entry.type === 'calendar' && (
                       <span className="text-xs text-blue-400/70 truncate">{entry.title}</span>
@@ -212,7 +213,7 @@ export default function TimelineView({ entries }: TimelineViewProps) {
 
             return (
               <div
-                className="absolute left-14 right-4 rounded-lg border border-focus/40 hatched-pattern bg-focus/5 overflow-hidden"
+                className="absolute left-14 right-4 rounded-[2px] border border-focus/40 hatched-pattern bg-focus/5 overflow-hidden"
                 style={{ top: Math.max(0, top), height }}
               >
                 <div className="px-2 py-1 flex items-center gap-2 h-full">
@@ -220,7 +221,7 @@ export default function TimelineView({ entries }: TimelineViewProps) {
                     {elapsedMin}m
                   </span>
                   {currentTaskId && (
-                    <span className="text-xs font-mono text-txt-muted">#{currentTaskId}</span>
+                    <span className="text-xs font-mono text-txt-muted">{currentTaskId}</span>
                   )}
                   {intention && height > 30 && (
                     <span className="text-xs text-txt-dim truncate">{intention}</span>
@@ -243,13 +244,13 @@ export default function TimelineView({ entries }: TimelineViewProps) {
 
             return (
               <div
-                className="absolute left-14 right-4 rounded-lg border border-emerald-500/40 hatched-pattern-break bg-emerald-500/5 overflow-hidden"
+                className="absolute left-14 right-4 rounded-[2px] border border-break/40 hatched-pattern-break bg-break/5 overflow-hidden"
                 style={{ top: Math.max(0, top), height }}
               >
                 <div className="px-2 py-1 flex items-center gap-2 h-full">
-                  <span className="text-xs font-mono text-emerald-400 font-medium">{elapsedMin}m</span>
-                  <span className="text-xs text-emerald-400/70">Break</span>
-                  <span className="text-xs text-emerald-400/60 ml-auto font-mono animate-pulse-subtle">
+                  <span className="text-xs font-mono text-break font-medium">{elapsedMin}m</span>
+                  <span className="text-xs text-break/70">Break</span>
+                  <span className="text-xs text-break/60 ml-auto font-mono animate-pulse-subtle">
                     On break...
                   </span>
                 </div>
@@ -257,12 +258,15 @@ export default function TimelineView({ entries }: TimelineViewProps) {
             );
           })()}
 
-          {/* Current time red line */}
+          {/* Current time: amber NOW tag (Phase 1 pattern) */}
           {isToday && currentTimeTop >= 0 && currentTimeTop <= totalHours * HOUR_HEIGHT && (
-            <div className="absolute left-12 right-0" style={{ top: currentTimeTop }}>
-              <div className="flex items-center">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500 -ml-1 shadow-[0_0_6px_rgba(239,68,68,0.5)]" />
-                <div className="flex-1 border-t-2 border-red-500/70" />
+            <div className="absolute left-12 right-4 pointer-events-none" style={{ top: currentTimeTop }}>
+              <div className="flex items-center gap-1.5 -translate-y-1/2">
+                <span className="w-[7px] h-[7px] bg-focus -ml-[3px]" />
+                <span className="flex-1 border-t border-focus" />
+                <span className="font-mono text-[10px] font-semibold tracking-[0.5px] text-drip-bg bg-focus px-1.5 leading-4">
+                  NOW {currentTime.getHours().toString().padStart(2, '0')}:{currentTime.getMinutes().toString().padStart(2, '0')}
+                </span>
               </div>
             </div>
           )}
@@ -271,22 +275,22 @@ export default function TimelineView({ entries }: TimelineViewProps) {
 
       {/* Unscheduled entries */}
       {unscheduledEntries.length > 0 && (
-        <div className="flex-none border-t border-focus/20 p-4">
-          <h3 className="text-sm font-semibold text-txt-secondary mb-2">
+        <div className="flex-none border-t border-drip-elevated p-4">
+          <h3 className="now-label text-txt-muted mb-2">
             Unscheduled
           </h3>
           <div className="space-y-2">
             {unscheduledEntries.map((entry) => (
               <div
                 key={entry.id}
-                className={`rounded-lg border px-2 py-1.5 text-xs ${getBlockClasses(entry)}`}
+                className={`rounded-[2px] border px-2 py-1.5 text-xs ${getBlockClasses(entry)}`}
               >
                 <div className="flex items-center gap-2">
                   <span className={`font-mono font-medium ${getDurationColor(entry)}`}>
                     {entry.durationMinutes}m
                   </span>
                   {entry.taskId && (
-                    <span className="font-mono text-txt-muted">#{entry.taskId}</span>
+                    <span className="font-mono text-txt-muted">{entry.taskId}</span>
                   )}
                   <span className="text-txt-primary truncate">{entry.title}</span>
                   {entry.logged && (
