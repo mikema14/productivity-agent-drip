@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event';
 import DailyLog from './DailyLog';
 import { useLogStore, type LogEntry } from '../../stores/logStore';
 import { makeEntry, FIXTURE_DATE } from '../../test/logFixtures';
-import { forceSyncCalendar, invalidateCalendarCache } from '../../services/calendar';
+import { forceSyncCalendar, invalidateCalendarCache, syncCalendarProposals } from '../../services/calendar';
+import { useListsStore } from '../../stores/listsStore';
 
 vi.mock('../../services/calendar', () => ({
   syncCalendarProposals: vi.fn(async () => undefined),
@@ -300,6 +301,53 @@ describe('DailyLog (Review)', () => {
     await act(async () => { await cb?.(); });
     expect(invalidateCalendarCache).toHaveBeenCalled();
     expect(loadDay).toHaveBeenCalledWith(FIXTURE_DATE);
+  });
+
+  it('loads tomorrow\'s proposals for the next workday and shows the meeting load', async () => {
+    window.logAPI.getCalendarProposals = vi.fn(async () => [
+      { id: 'p', event_uid: 'u', title: 'Standup', start_at: '', end_at: '', duration_minutes: 90, date: '2026-09-28', accepted: 0, dismissed: 0, task_id: null, comment: null, logged: 0, billable: 1 },
+    ]);
+    await renderLog([]);
+    await waitFor(() => expect(syncCalendarProposals).toHaveBeenCalledWith('2026-09-28'));
+    expect(window.logAPI.getCalendarProposals).toHaveBeenCalledWith('2026-09-28');
+    expect(screen.getByTestId('tomorrow-date')).toHaveTextContent('Mon 28 Sep');
+    expect(await screen.findByText(/4h 30m/)).toBeInTheDocument();
+  });
+
+  it('shows Calendar unavailable when the tomorrow feed fails', async () => {
+    vi.mocked(syncCalendarProposals).mockRejectedValueOnce(new Error('feed down'));
+    await renderLog([]);
+    expect(await screen.findByText('Calendar unavailable')).toBeInTheDocument();
+  });
+
+  it('End day opens the modal with the reflection draft and the next workday', async () => {
+    const { user } = await renderLog([]);
+    await user.type(screen.getByLabelText('One line on today'), 'Solid day');
+    await user.click(screen.getByRole('button', { name: 'End day' }));
+    const modal = screen.getByTestId('end-day-modal');
+    expect(modal).toHaveAttribute('data-reflection', 'Solid day');
+    expect(modal).toHaveAttribute('data-tomorrow', '2026-09-28');
+  });
+
+  it('locked day hides End day, shows Day ended and the saved reflection', async () => {
+    window.dashboardAPI.isDayLocked = vi.fn(async () => true);
+    window.dashboardAPI.getShutdownRitual = vi.fn(async () => ({
+      date: FIXTURE_DATE, totalMinutes: 0, deepWorkMinutes: 0, tasksWorked: [], reflection: 'Saved line', notes: null, tomorrowIntentions: null, locked: true, createdAt: '',
+    }));
+    await renderLog([]);
+    expect(await screen.findByText('Day ended')).toBeInTheDocument();
+    expect(screen.getByTestId('saved-reflection')).toHaveTextContent('Saved line');
+    expect(screen.queryByRole('button', { name: 'End day' })).toBeNull();
+  });
+
+  it('aside lists open today items from the lists store', async () => {
+    useListsStore.setState({
+      lists: [],
+      items: [{ id: 'i1', list_id: 'l1', title: 'Carry me', task_id: '77', column: 'today', order: 0, completed: 0, archived: 0, completed_at: null, description: null, subtasks: '[]', billable: 1, created_at: '' }],
+    });
+    await renderLog([]);
+    expect(within(screen.getByRole('complementary', { name: 'Tomorrow' })).getByText('Carry me')).toBeInTheDocument();
+    useListsStore.setState({ lists: [], items: [] });
   });
 
   it('table rows never render a # before the task id', async () => {

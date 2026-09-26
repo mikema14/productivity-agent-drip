@@ -9,10 +9,13 @@ import TimelineView from './TimelineView';
 import EndDayModal from './EndDayModal';
 import ReviewHeader from './ReviewHeader';
 import TodaysThree from './TodaysThree';
-import { dayStats, selectionSummary, shiftDate, todayString, buildEPLink, errorHint } from './reviewLogic';
+import TomorrowAside from './TomorrowAside';
+import { dayStats, selectionSummary, shiftDate, todayString, buildEPLink, errorHint, nextWorkday } from './reviewLogic';
+import type { CalendarProposal } from '../../types';
+import { useListsStore } from '../../stores/listsStore';
 import type { ViewId } from '../Layout/views';
 import { mergeEntriesByTaskId } from '../../utils/mergeEntries';
-import { forceSyncCalendar, invalidateCalendarCache } from '../../services/calendar';
+import { forceSyncCalendar, invalidateCalendarCache, syncCalendarProposals } from '../../services/calendar';
 
 interface DailyLogProps {
   /** R18: the 401 banner's `Open Settings` navigates through the App router. */
@@ -39,6 +42,8 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
   } = useLogStore();
 
   const { isDayLocked } = useShutdownStore();
+  const listItems = useListsStore(s => s.items);
+  const lists = useListsStore(s => s.lists);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -53,6 +58,12 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
   const [moveSingleId, setMoveSingleId] = useState<string | null>(null);
   // R18: last log error per entry id; cleared for a row on its next attempt or edit
   const [logErrors, setLogErrors] = useState<Record<string, string>>({});
+  // R3: the aside's one-liner is a draft of the modal's Reflection
+  const [reflectionDraft, setReflectionDraft] = useState('');
+  const [savedReflection, setSavedReflection] = useState<string | null>(null);
+  // R4: tomorrow = next workday; null = feed unavailable
+  const [tomorrowProposals, setTomorrowProposals] = useState<CalendarProposal[] | null>(null);
+  const tomorrowDate = nextWorkday(selectedDate);
 
   // Auto-dismiss toast after 10 seconds
   useEffect(() => {
@@ -86,14 +97,44 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     });
   }, [selectedDate, loadDay]);
 
-  // Check if day is locked
+  // Check if day is locked; a locked day shows its saved reflection read-only (R15)
   useEffect(() => {
+    let alive = true;
     async function checkLockStatus() {
       const locked = await isDayLocked(selectedDate);
+      if (!alive) return;
       setDayLocked(locked);
+      if (locked) {
+        try {
+          const ritual = await window.dashboardAPI.getShutdownRitual(selectedDate);
+          if (alive) setSavedReflection(ritual?.reflection ?? null);
+        } catch {
+          if (alive) setSavedReflection(null);
+        }
+      } else {
+        setSavedReflection(null);
+      }
     }
     checkLockStatus();
+    return () => { alive = false; };
   }, [selectedDate, isDayLocked]);
+
+  // Tomorrow's meeting load for the aside (R4)
+  useEffect(() => {
+    let alive = true;
+    async function loadTomorrow() {
+      try {
+        await syncCalendarProposals(tomorrowDate);
+        const proposals = await window.logAPI.getCalendarProposals(tomorrowDate);
+        if (alive) setTomorrowProposals(proposals);
+      } catch (error) {
+        console.error('Failed to load tomorrow\'s calendar:', error);
+        if (alive) setTomorrowProposals(null);
+      }
+    }
+    loadTomorrow();
+    return () => { alive = false; };
+  }, [tomorrowDate]);
 
   const handleDateChange = (days: number) => {
     setSelectedDate(shiftDate(selectedDate, days));
@@ -294,6 +335,11 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     // Refresh the day's lock status
     const locked = await isDayLocked(selectedDate);
     setDayLocked(locked);
+    if (locked) {
+      const ritual = await window.dashboardAPI.getShutdownRitual(selectedDate).catch(() => null);
+      setSavedReflection(ritual?.reflection ?? null);
+      setReflectionDraft('');
+    }
     // Show success message
     window.timerAPI.showNotification('Day Complete', 'Your shutdown ritual has been saved!');
   };
@@ -402,6 +448,17 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
             {body}
           </EntriesTable>
         </div>
+        <TomorrowAside
+          date={selectedDate}
+          todayItems={listItems.filter(i => i.column === 'today')}
+          lists={lists}
+          proposals={tomorrowProposals}
+          reflection={reflectionDraft}
+          onReflectionChange={setReflectionDraft}
+          locked={dayLocked}
+          savedReflection={savedReflection}
+          onEndDay={handleEndDay}
+        />
       </div>
 
       {/* Add Entry Modal */}
@@ -418,6 +475,8 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
           date={selectedDate}
           onClose={() => setShowEndDayModal(false)}
           onSuccess={handleEndDaySuccess}
+          initialReflection={reflectionDraft}
+          tomorrowDate={tomorrowDate}
         />
       )}
 
