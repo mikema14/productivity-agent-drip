@@ -1,8 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
 import { useListsStore } from './stores/listsStore';
+import { useTimerStore } from './stores/timerStore';
+import { resetTimer, setTimer } from './test/timerState';
 import type { TaskList } from './types';
 
 vi.mock('./components/Timer/Timer', () => ({ default: () => <div>TimerView</div> }));
@@ -68,5 +70,39 @@ describe('App', () => {
     await user.click(rail().getByRole('button', { name: 'Plan' }));
     await user.click(screen.getByTitle('Create list'));
     expect(screen.getByText('CreateListModal')).toBeInTheDocument();
+  });
+});
+
+describe('App — kickoff takeover (Phase 4, K1)', () => {
+  afterEach(() => resetTimer());
+
+  const warmup = {
+    status: 'focus' as const, kickoff: 'warmup' as const, kickoffSource: 'now' as const, isPaused: false,
+    remainingSeconds: 100, totalDuration: 120, currentTaskId: null, durationMinutes: 25,
+    sessionStartTime: new Date(), intervalId: 1,
+  };
+
+  it('covers every view while a kickoff is in its warmup; the views stay mounted underneath', () => {
+    setTimer(warmup);
+    render(<App />);
+    expect(screen.getByRole('dialog', { name: 'Kickoff' })).toBeInTheDocument();
+    expect(screen.getByText('TimerView')).toBeInTheDocument();
+    expect(screen.getByTestId('kickoff-source')).toHaveTextContent('Started from Now');
+  });
+
+  it('is absent once the kickoff has rolled over, and Escape during the warmup stops without a row', async () => {
+    setTimer({ ...warmup, kickoff: 'rolled' });
+    const view = render(<App />);
+    expect(screen.queryByRole('dialog', { name: 'Kickoff' })).toBeNull();
+    view.unmount();
+
+    setTimer(warmup);
+    window.timerAPI.saveSession = vi.fn(async () => 'x');
+    render(<App />);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await vi.waitFor(() => expect(useTimerStore.getState().status).toBe('idle'));
+    expect(window.timerAPI.stopMainTimer).toHaveBeenCalled();
+    expect(window.timerAPI.saveSession).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: 'Kickoff' })).toBeNull();
   });
 });

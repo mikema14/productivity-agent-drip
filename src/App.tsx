@@ -8,6 +8,7 @@ import Settings from './components/Settings/Settings';
 import ProgressPage from './components/Progress/ProgressPage';
 import PlanView from './components/Plan/PlanView';
 import CreateListModal from './components/Lists/CreateListModal';
+import KickoffTakeover from './components/Kickoff/KickoffTakeover';
 import { useListsStore } from './stores/listsStore';
 import { loadSessionCount, checkTimerHydration, cleanupTimerIntervals, setupMainTimerListeners } from './stores/timerStore';
 import { useLogStore } from './stores/logStore';
@@ -81,6 +82,7 @@ function App() {
     <div className="flex h-screen overflow-hidden">
       <Rail view={currentView} onNavigate={setCurrentView} />
       <MainContent>{renderView()}</MainContent>
+      <KickoffTakeover />
       {showCreateList && (
         <CreateListModal onClose={() => { setShowCreateList(false); useListsStore.getState().loadLists(); }} />
       )}
