@@ -8,6 +8,11 @@ import { formatMinutesPadded, tomorrowCalendar, tomorrowLabel } from './reviewLo
 export interface TomorrowAsideProps {
   /** Selected `YYYY-MM-DD`; the heading shows its next workday (R4). */
   date: string;
+  /**
+   * Whether `date` is today. Plan's Today column is not date-specific, so the
+   * carry-over list is rendered only for today's review (like the Today section).
+   */
+  isToday: boolean;
   /** Today-column items (open ones are listed under `Starts in Today`). */
   todayItems: ListItem[];
   lists: TaskList[];
@@ -26,7 +31,7 @@ export interface TomorrowAsideProps {
  * that seeds EndDayModal (R3), and `End day` / `Day ended` (R15).
  */
 export default function TomorrowAside(props: TomorrowAsideProps) {
-  const { date, todayItems, lists, proposals, reflection, onReflectionChange, locked, savedReflection, onEndDay } = props;
+  const { date, isToday, todayItems, lists, proposals, reflection, onReflectionChange, locked, savedReflection, onEndDay } = props;
   const carry = todayItems.filter(i => !i.completed && !i.archived);
   const calendar = proposals ? tomorrowCalendar(proposals) : null;
 
@@ -39,7 +44,8 @@ export default function TomorrowAside(props: TomorrowAsideProps) {
         Tomorrow · <span className="text-txt-muted font-normal" data-testid="tomorrow-date">{tomorrowLabel(date)}</span>
       </h2>
 
-      <div className="flex flex-col gap-1.5">
+      {isToday && (
+      <div className="flex flex-col gap-1.5" data-testid="carry-list">
         <span className="now-label text-txt-muted">Starts in Today</span>
         {carry.length === 0 ? (
           <span className="font-display text-[12.5px] text-txt-muted">Nothing carried over</span>
@@ -53,6 +59,7 @@ export default function TomorrowAside(props: TomorrowAsideProps) {
           );
         })}
       </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <span className="now-label text-txt-muted">Calendar</span>

@@ -453,6 +453,7 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
         </div>
         <TomorrowAside
           date={selectedDate}
+          isToday={selectedDate === todayString()}
           todayItems={listItems.filter(i => i.column === 'today')}
           lists={lists}
           proposals={tomorrowProposals}
