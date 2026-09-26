@@ -58,18 +58,25 @@ export default function EntriesTable(props: Props) {
 
   return (
     <section aria-label="Time entries" className="shrink-0 flex flex-col border border-drip-elevated rounded-[2px]">
-      {/* Toolbar */}
-      <div data-testid="entries-toolbar" className="h-10 shrink-0 px-4 flex items-center justify-between gap-3 border-b border-drip-elevated">
-        <div className="flex items-center gap-3">
+      {/* Toolbar. Below `wide:` the section can be ~390px wide: the controls never wrap or
+          clip; the row scrolls sideways instead (quiet scrollbar). While the Move popover is
+          open the overflow must stay visible or the popover would be clipped by the scroller. */}
+      <div
+        data-testid="entries-toolbar"
+        className={`h-10 shrink-0 px-4 flex items-center justify-between gap-3 border-b border-drip-elevated whitespace-nowrap ${
+          moveCalendar.open ? 'overflow-visible' : 'overflow-x-auto scroll-x-quiet wide:overflow-visible'
+        }`}
+      >
+        <div className="shrink-0 flex items-center gap-3">
           <span className="inline-flex border border-drip-border">
             {tab('list', 'List')}
             {tab('timeline', 'Timeline', 'border-l border-drip-border')}
           </span>
           {showGroupToggle && (
-            <Pill pressed={groupByTask} onClick={onGroupByTaskToggle}>Group by task</Pill>
+            <Pill pressed={groupByTask} onClick={onGroupByTaskToggle} className="whitespace-nowrap">Group by task</Pill>
           )}
         </div>
-        <div className="relative flex items-center gap-1">
+        <div className="relative shrink-0 flex items-center gap-1">
           {stats.toggleableCount > 0 && (
             <button type="button" onClick={onSelectToggle} className={TEXT_KEY}>
               {stats.allSelected ? 'Unselect all' : 'Select all'}
@@ -100,22 +107,24 @@ export default function EntriesTable(props: Props) {
 
       {/* Footer: sticky to the bottom of the scrolling main column */}
       <div data-testid="entries-footer" className="sticky bottom-0 z-[5] bg-drip-bg h-[60px] shrink-0 px-4 flex items-center justify-between gap-3 border-t border-drip-elevated">
-        <span className="font-display text-[12.5px] text-txt-muted whitespace-nowrap truncate">
+        {/* `N selected` always; the minutes only from `wide:` up so the keys keep their one line */}
+        <span className="min-w-0 font-display text-[12.5px] text-txt-muted whitespace-nowrap truncate">
           <span className="font-mono text-txt-primary">{summary.selectedCount}</span> selected
           {summary.selectedCount > 0 && (
-            <> · <span className="font-mono text-txt-primary">{formatMinutesPadded(summary.selectedMinutes)}</span></>
+            <span className="hidden wide:inline"> · <span className="font-mono text-txt-primary">{formatMinutesPadded(summary.selectedMinutes)}</span></span>
           )}
           {summary.needsTaskCount > 0 && (
             <> · <span className="text-focus">{summary.needsTaskCount} {summary.needsTaskCount === 1 ? 'needs' : 'need'} a task</span></>
           )}
         </span>
-        <div className="flex items-center gap-2.5">
-          <KeyButton variant="outline" size="md" onClick={onAddEntry}>+ Entry</KeyButton>
+        <div className="shrink-0 flex items-center gap-2.5">
+          <KeyButton variant="outline" size="md" onClick={onAddEntry} className="whitespace-nowrap">+ Entry</KeyButton>
           <KeyButton
             variant="amber"
             size="md"
             onClick={onLogSelected}
             disabled={!canLog}
+            className="whitespace-nowrap"
             title={summary.selectedCount === 0 ? 'Mark entries to log' : isLogging ? 'Logging…' : undefined}
           >
             {logLabel}
