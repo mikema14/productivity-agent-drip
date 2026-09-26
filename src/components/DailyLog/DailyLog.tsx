@@ -425,7 +425,8 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
               )}
             </div>
           )}
-          <TodaysThree />
+          {/* Plan's Today column is not date-specific: only today's review triages it */}
+          {selectedDate === todayString() && <TodaysThree />}
           <EntriesTable
             viewMode={viewMode}
             onViewModeChange={setViewMode}

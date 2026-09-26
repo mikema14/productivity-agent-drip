@@ -358,6 +358,13 @@ describe('DailyLog (Review)', () => {
     expect(table()).toBeInTheDocument();
   });
 
+  it('the Today section renders only when the selected date is today', async () => {
+    await renderLog([], '2020-01-02');
+    expect(screen.queryByRole('region', { name: 'Today' })).toBeNull();
+    await act(async () => { useLogStore.setState({ selectedDate: today }); });
+    expect(screen.getByRole('region', { name: 'Today' })).toBeInTheDocument();
+  });
+
   it('the main column scrolls as a whole; the entries section is unconstrained and its footer sticky', async () => {
     await renderLog([makeEntry('pomodoro')]);
     const main = screen.getByTestId('review-main');
