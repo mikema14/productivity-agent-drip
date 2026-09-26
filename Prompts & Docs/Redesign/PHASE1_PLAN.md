@@ -81,7 +81,7 @@ Layout in every state: `NowHeader` → main column (`01 FOCUS` block, then `02 T
 | Intention row | `SET INTENTION` ghost key (new entry point) or intention + EDIT | same | same (*Revised by owner (parity audit)*: editable, `SET INTENTION` key when none) | same | same (*Revised by owner (parity audit)*: shown, editable) | as running |
 | Continue CTA slot (44px reserved) | CTA if `previousSession` | same | not rendered | not rendered | rendered (preserves today's behaviour; see Q6) | not rendered |
 | Right column | placeholder "Pick a task below" + DurationSegments + KeyButtons: `BEGIN FOCUS ↵` disabled, `KICKOFF 2M` | `TaskCardWithPicker` (id — PROJECT / title, collapsible search-in-place, `beforeNote`=DurationSegments, note input), `BillableToggle` (sm), `BEGIN FOCUS ↵` (amber), `KICKOFF 2M` (outline) | readonly `TaskCard` (or intention-only card as `Timer.tsx:531-535`), keys: `PAUSE` outline, `FINISH` outline, `CANCEL` danger-ghost, `+5 MIN` sm | `RESUME` amber, `FINISH`, `CANCEL` | "Take a breather" + `SKIP BREAK` outline | as running (+5 MIN still allowed, as today) |
-| 02 TASKS section | `TaskPicker` (search `/`, Recent by frequency, keycaps 1-3) | hidden (picker lives in the card, as today) | hidden | hidden | hidden | hidden |
+| 02 TASKS section | `TaskPicker` (search `/`, Recent by frequency, keycaps 1-3) | hidden (picker lives in the card, as today) | hidden | hidden | *Revised by owner (parity audit):* `TaskPicker` when nothing is selected, else `TaskCardWithPicker` + note + `BillableToggle` (no duration strip, no Begin Focus / Kickoff) — as the old app did during a break | hidden |
 | Enter shortcut | no | yes (guarded) | no | no | no | no |
 | Cancel confirm | – | – | if elapsed > 300 s | same | – | same |
 
