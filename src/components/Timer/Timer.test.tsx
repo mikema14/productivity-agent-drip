@@ -142,6 +142,23 @@ describe('Timer — ready states', () => {
     expect(useTimerStore.getState().pendingSelection).toBeNull();
   });
 
+  it('clearSelection() from the store drops the picked task (the kickoff takeover\'s Stop / Finish)', async () => {
+    const { user } = await renderTimer();
+    await selectFirstTask(user);
+    expect(key(/begin focus/i)).toBeEnabled();
+    act(() => { useTimerStore.getState().clearSelection(); });
+    expect(key(/begin focus/i)).toBeDisabled();
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+  });
+
+  it('a pendingSelection is not undone by the mount value of selectionResetToken', async () => {
+    window.logAPI.getCachedTask = vi.fn(async () => makeTasks(1)[0]);
+    setTimer({ pendingSelection: { taskId: '600001', title: 'Do X' }, selectionResetToken: 3 });
+    await renderTimer();
+    expect(await screen.findByText('Task number 1')).toBeInTheDocument();
+    expect(key(/begin focus/i)).toBeEnabled();
+  });
+
   it('leaves a pendingSelection untouched while a session is running', async () => {
     setTimer({ status: 'focus', sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, currentTaskId: '600002', pendingSelection: { taskId: '600001', title: 'Do X' } });
     await renderTimer();

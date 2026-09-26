@@ -139,6 +139,14 @@ describe('timerStore — kickoff', () => {
     expect(s.raycastFocus).toBe(false);
   });
 
+  it('clearSelection bumps selectionResetToken and the token is never persisted', () => {
+    const before = useTimerStore.getState().selectionResetToken;
+    useTimerStore.getState().clearSelection();
+    expect(useTimerStore.getState().selectionResetToken).toBe(before + 1);
+    const persisted = JSON.parse(localStorage.getItem('timer-storage') || '{}');
+    expect(persisted.state ?? {}).not.toHaveProperty('selectionResetToken');
+  });
+
   it('kickoffSource, kickoffEscalateMinutes and raycastFocus are never persisted', () => {
     setTimer({ kickoffSource: 'auto', kickoffEscalateMinutes: 15, raycastFocus: true, durationMinutes: 50 });
     const stored = JSON.parse(localStorage.getItem('timer-storage') || '{}');

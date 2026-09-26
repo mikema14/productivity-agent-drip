@@ -142,8 +142,9 @@ describe('KickoffTakeover — Stop (K2) and the esc hint (N3)', () => {
     vi.restoreAllMocks();
   });
 
-  it('Stop resets: main timer stopped, no row saved, store idle with the kickoff fields cleared', async () => {
-    draw();
+  it('Stop has exactly Now\'s Cancel effects: reset, no row, note cleared, task selection cleared', async () => {
+    draw({ intention: 'Write the brief' });
+    const tokenBefore = useTimerStore.getState().selectionResetToken;
     await userEvent.setup().click(key(/^Stop/));
     expect(window.timerAPI.stopMainTimer).toHaveBeenCalled();
     expect(window.timerAPI.saveSession).not.toHaveBeenCalled();
@@ -152,15 +153,20 @@ describe('KickoffTakeover — Stop (K2) and the esc hint (N3)', () => {
     expect(s.kickoff).toBeNull();
     expect(s.kickoffSource).toBeNull();
     expect(s.raycastFocus).toBe(false);
+    expect(s.intention).toBe('');
+    expect(s.selectionResetToken).toBe(tokenBefore + 1);
     expect(dialog()).toBeNull();
   });
 
   it('Escape does the same, and unmounts the takeover', async () => {
-    draw();
+    draw({ intention: 'Write the brief' });
+    const tokenBefore = useTimerStore.getState().selectionResetToken;
     fireEvent.keyDown(window, { key: 'Escape' });
     await vi.waitFor(() => expect(useTimerStore.getState().status).toBe('idle'));
     expect(window.timerAPI.stopMainTimer).toHaveBeenCalled();
     expect(window.timerAPI.saveSession).not.toHaveBeenCalled();
+    expect(useTimerStore.getState().intention).toBe('');
+    expect(useTimerStore.getState().selectionResetToken).toBe(tokenBefore + 1);
     expect(dialog()).toBeNull();
   });
 
@@ -226,14 +232,16 @@ describe('KickoffTakeover — secondary row (K3 override): the same handlers Now
     expect(window.timerAPI.extendMainTimer).toHaveBeenCalledWith(300);
   });
 
-  it('Finish → finishEarly: saves what ran as a Kickoff row and leaves the warmup', async () => {
+  it('Finish has exactly Now\'s Finish effects: finishEarly saves the Kickoff row, leaves the warmup, clears the task selection', async () => {
     draw({ sessionStartTime: new Date(Date.now() - 90_000) });
+    const tokenBefore = useTimerStore.getState().selectionResetToken;
     await userEvent.setup().click(key('Finish'));
     await vi.waitFor(() => expect(useTimerStore.getState().status).toBe('idle'));
     expect(window.timerAPI.stopMainTimer).toHaveBeenCalled();
     expect(window.timerAPI.saveSession).toHaveBeenCalledWith(
       expect.objectContaining({ comment: 'Kickoff', task_id: '689742', duration_minutes: 2 })
     );
+    expect(useTimerStore.getState().selectionResetToken).toBe(tokenBefore + 1);
     expect(dialog()).toBeNull();
   });
 });

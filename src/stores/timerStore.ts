@@ -53,6 +53,13 @@ interface TimerStore extends TimerState {
    */
   pendingSelection: PendingSelection | null;
   setPendingSelection: (selection: PendingSelection | null) => void;
+  /**
+   * Bumped by `clearSelection()`. The Now screen owns its selected task as local
+   * state; this lets another surface (the kickoff takeover's Stop / Finish) drop
+   * it exactly as Now's own Cancel / Finish do. Not persisted.
+   */
+  selectionResetToken: number;
+  clearSelection: () => void;
 }
 
 export interface PendingSelection {
@@ -153,6 +160,7 @@ export const useTimerStore = create<TimerStore>()(
       kickoffEscalateMinutes: null,
       raycastFocus: false,
       pendingSelection: null,
+      selectionResetToken: 0,
 
       setIntention: (intention: string) => {
         set({ intention });
@@ -160,6 +168,10 @@ export const useTimerStore = create<TimerStore>()(
 
       setPendingSelection: (selection) => {
         set({ pendingSelection: selection });
+      },
+
+      clearSelection: () => {
+        set((state) => ({ selectionResetToken: state.selectionResetToken + 1 }));
       },
 
       setTimerMode: (mode: 'pomodoro' | 'stopwatch') => {

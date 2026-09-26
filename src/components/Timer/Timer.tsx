@@ -56,6 +56,7 @@ export default function Timer({ onNavigate }: TimerProps) {
     setCurrentBillable,
     kickoff,
     startKickoff,
+    selectionResetToken,
   } = useTimerStore();
 
   const today = new Date().toISOString().split('T')[0];
@@ -125,6 +126,16 @@ export default function Timer({ onNavigate }: TimerProps) {
     setIntention(title);
     setPendingSelection(null);
   }, []);
+
+  // Another surface asked for the selection to go (the kickoff takeover's Stop / Finish,
+  // which mirror Now's Cancel / Finish). Skip the mount run so a pendingSelection survives.
+  const seenResetToken = useRef(selectionResetToken);
+  useEffect(() => {
+    if (seenResetToken.current === selectionResetToken) return;
+    seenResetToken.current = selectionResetToken;
+    setSelectedTask(null);
+    setPickerOpen(false);
+  }, [selectionResetToken]);
 
   // `/` — focus the task search from ready states, break included (guard against input fields).
   // Only the selected-task card has a collapsed picker to open; the idle picker is always open.

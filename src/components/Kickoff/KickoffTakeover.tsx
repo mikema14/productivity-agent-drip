@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import { useTimerStore } from '../../stores/timerStore';
 import { useTaskName } from '../../hooks/useTaskName';
@@ -20,9 +20,10 @@ function isEditable(target: EventTarget | null): boolean {
  * PHASE4_PLAN.md §2.2). A fixed layer over the rail and every view (K1); the Now
  * screen keeps rendering its own kickoff state underneath (K3).
  *
- * `esc Stop` is Now's Cancel path — `reset()`, no row (K2). The quiet secondary
- * row carries the same Pause / Resume / Finish / +5 min handlers Now uses during
- * the warmup (K3 override), so nothing that works on Now is hidden.
+ * `esc Stop` is Now's Cancel path — `reset()` + cleared note + cleared task
+ * selection, no row (K2). The quiet secondary row carries the same Pause /
+ * Resume / Finish / +5 min effects Now has during the warmup (K3 override), so
+ * nothing that works on Now is hidden and nothing is left behind.
  */
 export default function KickoffTakeover() {
   const status = useTimerStore((s) => s.status);
@@ -41,6 +42,21 @@ export default function KickoffTakeover() {
   const resume = useTimerStore((s) => s.resume);
   const finishEarly = useTimerStore((s) => s.finishEarly);
   const extendSession = useTimerStore((s) => s.extendSession);
+  const setIntention = useTimerStore((s) => s.setIntention);
+  const clearSelection = useTimerStore((s) => s.clearSelection);
+
+  // Exactly Now's Cancel (`doCancel`): reset, drop the session note, drop the picked task.
+  const stop = useCallback(() => {
+    reset();
+    setIntention('');
+    clearSelection();
+  }, [reset, setIntention, clearSelection]);
+
+  // Exactly Now's Finish (`handleFinish`): finishEarly, drop the picked task.
+  const finish = useCallback(() => {
+    finishEarly();
+    clearSelection();
+  }, [finishEarly, clearSelection]);
 
   const active = status === 'focus' && kickoff === 'warmup';
   const taskName = useTaskName(active ? currentTaskId : null);
@@ -52,11 +68,11 @@ export default function KickoffTakeover() {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || isEditable(event.target)) return;
       event.preventDefault();
-      reset();
+      stop();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [active, reset]);
+  }, [active, stop]);
 
   if (!active) return null;
 
@@ -140,12 +156,12 @@ export default function KickoffTakeover() {
             ) : (
               <KeyButton variant="ghost" size="sm" onClick={() => pause()}>Pause</KeyButton>
             )}
-            <KeyButton variant="ghost" size="sm" onClick={() => finishEarly()}>Finish</KeyButton>
+            <KeyButton variant="ghost" size="sm" onClick={finish}>Finish</KeyButton>
             {!isPaused && (
               <KeyButton variant="ghost" size="sm" onClick={() => extendSession(5)}>+5 min</KeyButton>
             )}
           </div>
-          <KeyButton variant="outline" size="sm" className="ml-2" kbd={windowFocused ? 'esc' : undefined} onClick={() => reset()}>
+          <KeyButton variant="outline" size="sm" className="ml-2" kbd={windowFocused ? 'esc' : undefined} onClick={stop}>
             Stop
           </KeyButton>
         </div>
