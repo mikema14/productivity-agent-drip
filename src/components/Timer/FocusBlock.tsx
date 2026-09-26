@@ -4,8 +4,12 @@ export type TopRule = 'amber' | 'emerald' | 'dim';
 
 interface Props {
   topRule: TopRule;
-  /** The countdown column (330px on wide windows). */
-  countdown: ReactNode;
+  /**
+   * The countdown column (330px on wide windows). Omit it for the calm
+   * single-column layout (running / paused / kickoff), where the children
+   * own the whole block.
+   */
+  countdown?: ReactNode;
   /** State-dependent context: task card, duration strip, action keys. */
   children: ReactNode;
 }
@@ -27,12 +31,26 @@ export function SectionHeader({ children, right }: { children: ReactNode; right?
   );
 }
 
-/** The bordered focus section: countdown on the left, a hairline divider, context on the right. */
+/**
+ * The bordered focus section. With a `countdown`: countdown on the left, a
+ * hairline divider, context on the right. Without one: a single column.
+ */
 export default function FocusBlock({ topRule, countdown, children }: Props) {
+  const frame = `shrink-0 px-6 py-5 border border-drip-border border-t-2 ${RULE[topRule]}`;
+
+  if (countdown === undefined) {
+    return (
+      <section aria-label="Focus" data-layout="calm" className={`${frame} flex flex-col`}>
+        {children}
+      </section>
+    );
+  }
+
   return (
     <section
       aria-label="Focus"
-      className={`shrink-0 flex flex-col wide:flex-row wide:items-center gap-6 px-6 py-5 border border-drip-border border-t-2 ${RULE[topRule]}`}
+      data-layout="split"
+      className={`${frame} flex flex-col wide:flex-row wide:items-center gap-6`}
     >
       <div className="w-full wide:w-[330px] shrink-0">{countdown}</div>
       <div aria-hidden className="w-full h-px wide:w-px wide:h-auto wide:self-stretch bg-drip-border shrink-0" />

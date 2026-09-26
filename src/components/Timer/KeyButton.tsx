@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-type Variant = 'amber' | 'outline' | 'ghost' | 'danger';
+type Variant = 'amber' | 'light' | 'outline' | 'ghost' | 'danger' | 'text' | 'text-danger';
 type Size = 'md' | 'sm';
 
 interface Props extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
@@ -13,9 +13,14 @@ interface Props extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'
 
 const VARIANT: Record<Variant, string> = {
   amber: 'bg-focus text-drip-bg shadow-key-amber hover:brightness-110 disabled:shadow-none',
+  // Solid light keycap: the primary key of the calm running state (PAUSE / RESUME).
+  light: 'bg-txt-primary text-drip-bg shadow-key-light hover:brightness-95 disabled:shadow-none',
   outline: 'bg-transparent text-txt-primary border border-txt-dim shadow-key-dark hover:bg-focus/5 hover:border-txt-muted',
   ghost: 'bg-transparent text-txt-muted border border-drip-border hover:text-txt-primary hover:bg-focus/5',
   danger: 'bg-transparent text-txt-muted border border-drip-border hover:text-alert hover:border-alert/40 hover:bg-alert/5',
+  // Quiet text keys: no border, no drop edge (+5 MIN / CANCEL in the calm running state).
+  text: 'bg-transparent text-txt-secondary hover:text-txt-primary',
+  'text-danger': 'bg-transparent text-txt-muted hover:text-alert',
 };
 
 const SIZE: Record<Size, string> = {
@@ -28,6 +33,7 @@ export default function KeyButton({ variant = 'outline', size = 'md', kbd, child
   return (
     <button
       type="button"
+      data-variant={variant}
       className={`inline-flex items-center justify-center font-mono font-medium uppercase tracking-label rounded-[3px] transition-[transform,box-shadow,background-color,color] duration-100 active:translate-y-[2px] active:shadow-none disabled:opacity-40 disabled:cursor-not-allowed disabled:active:translate-y-0 ${VARIANT[variant]} ${SIZE[size]} ${className}`}
       {...rest}
     >

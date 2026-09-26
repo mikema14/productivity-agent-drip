@@ -1,11 +1,11 @@
 import type { RefObject } from 'react';
-import { formatTime } from '../../utils/time';
+import CountdownDigits from './CountdownDigits';
 import TickRuler, { type RulerTone } from './TickRuler';
 
 export const SESSIONS_PER_DAY = 8;
 
 interface Props {
-  /** Left label, e.g. `READY`, `FOCUS · 11:40 → 12:05`, `KICKOFF · ROLLS INTO 25M`. */
+  /** Left label, e.g. `READY`, `BREAK · 12:05 → 12:10`. */
   label: string;
   /** Sessions completed today. */
   sessionCount: number;
@@ -32,13 +32,15 @@ interface Props {
   rulerRef?: RefObject<HTMLDivElement>;
 }
 
-/** The left column of the focus block: label row, big digits over ghost segments, minute ruler. */
+/**
+ * The left column of the focus block in the ready and break states: label row
+ * with the session counter, big digits over ghost segments, minute ruler.
+ * Running / paused / kickoff use the single-column `ActiveFocus` instead.
+ */
 export default function CountdownDisplay({
   label, sessionCount, sessionLabel = 'next', currentGlows = false, compactCounter = false, remainingSeconds,
   running = false, paused = false, tone = 'amber', rulerMinutes, elapsedSeconds, active = false, rulerRef,
 }: Props) {
-  const [mins, secs] = formatTime(remainingSeconds).split(':');
-  const digitColor = tone === 'emerald' ? 'text-break' : paused ? 'text-txt-secondary' : 'text-txt-primary';
   const squareOn = tone === 'emerald' ? 'bg-break' : 'bg-focus';
 
   return (
@@ -68,14 +70,7 @@ export default function CountdownDisplay({
         </span>
       </div>
 
-      <div className="relative now-digits -ml-1.5">
-        <span aria-hidden className="absolute left-0 top-0 text-drip-ghost">88:88</span>
-        <div role="timer" aria-label="Time remaining" className={`relative ${digitColor}`}>
-          <span>{mins}</span>
-          <span className={running ? 'colon-blink' : ''}>:</span>
-          <span>{secs}</span>
-        </div>
-      </div>
+      <CountdownDigits remainingSeconds={remainingSeconds} running={running} paused={paused} tone={tone} />
 
       <TickRuler
         ref={rulerRef}
