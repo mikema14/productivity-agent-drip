@@ -1,94 +1,72 @@
 # Drip UI Design System
 
-## Design Principles
+Token and pattern reference for the redesign language (rail + Now, Plan, Review, overlay nudge and
+kickoff takeover). The rules themselves — what is allowed, what is forbidden, the design context — live
+in the project `CLAUDE.md` §6; this file says *which class* implements each rule and records the
+per-screen patterns that shipped. When the two disagree, `CLAUDE.md` wins and this file is stale.
 
-- **Transparent backgrounds**: Prefer `bg-transparent` over solid fills for inputs and containers
-- **Orange (`focus`) accent color**: Every interactive element, border, and state indicator uses the `focus` token (amber/orange)
-- **No grey glass remnants**: The old `glass-*` utility classes are deprecated in Timer-view files — use orange accent equivalents
-- **Consistent rounding**: `rounded-xl` for inputs/buttons/cards, `rounded-2xl` for modals, `rounded-full` for pills/badges
+## Tokens
 
----
+Colours come from `src/theme/tokens.js` (`COLOR`), which both `tailwind.config.js` and the overlay
+renderer's inline styles (`src/overlay/glass.ts`) import. Components never carry hex values.
 
-## Token Reference
+| Token | Value | Tailwind | Use |
+|---|---|---|---|
+| `drip.bg` | `#0a0a0c` | `bg-drip-bg` | window / takeover background |
+| `drip.surface` | `#141418` | `bg-drip-surface` | cards that need a fill |
+| `drip.elevated` | `#1c1c22` | `bg-drip-elevated`, `border-drip-elevated` | dropdown fill; **section hairlines** |
+| `drip.border` | `#2a2a32` | `border-drip-border` | **control outlines**, dot grille, empty day-bar segments |
+| `drip.ghost` | `#16161b` | `text-drip-ghost` | the unlit `88:88` behind the countdown |
+| `focus` | `#f59e0b` (`light #fbbf24`, `dark #d97706`, `shadow #92560a`) | `text-focus`, `bg-focus`, `border-focus/30`, `bg-focus/10`, `hover:bg-focus/5` | the one accent: active state, current item, primary key, id pills, Today container |
+| `break` | `#34d399` | `text-break`, `border-break/40`, `bg-break/15` | break state, done checks, logged rows |
+| `alert` | `#ef4444` (`light #f87171`) | `text-alert`, `border-alert/40` | errors, Delete hover, the idle nudge |
+| `blue-500` / `blue-400` | Tailwind | `border-blue-500/40`, `bg-blue-400` | calendar rows and blocks only |
+| `txt` | primary `#f0f0f2` · secondary `#a0a0b0` · muted `#8585a0` · dim `#45455a` | `text-txt-*` | type hierarchy; `border-txt-dim` on outline keys |
 
-| Element | Tailwind Classes |
-|---------|-----------------|
-| **Input (resting)** | `bg-transparent border border-focus/30 rounded-xl` |
-| **Input (focus ring)** | `focus:ring-2 focus:ring-focus/30 focus:border-focus/30` |
-| **Primary button** | `bg-focus text-drip-bg rounded-2xl shadow-glow-focus hover:scale-[1.02]` |
-| **Secondary button** | `px-4 py-2 bg-focus/10 border border-focus/20 text-focus rounded-xl hover:bg-focus/20` |
-| **Ghost / neutral button** | `px-4 py-2 bg-transparent border border-focus/20 text-txt-muted rounded-xl hover:bg-focus/5 transition-all` |
-| **Destructive ghost** | `text-txt-dim hover:text-red-400 transition-colors` |
-| **Toggle (active)** | `bg-focus/15 text-focus border border-focus/30` |
-| **Toggle (inactive)** | `text-txt-secondary hover:text-txt-primary hover:bg-focus/5` |
-| **Billable toggle** | Shared `BillableToggle` pill — active `bg-focus/15 text-focus border-focus/30` (with `✓`), inactive `bg-transparent text-txt-secondary border-focus/20 hover:bg-focus/5`, `rounded-full`. Use it for any billable control (timer, lists, items, log entries) instead of a raw checkbox. See `BILLABLE_FEATURE.md`. |
-| **Filter pill (active)** | `bg-focus/15 text-focus` |
-| **Filter pill (inactive)** | `text-txt-muted hover:text-txt-secondary hover:bg-focus/5` |
-| **Container / card** | `bg-transparent border border-focus/30 rounded-xl` |
-| **Content card (subtle)** | `bg-focus/5 border border-focus/20 rounded-xl` |
-| **Modal surface** | `bg-drip-bg/95 backdrop-blur-2xl border border-focus/30 rounded-2xl shadow-glass` |
-| **Divider border** | `border-focus/20` |
-| **Section border (header/footer)** | `border-b border-focus/20` / `border-t border-focus/20` |
-| **Dropdown container** | `bg-drip-elevated border border-focus/30 rounded-xl shadow-glass` |
-| **Dropdown item hover** | `hover:bg-focus/5` |
-| **Progress bar track** | `bg-focus/10` |
-| **Pill / badge** | `bg-focus/5 border border-focus/20 rounded-full` |
-| **Hour line dashes** | `border-dashed border-focus/10` |
-| **Hover state (generic)** | `hover:bg-focus/5` |
-| **Checkbox border** | `border border-focus/20 hover:border-focus/50` |
+| Token | Tailwind / CSS | Notes |
+|---|---|---|
+| Fonts | `font-display` Outfit · `font-mono` JetBrains Mono · `font-condensed` Barlow Condensed 700 | loaded from Google Fonts in `index.html` |
+| `.now-digits` | condensed 700, 160px (120px below `wide:`), line-height .8, tabular | countdown; the takeover overrides to 240px |
+| `.now-label` | mono 10.5px 500, `tracking-label` (1.5px), uppercase via CSS | every micro-label and section header; source text stays sentence-case |
+| Radii | `rounded-[2px]` surfaces and pills, `rounded-[3px]` keys, none on hairlines | no `rounded-xl` / `rounded-full` on redesigned surfaces |
+| Shadows | `shadow-key-amber`, `shadow-key-dark`, `shadow-key-sm` (keycap drop edges), `shadow-led` (4px LED) | `shadow-glass` remains only on the old modals |
+| Breakpoint | `wide:` = 1000px | aside 280px / digits 120px / horizontal scroll below it |
+| Motion | `transition-* duration-150` (200 max), `active:translate-y-[2px] active:shadow-none` on keys, `.colon-blink` 1 s, `led-running` pulse | glow / breathe only for the timer state |
+| Overlay glass | `GLASS` (fill, blur, `radiusCard` 24, `shadowCard`, `haloAlert`), `CARD_W` 440, `WINDOW` 560×400 inset 44 | overlay window only; not the main-window language |
 
----
+## Shared primitives
 
-## Semantic Color Palette
+Reuse these; never re-implement one inline.
 
-| Semantic role | Token | Color |
-|---------------|-------|-------|
-| Focus sessions / primary accent | `focus` | Amber/orange |
-| Break sessions | `break` | Emerald green |
-| Calendar events | `blue-500` | Blue |
-| Adhoc entries | `focus` (subtle) | Orange-tinted |
-| Error / destructive | `red-400` / `red-500` | Red |
-| Primary text | `txt-primary` | — |
-| Secondary text | `txt-secondary` | — |
-| Muted text | `txt-muted` | — |
-| Dim text | `txt-dim` | — |
+| Primitive | File | Contract |
+|---|---|---|
+| `KeyButton` | `src/components/Timer/KeyButton.tsx` | `variant` amber / outline / ghost / danger, `size` md (44px) / sm (28px), `kbd` hint; mono uppercase, `rounded-[3px]`, keycap drop edge, presses in; `disabled:opacity-40` |
+| `Pill` | `src/components/shared/Pill.tsx` | 26px hairline toggle, `aria-pressed`; pressed `border-focus/30 bg-focus/10 text-txt-primary` |
+| `SectionHeader` | `src/components/Timer/FocusBlock.tsx` | `.now-label text-txt-muted` label + `border-t border-drip-elevated` hairline + optional right slot (`01 Focus`, `02 Tasks`, `03 Day`) |
+| Id pill | `TaskIdBadge plain` (`src/components/shared/TaskIdBadge.tsx`) or inline `font-mono text-[12px] text-focus bg-focus/10 rounded-[2px] px-1.5` | never a `#`; cached title as `title=` |
+| `BillableToggle` | `src/components/shared/BillableToggle.tsx` | `role=switch` pill, sizes; the only billable control (lists, items, entries, timer) |
+| `TickRuler` | `src/components/Timer/TickRuler.tsx` | one tick per minute, majors every 5, labels every 5 / 10 / 15 for 15–25 / 50 / 90 min; amber fill via `--progress`, emerald in break |
+| LED | `w-1 h-1 bg-focus shadow-led` | active rail item, selected duration, current session square |
+| Joined segmented control | `border border-drip-border`, children `border-l border-drip-border`, active `bg-focus text-drip-bg` | `DurationSegments`, aside tabs, List \| Timeline |
+| Hover actions | `.plan-card-actions` / `.row-actions` (`src/index.css`) | `opacity-0 pointer-events-none` until `group-hover` / `group-focus-within` — hidden actions never catch clicks |
+| Hairline pill | `border-drip-border rounded-[2px] px-2.5 py-1 text-[12px]` + 6px square dot | header state pills (`NowHeader`), takeover Raycast pill |
+| Quiet scroller | `.scroll-x-quiet` | toolbars that must not wrap below `wide:` |
+| Key hints | `hooks/useWindowFocus` | print `↵` / `esc` only while `document.hasFocus()`; the binding exists regardless |
 
----
+## Legacy surfaces
 
-## Legacy Patterns to Avoid
-
-These classes still exist in DailyLog, Lists, and Settings views — **do not use them in new code** and migrate when touching those views:
-
-| Legacy class | Replacement |
-|-------------|-------------|
-| `glass-button` | `px-4 py-2 bg-transparent border border-focus/20 text-txt-muted rounded-xl hover:bg-focus/5 transition-all` |
-| `glass-surface-elevated` | `bg-drip-bg/95 backdrop-blur-2xl border border-focus/30 rounded-2xl shadow-glass` |
-| `bg-glass-bg` | `bg-transparent` (inputs) or `bg-focus/5` (cards) |
-| `border-glass-border` | `border-focus/30` (prominent) or `border-focus/20` (subtle) |
-| `bg-glass-hover` | `bg-focus/5` |
-| `bg-drip-elevated` | Still valid for dropdown backgrounds; replace borders only |
-
----
-
-## Migration Checklist
-
-When updating an older view to the orange accent design language:
-
-1. Find all `glass-button` usages → replace with ghost button pattern
-2. Find all `glass-surface-elevated` → replace with modal surface pattern
-3. Find all `bg-glass-bg` → use `bg-transparent` for inputs, `bg-focus/5` for info cards
-4. Find all `border-glass-border` → use `border-focus/30` or `border-focus/20`
-5. Find all `bg-glass-hover` → use `hover:bg-focus/5`
-6. Verify modals: header/footer dividers should be `border-focus/20`
-7. Verify dropdowns: container border should be `border-focus/30`, items `hover:bg-focus/5`
-8. Verify progress bars: track should be `bg-focus/10`
-9. Verify checkboxes: border should be `border-focus/20`
+Settings (`src/components/Settings/*`), Insights (`src/components/Progress/*`) and the modals the mockups
+do not draw (`AddEntryModal`, `EndDayModal`, `TemplateManagerModal`, `CalendarPopover`, `LogTimeModal`,
+`CreateListModal`, `SetIntentionModal`, `CancelConfirmModal`, `BoundaryConfirmDialog`) keep their older
+`rounded-xl` / `shadow-glass` / `bg-focus/5` styling. Leave them alone unless a task names them; when you
+do touch one, re-token to `rounded-[2px]` + hairlines, drop emoji or `#` prefixes, and change nothing
+else. No `glass-*` utility classes exist any more; do not reintroduce them.
 
 ---
 
 ## Now Screen Tokens (Phase 1 redesign)
 
-The rail + Now screen introduce a squarer, hairline language that Phase 2 (Plan / Review / Insights) should reuse. Corners are `rounded-[2px]` or none; no `rounded-xl` / `rounded-full` on new surfaces.
+The rail + Now screen introduced the square, hairline language every later screen reuses. Owner decisions Q1–Q9 are recorded in `Redesign/PHASE1_PLAN.md` §7. Shared primitives are described above; this table records the Now-specific patterns.
 
 | Element | Tailwind / class |
 |---------|------------------|
@@ -100,11 +78,10 @@ The rail + Now screen introduce a squarer, hairline language that Phase 2 (Plan 
 | **Hairline separator** | `border-drip-elevated` (section separators) / `border-drip-border` (control outlines) |
 | **Focus block top rule** | `border-t-2 border-t-focus`; `border-t-break` in break; `border-t-drip-border` when paused |
 | **Joined segmented control** | `border border-drip-border`, children `border-l border-drip-border`, active `bg-focus text-drip-bg` (DurationSegments, aside tabs, task-list filters) |
-| **Id pill** | `font-mono text-[12px] text-focus bg-focus/10 rounded-[2px] px-1.5` — never a `#` prefix (design rule 6) |
+| **Id pill** | `font-mono text-[12px] text-focus bg-focus/10 rounded-[2px] px-1.5` — never a `#` prefix (CLAUDE.md §6 rule 4) |
 | **Timeline blocks** | `rounded-[2px]` 1px borders: focus `border-focus/30-40`, break `border-break/40`, calendar `border-blue-500/40` (dashed = proposal), adhoc dashed `border-focus/30` |
 | **NOW marker** | 7px `bg-focus` square + 1px amber line + inverted `NOW hh:mm` tag |
 | **Day bar** | 12 × `h-1.5` segments, `bg-focus` filled / `bg-drip-border` empty, against `DAY_TARGET_MINUTES = 360` |
-| **Tokens added** | `drip.ghost #16161b`, `focus.shadow #92560a`, `shadow-key-amber/key-dark/key-sm/led`, `tracking-label`, `font-condensed`, screen `wide` (1000px) |
 
 ---
 
