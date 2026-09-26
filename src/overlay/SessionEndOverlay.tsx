@@ -1,41 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties } from 'react';
 import type {
   BreakRunningPayload,
   FocusCompletePayload,
   BreakCompletePayload,
-  IdleNudgePayload,
-  KickoffContinuePayload,
   OverlayActionType,
   SessionOverlayPayload
 } from '../types';
-import { ALERT, BREAK, CARD_W, FOCUS, GLASS, TXT, WINDOW } from './glass';
+import { BREAK, CARD_W, FOCUS, GLASS, TXT, WINDOW } from './glass';
 import { playEscalationChime } from './chime';
 import { useOverlayHoverInteractivity } from './useOverlayHoverInteractivity';
+import { useWindowFocus } from '../hooks/useWindowFocus';
+import { ActionButton, CoffeeIcon, DismissButton, Dot, label, mmss, mono, pad } from './parts';
+import { IdleNudgeCard } from './IdleNudgeCard';
+import { KickoffPromptCard } from './KickoffPromptCard';
 
 const ESCALATE_AFTER_MS = 60_000;
 const NOTE_DEBOUNCE_MS = 400;
 
 type Shape = 'card' | 'break';
 
-function pad(n: number): string {
-  return n < 10 ? `0${n}` : String(n);
-}
-
 function clockTime(iso: string): string {
   const d = new Date(iso);
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function mmss(totalSeconds: number): string {
-  const s = Math.max(0, totalSeconds);
-  return `${Math.floor(s / 60)}:${pad(s % 60)}`;
-}
-
-/** 12m, or 40s below a minute (DRIP_IDLE_FAST runs in seconds). */
-function span(totalSeconds: number): string {
-  const s = Math.max(0, Math.round(totalSeconds));
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m`;
 }
 
 /** The idle nudge and the kickoff prompt run on main's clock, not the escalation one. */
@@ -88,6 +75,9 @@ function devPayload(): SessionOverlayPayload | null {
 export function SessionEndOverlay() {
   const initial = useMemo(devPayload, []);
   const [payload, setPayload] = useState<SessionOverlayPayload | null>(initial);
+  // The window keydown handler is registered once; it reads the kind from here.
+  const kindRef = useRef<SessionOverlayPayload['kind'] | null>(initial?.kind ?? null);
+  const windowFocused = useWindowFocus();
 
   const [escalated, setEscalated] = useState(false);
   const [note, setNote] = useState('');
@@ -166,6 +156,20 @@ export function SessionEndOverlay() {
     playEscalationChime();
   }, []);
 
+  const act = useCallback(
+    (type: OverlayActionType) => {
+      flushNote(true);
+      stopEscalation();
+      if (!window.overlayAPI) {
+        // Dev / e2e fixture window (no preload): nothing can leave the page.
+        console.log(`[Overlay] fixture action: ${type}`);
+        return;
+      }
+      window.overlayAPI.action(type);
+    },
+    [flushNote, stopEscalation]
+  );
+
   // Hovering the card means the user has seen it, so stop nagging.
   const onHoverEnter = useCallback(() => {
     if (!isBreakRunning) stopEscalation();
@@ -183,6 +187,7 @@ export function SessionEndOverlay() {
       noteFocusedRef.current = false;
 
       setPayload(next);
+      kindRef.current = next.kind;
       setShownAt(Date.now());
       stopEscalation();
 
@@ -211,7 +216,14 @@ export function SessionEndOverlay() {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         flushNote(true);
-        window.overlayAPI?.action('dismiss');
+        act('dismiss');
+        return;
+      }
+      // The nudge's Start focus ↵ (N3). The note input's own Enter → start-break is untouched.
+      if (event.key === 'Enter' && kindRef.current === 'idle') {
+        const target = event.target as HTMLElement | null;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+        act('idle-start-focus');
       }
     };
     window.addEventListener('beforeunload', onBeforeUnload);
@@ -220,23 +232,13 @@ export function SessionEndOverlay() {
       window.removeEventListener('beforeunload', onBeforeUnload);
       window.removeEventListener('keydown', onKey);
     };
-  }, [escalate, flushNote, resetInteractive, stopEscalation]);
+  }, [act, escalate, flushNote, resetInteractive, stopEscalation]);
 
   // Focus the note as soon as a finished session appears, so typing works
   // without hunting for the field.
   useEffect(() => {
     if (payload && payload.kind === 'focus-complete') inputRef.current?.focus();
   }, [payload]);
-
-
-  const act = useCallback(
-    (type: OverlayActionType) => {
-      flushNote(true);
-      stopEscalation();
-      window.overlayAPI?.action(type);
-    },
-    [flushNote, stopEscalation]
-  );
 
   if (!payload) return null;
 
@@ -246,11 +248,6 @@ export function SessionEndOverlay() {
     top: WINDOW.inset,
     right: WINDOW.inset,
     fontFamily: "'Outfit', system-ui, sans-serif"
-  };
-
-  const mono: CSSProperties = {
-    fontFamily: "'JetBrains Mono', Menlo, monospace",
-    fontVariantNumeric: 'tabular-nums'
   };
 
   const sheen: CSSProperties = {
@@ -309,46 +306,23 @@ export function SessionEndOverlay() {
     );
   }
 
-  if (payload.kind === 'idle' || payload.kind === 'kickoff-continue') {
+  if (payload.kind === 'idle') {
     return (
       <div style={anchor}>
-        <div
-          ref={shapeRef}
-          style={{
-            position: 'relative',
-            width: CARD_W,
-            boxSizing: 'border-box',
-            padding: '16px 16px 14px',
-            borderRadius: GLASS.radiusCard,
-            background: GLASS.fill,
-            backdropFilter: GLASS.blur,
-            WebkitBackdropFilter: GLASS.blur,
-            border: payload.kind === 'idle' ? `1px solid ${withAlpha(ALERT.base, 0.45)}` : `0.5px solid ${GLASS.hairline}`,
-            boxShadow: GLASS.shadowCard,
-            animation: `drip-arrive 260ms ${GLASS.ease} both`
-          }}
-        >
-          <div style={sheen} />
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              top: 0,
-              height: 90,
-              borderRadius: `${GLASS.radiusCard}px ${GLASS.radiusCard}px 0 0`,
-              pointerEvents: 'none',
-              background: `radial-gradient(80% 100% at 50% 0%, ${payload.kind === 'idle' ? ALERT.base : FOCUS.base}26 0%, transparent 72%)`
-            }}
-          />
-          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {payload.kind === 'idle' ? (
-              <IdleBody payload={payload} now={now} mono={mono} act={act} />
-            ) : (
-              <KickoffBody payload={payload} secondsLeft={payload.countdownSeconds - Math.floor((now - shownAt) / 1000)} mono={mono} act={act} />
-            )}
-          </div>
-        </div>
+        <IdleNudgeCard payload={payload} now={now} windowFocused={windowFocused} shapeRef={shapeRef} act={act} />
+      </div>
+    );
+  }
+
+  if (payload.kind === 'kickoff-continue') {
+    return (
+      <div style={anchor}>
+        <KickoffPromptCard
+          payload={payload}
+          secondsLeft={payload.countdownSeconds - Math.floor((now - shownAt) / 1000)}
+          shapeRef={shapeRef}
+          act={act}
+        />
       </div>
     );
   }
@@ -501,209 +475,5 @@ export function SessionEndOverlay() {
         </div>
       </div>
     </div>
-  );
-}
-
-function IdleBody({
-  payload,
-  now,
-  mono,
-  act
-}: {
-  payload: IdleNudgePayload;
-  now: number;
-  mono: CSSProperties;
-  act: (type: OverlayActionType) => void;
-}) {
-  const idleFor = span((now - Date.parse(payload.idleSince)) / 1000);
-  return (
-    <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Dot color={ALERT.base} size={6} />
-        <span style={label(ALERT.light, 600)}>Nothing running</span>
-        <span style={{ ...mono, fontSize: 11.5, color: ALERT.light }}>· {idleFor}</span>
-        <span style={{ flexGrow: 1 }} />
-        <span style={{ ...mono, fontSize: 11.5, color: TXT.muted }}>Kickoff {clockTime(payload.kickoffAt)}</span>
-        <DismissButton onClick={() => act('dismiss')} />
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <ActionButton primary accent={FOCUS} onClick={() => act('idle-start-focus')}>
-          Start focus
-        </ActionButton>
-        <ActionButton accent={FOCUS} onClick={() => act('idle-kickoff')}>
-          Kickoff
-          <span style={{ ...mono, fontSize: 11.5, opacity: 0.6 }}>{span(payload.kickoffSeconds)}</span>
-        </ActionButton>
-        <ActionButton accent={FOCUS} onClick={() => act('idle-snooze')}>
-          Snooze
-          <span style={{ ...mono, fontSize: 11.5, opacity: 0.6 }}>{span(payload.snoozeSeconds)}</span>
-        </ActionButton>
-      </div>
-    </>
-  );
-}
-
-function KickoffBody({
-  payload,
-  secondsLeft,
-  mono,
-  act
-}: {
-  payload: KickoffContinuePayload;
-  secondsLeft: number;
-  mono: CSSProperties;
-  act: (type: OverlayActionType) => void;
-}) {
-  return (
-    <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Dot color={FOCUS.base} size={6} />
-        <span style={label(TXT.secondary)}>Kickoff done</span>
-        <span style={{ flexGrow: 1 }} />
-        <span style={{ ...mono, fontSize: 11.5, color: TXT.muted }}>{mmss(Math.max(0, secondsLeft))}</span>
-        <DismissButton onClick={() => act('dismiss')} />
-      </div>
-      <span style={{ fontSize: 14, color: TXT.primary }}>
-        Rolling into <span style={mono}>{payload.focusMinutes}m</span> focus.
-      </span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <ActionButton primary accent={FOCUS} onClick={() => act('kickoff-keep')}>
-          Keep going
-        </ActionButton>
-        <ActionButton accent={FOCUS} onClick={() => act('kickoff-stop')}>
-          Stop
-        </ActionButton>
-      </div>
-    </>
-  );
-}
-
-function DismissButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      aria-label="Dismiss"
-      onClick={onClick}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 22,
-        height: 22,
-        margin: '-2px -4px -2px 2px',
-        padding: 0,
-        border: 'none',
-        background: 'transparent',
-        color: TXT.dim,
-        cursor: 'pointer',
-        transition: 'color 150ms ease'
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.color = TXT.secondary)}
-      onMouseLeave={(e) => (e.currentTarget.style.color = TXT.dim)}
-    >
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-        <path d="M6 6l12 12M18 6L6 18" />
-      </svg>
-    </button>
-  );
-}
-
-function label(color: string, weight: number = 500): CSSProperties {
-  return {
-    fontSize: 10.5,
-    fontWeight: weight,
-    letterSpacing: '0.14em',
-    textTransform: 'uppercase',
-    color
-  };
-}
-
-function Dot({ color, size, breathe }: { color: string; size: number; breathe?: boolean }) {
-  return (
-    <span
-      style={{
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        background: color,
-        boxShadow: `0 0 ${breathe ? 14 : 8}px ${color}cc`,
-        flexShrink: 0,
-        animation: breathe ? 'drip-dot 1.8s ease-in-out infinite' : undefined
-      }}
-    />
-  );
-}
-
-function ActionButton({
-  children,
-  onClick,
-  primary,
-  accent,
-  escalated
-}: {
-  children: ReactNode;
-  onClick: () => void;
-  primary?: boolean;
-  accent: { base: string; light: string; bright: string } | typeof BREAK;
-  escalated?: boolean;
-}) {
-  const light = 'light' in accent ? accent.light : FOCUS.light;
-  const bright = 'bright' in accent ? (accent as typeof FOCUS).bright : light;
-  const fillAlpha = escalated ? 0.26 : 0.16;
-  const borderAlpha = escalated ? 0.45 : 0.28;
-
-  const base: CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    flexGrow: primary ? 1 : 0,
-    height: 40,
-    padding: '0 14px',
-    borderRadius: 13,
-    fontFamily: "'Outfit', system-ui, sans-serif",
-    fontSize: 13.5,
-    fontWeight: primary ? 500 : 400,
-    cursor: 'pointer',
-    outline: 'none',
-    transition: 'background-color 160ms ease, border-color 160ms ease, color 160ms ease',
-    background: primary ? withAlpha(accent.base, fillAlpha) : 'transparent',
-    border: primary ? `0.5px solid ${withAlpha(accent.base, borderAlpha)}` : `0.5px solid rgba(255,255,255,0.10)`,
-    color: primary ? (escalated ? bright : light) : TXT.secondary
-  };
-
-  return (
-    <button
-      onClick={onClick}
-      style={base}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = primary
-          ? withAlpha(accent.base, fillAlpha + 0.08)
-          : withAlpha(accent.base, 0.06);
-        if (!primary) e.currentTarget.style.color = TXT.primary;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = primary ? withAlpha(accent.base, fillAlpha) : 'transparent';
-        if (!primary) e.currentTarget.style.color = TXT.secondary;
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function withAlpha(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function CoffeeIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8h1a4 4 0 010 8h-1" />
-      <path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z" />
-      <path d="M6 2v2M10 2v2M14 2v2" />
-    </svg>
   );
 }

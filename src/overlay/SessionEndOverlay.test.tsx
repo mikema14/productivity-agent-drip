@@ -40,11 +40,59 @@ describe('SessionEndOverlay — idle nudge', () => {
 
   it('renders the red nudge with its idle time and three actions', () => {
     show(idle);
-    expect(screen.getByText('Nothing running')).toBeInTheDocument();
-    expect(screen.getByText('· 12m')).toBeInTheDocument();
+    expect(screen.getByTestId('idle-nudge')).toBeInTheDocument();
+    expect(screen.getByText('Idle')).toBeInTheDocument();
+    expect(screen.getByTestId('nudge-title')).toHaveTextContent('Nothing running · 12m');
+    expect(screen.getByTestId('nudge-takeover')).toHaveTextContent(/^1[45]:\d\d$/);
     expect(screen.getByRole('button', { name: /Start focus/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Kickoff\s*2m/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Snooze\s*15m/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
+  });
+
+  it('the takeover countdown ticks on the 1 s clock', () => {
+    vi.useFakeTimers();
+    try {
+      const now = Date.now();
+      show({ ...idle, kickoffAt: new Date(now + 872_000).toISOString() });
+      expect(screen.getByTestId('nudge-takeover')).toHaveTextContent('14:32');
+      act(() => {
+        vi.advanceTimersByTime(1_000);
+      });
+      expect(screen.getByTestId('nudge-takeover')).toHaveTextContent('14:31');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('Enter on the window relays idle-start-focus for the nudge, not for the prompt', () => {
+    show(idle);
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(overlayAPI.action).toHaveBeenCalledWith('idle-start-focus');
+
+    act(() => push({ kind: 'kickoff-continue', focusMinutes: 25, countdownSeconds: 10 }));
+    vi.mocked(overlayAPI.action).mockClear();
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(overlayAPI.action).not.toHaveBeenCalled();
+  });
+
+  it('fixture: renders from ?state=idle and never calls overlayAPI.action when the bridge is absent', () => {
+    window.history.replaceState({}, '', '/?state=idle');
+    (window as { overlayAPI?: OverlayAPI }).overlayAPI = undefined;
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      render(<SessionEndOverlay />);
+      expect(screen.getByTestId('idle-nudge')).toBeInTheDocument();
+      expect(screen.getByTestId('nudge-copy')).toHaveTextContent(
+        'Then Raycast Focus turns on and a 2-minute kickoff starts on 689742.'
+      );
+      fireEvent.click(screen.getByRole('button', { name: /Start focus/ }));
+      expect(overlayAPI.action).not.toHaveBeenCalled();
+      expect(log).toHaveBeenCalledWith('[Overlay] fixture action: idle-start-focus');
+    } finally {
+      log.mockRestore();
+      window.history.replaceState({}, '', '/');
+    }
   });
 
   it.each([
