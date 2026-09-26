@@ -216,7 +216,8 @@ export function SessionEndOverlay() {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         flushNote(true);
-        act('dismiss');
+        if (window.overlayAPI) window.overlayAPI.action('dismiss');
+        else console.log('[Overlay] fixture action: dismiss');
         return;
       }
       // The nudge's Start focus ↵ (N3). The note input's own Enter → start-break is untouched.
