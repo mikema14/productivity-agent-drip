@@ -150,10 +150,11 @@ describe('reviewLogic misc', () => {
     expect(formatTimeOfDay('nonsense')).toBe('--:--');
   });
 
-  it('formatMinutesPadded reads `5h 40m`, `2h 05m`, `45m`', () => {
+  it('formatMinutesPadded reads `5h 40m`, `2h 05m`, `45m`, and `6h` with no zero minutes (as Plan / Now)', () => {
     expect(formatMinutesPadded(340)).toBe('5h 40m');
     expect(formatMinutesPadded(125)).toBe('2h 05m');
     expect(formatMinutesPadded(45)).toBe('45m');
     expect(formatMinutesPadded(0)).toBe('0m');
+    expect(formatMinutesPadded(360)).toBe('6h');
   });
 });

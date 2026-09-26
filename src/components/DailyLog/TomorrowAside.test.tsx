@@ -60,6 +60,14 @@ describe('TomorrowAside', () => {
     const line = screen.getByTestId('tomorrow-calendar');
     expect(line).toHaveTextContent('2 meetings · 1h 30m');
     expect(line).toHaveTextContent('4h 30m free of 6h');
+    expect(line.textContent).not.toContain('00m');
+  });
+
+  it('a free day reads `6h free of 6h`, never `6h 00m`', () => {
+    renderAside({ proposals: [] });
+    expect(screen.getByTestId('tomorrow-calendar')).toHaveTextContent('0 meetings · 0m');
+    expect(screen.getByTestId('tomorrow-calendar').textContent).toContain('6h free of 6h');
+    expect(screen.getByTestId('tomorrow-calendar').textContent).not.toContain('00m');
   });
 
   it('shows Calendar unavailable when proposals could not be loaded', () => {

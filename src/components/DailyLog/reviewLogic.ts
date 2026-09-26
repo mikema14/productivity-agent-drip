@@ -211,11 +211,5 @@ export function errorHint(message: string): ErrorHint {
   return { kind: 'other' };
 }
 
-/** `2h 05m` style used by the header and footer (hours + zero-padded minutes). */
-export function formatMinutesPadded(minutes: number): string {
-  const total = Math.max(0, Math.round(minutes));
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  if (h === 0) return `${m}m`;
-  return `${h}h ${String(m).padStart(2, '0')}m`;
-}
+/** `2h 05m` / `6h` / `45m` — the same compact formatter Plan and Now use (header, footer, aside). */
+export { formatMinutesPadded } from '../Plan/boardLogic';
