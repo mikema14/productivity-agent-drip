@@ -203,7 +203,7 @@ function handleDripUrl(url: string) {
       }
       case 'kickoff':
         // 2 minutes of focus on the last task, rolling into a full session
-        startKickoff('manual');
+        startKickoff('deeplink');
         break;
       case 'skip-break':
         stopTimer();
@@ -1345,8 +1345,8 @@ ipcMain.handle('call-openrouter', async (_event, apiKey: string, model: string, 
 
 ipcMain.handle('start-main-timer', async (_event, duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string, kickoffRolloverSeconds?: number) => {
   try {
-    startTimer(duration, timerType, nextBreakDuration, taskId, kickoffRolloverSeconds);
-    return { success: true };
+    const raycastFocus = startTimer(duration, timerType, nextBreakDuration, taskId, kickoffRolloverSeconds);
+    return { success: true, raycastFocus };
   } catch (error) {
     console.error('Failed to start main timer:', error);
     return { success: false, error: (error as Error).message };

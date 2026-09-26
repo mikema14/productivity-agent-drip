@@ -212,6 +212,15 @@ export interface BreakRunningPayload {
   isLong: boolean;
 }
 
+/**
+ * Raycast Focus's built-in blocklist category ids, spelled out on the kickoff
+ * takeover. Shared by both processes so the deeplink and the pill never drift.
+ */
+export const RAYCAST_BLOCK_CATEGORIES = ['social', 'streaming', 'gaming'] as const;
+
+/** Where a kickoff was started from; drives the takeover's source line. */
+export type KickoffSource = 'auto' | 'nudge' | 'deeplink' | 'now';
+
 /** Red nudge: the timer has been idle too long. Raised by the main-process idle watcher. */
 export interface IdleNudgePayload {
   kind: 'idle';
@@ -221,6 +230,13 @@ export interface IdleNudgePayload {
   kickoffAt: string;
   kickoffSeconds: number;
   snoozeSeconds: number;
+  /** Minutes between the nudge and the automatic kickoff. */
+  escalateMinutes: number;
+  /** Main's prediction of the kickoff's task (today's last session with a task); null when unknown. */
+  taskId: string | null;
+  taskTitle: string | null;
+  /** Whether Raycast Focus would be started with the kickoff (setting on, Raycast present, not test mode). */
+  raycastFocus: boolean;
 }
 
 /** A kickoff just rolled over into a full focus session. */
@@ -253,7 +269,7 @@ export type OverlayActionType =
 /** Main → main-window renderer: the idle watcher asks the timer store to act. */
 export type IdleCommand =
   | { type: 'start-focus' }
-  | { type: 'kickoff'; seconds: number }
+  | { type: 'kickoff'; seconds: number; source: Exclude<KickoffSource, 'now'>; escalateMinutes: number }
   | { type: 'stop-kickoff' };
 
 export interface OverlayAPI {
@@ -283,7 +299,8 @@ export interface TimerAPI {
   getDaysSinceLastLog?: () => Promise<number | null>;
   openExternal?: (url: string) => Promise<void>;
   // Main process timer control
-  startMainTimer: (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string, kickoffRolloverSeconds?: number) => Promise<void>;
+  /** Resolves with whether main asked Raycast Focus to start alongside the timer. */
+  startMainTimer: (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string, kickoffRolloverSeconds?: number) => Promise<{ raycastFocus: boolean }>;
   pauseMainTimer: () => Promise<void>;
   resumeMainTimer: () => Promise<void>;
   stopMainTimer: () => Promise<void>;

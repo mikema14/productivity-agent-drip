@@ -1,9 +1,10 @@
 import { BrowserWindow, powerMonitor } from 'electron';
-import { getSetting, getCalendarProposals } from '../src/services/db';
-import type { IdleCommand, OverlayActionType } from '../src/types';
+import { getSetting, getCalendarProposals, getLastSessionWithTask, getCachedTask } from '../src/services/db';
+import type { IdleCommand, KickoffSource, OverlayActionType } from '../src/types';
 import { getVisibleOverlayKind, hideOverlay, sampleActiveDisplay, showOverlay } from './overlayWindow';
 import { getTimerState, setTimerListener } from './timer';
-import { raycastFocusEnd } from './raycastFocus';
+import { raycastFocusEnd, isRaycastFocusEnabled } from './raycastFocus';
+import { buildNudgePayload } from './nudgePayload';
 import {
   IDLE_DEFAULTS,
   IDLE_FAST,
@@ -92,13 +93,13 @@ function apply(result: { state: IdleState; action: IdleAction }): void {
       // The display sample goes stale once the timer stops, so take a fresh one.
       sampleActiveDisplay();
       showOverlay(
-        {
-          kind: 'idle',
-          idleSince: new Date(result.action.idleSince).toISOString(),
-          kickoffAt: new Date(result.action.kickoffAt).toISOString(),
-          kickoffSeconds: cfg.kickoffSeconds,
-          snoozeSeconds: Math.round(cfg.snoozeMs / 1000),
-        },
+        buildNudgePayload(result.action, cfg, {
+          // The renderer resolves the kickoff's task the same way (today's last
+          // session with a task first), so the copy names the id it will use.
+          lastTask: () => getLastSessionWithTask(localDateKey(new Date()))?.task_id,
+          taskTitle: (id) => (getCachedTask(id) as { title?: string } | undefined)?.title,
+          raycastFocus: isRaycastFocusEnabled,
+        }),
         { force: true }
       );
       break;
@@ -139,16 +140,24 @@ function poll(): void {
 /**
  * Start a kickoff: 2 minutes of focus on the last task, rolling into a full
  * session. `auto` is the takeover — it also brings Drip to the front, without
- * taking keyboard focus from whatever the user is typing into.
+ * taking keyboard focus from whatever the user is typing into. `nudge` (the
+ * card's Kickoff key) and `deeplink` (`drip://kickoff`) show the window
+ * normally; the source is carried so the takeover can say where it came from.
  */
-export function startKickoff(source: 'auto' | 'manual'): void {
+export function startKickoff(source: Exclude<KickoffSource, 'now'>): void {
   if (getTimerState().status === 'focus') {
     console.log('[IdleNudge] Kickoff ignored — focus already running');
     return;
   }
 
   hideIdleNudge();
-  if (!sendCommand({ type: 'kickoff', seconds: cfg.kickoffSeconds })) {
+  const command: IdleCommand = {
+    type: 'kickoff',
+    seconds: cfg.kickoffSeconds,
+    source,
+    escalateMinutes: Math.round(cfg.escalateAfterMs / 60000),
+  };
+  if (!sendCommand(command)) {
     console.warn('[IdleNudge] No main window — kickoff skipped');
     return;
   }
@@ -207,7 +216,7 @@ export function handleIdleOverlayAction(type: OverlayActionType): boolean {
       sendCommand({ type: 'start-focus' });
       return true;
     case 'idle-kickoff':
-      startKickoff('manual');
+      startKickoff('nudge');
       return true;
     case 'idle-snooze':
       hideIdleNudge();

@@ -72,7 +72,11 @@ function devPayload(): SessionOverlayPayload | null {
       idleSince: new Date(Date.now() - 12 * 60_000).toISOString(),
       kickoffAt: new Date(Date.now() + 15 * 60_000).toISOString(),
       kickoffSeconds: 120,
-      snoozeSeconds: 900
+      snoozeSeconds: 900,
+      escalateMinutes: 15,
+      taskId: '689742',
+      taskTitle: 'Automatizovať dokumentáciu',
+      raycastFocus: true
     };
   }
   if (which === 'kickoff') {

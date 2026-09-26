@@ -106,11 +106,12 @@ const timerAPI: TimerAPI = {
   },
 
   // Main process timer control
-  startMainTimer: async (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string, kickoffRolloverSeconds?: number): Promise<void> => {
+  startMainTimer: async (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string, kickoffRolloverSeconds?: number): Promise<{ raycastFocus: boolean }> => {
     const result = await ipcRenderer.invoke('start-main-timer', duration, timerType, nextBreakDuration, taskId, kickoffRolloverSeconds);
     if (!result.success) {
       throw new Error(result.error || 'Failed to start main timer');
     }
+    return { raycastFocus: result.raycastFocus === true };
   },
 
   pauseMainTimer: async (): Promise<void> => {

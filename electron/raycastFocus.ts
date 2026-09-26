@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import { spawn, execFileSync } from 'child_process';
 import { getSetting, getCachedTask } from '../src/services/db';
+import { RAYCAST_BLOCK_CATEGORIES } from '../src/types';
 
 /**
  * Mirrors Drip focus sessions into Raycast Focus (the app/website blocker).
@@ -20,7 +21,7 @@ const START_DELAY_MS = 300;
  * Raycast's built-in blocklist category ids. Deeplinks don't reuse the last
  * selection from Raycast's own form — without this nothing gets blocked.
  */
-const BLOCK_CATEGORIES = 'social,streaming,gaming';
+const BLOCK_CATEGORIES = RAYCAST_BLOCK_CATEGORIES.join(',');
 
 let active = false;
 let pendingStart: NodeJS.Timeout | null = null;
@@ -38,7 +39,8 @@ function openInBackground(url: string): void {
   }
 }
 
-function isEnabled(): boolean {
+/** Setting on, Raycast owns `raycast://`, and not a test run. */
+export function isRaycastFocusEnabled(): boolean {
   // DRIP_TEST_MODE: agent/QA runs must not start Raycast Focus on the user's Mac
   if (process.env.DRIP_TEST_MODE === '1') return false;
   try {
@@ -48,6 +50,8 @@ function isEnabled(): boolean {
     return false;
   }
 }
+
+const isEnabled = isRaycastFocusEnabled;
 
 function isRaycastRunning(): boolean {
   try {

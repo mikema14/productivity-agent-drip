@@ -45,7 +45,7 @@ function installBridgeStubs() {
     openExternal: vi.fn(async () => undefined),
     getSessions: vi.fn(async () => []),
     getLastSessionWithTask: vi.fn(async () => null),
-    startMainTimer: vi.fn(async () => undefined),
+    startMainTimer: vi.fn(async () => ({ raycastFocus: false })),
     stopMainTimer: vi.fn(async () => undefined),
     pauseMainTimer: vi.fn(async () => undefined),
     resumeMainTimer: vi.fn(async () => undefined),

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { BreakCompletePayload, FocusCompletePayload, TimerState } from '../types';
+import type { BreakCompletePayload, FocusCompletePayload, KickoffSource, TimerState } from '../types';
 import { formatTrayTime, getCurrentDate, formatDateTime } from '../utils/time';
 import {
   notifySessionComplete,
@@ -24,9 +24,28 @@ interface TimerStore extends TimerState {
    * 'rolled' once it has extended itself into a full focus session.
    */
   kickoff: 'warmup' | 'rolled' | null;
-  /** `kickoffSeconds` turns the session into a kickoff of that length. */
-  startFocus: (taskId?: string, billable?: boolean, fromOverlay?: boolean, kickoffSeconds?: number) => Promise<void>;
-  startKickoff: (seconds: number) => Promise<void>;
+  /** Where the running kickoff came from (takeover source line). Not persisted. */
+  kickoffSource: KickoffSource | null;
+  /** Minutes of ignored nudge before an `auto` kickoff, as main reported it. Not persisted. */
+  kickoffEscalateMinutes: number | null;
+  /**
+   * Whether main asked Raycast Focus to start with the running session (K5).
+   * Mirrors the `startMainTimer` result; cleared with `kickoff`. Not persisted.
+   */
+  raycastFocus: boolean;
+  /**
+   * `kickoffSeconds` turns the session into a kickoff of that length;
+   * `kickoffSource` / `kickoffEscalateMinutes` label it (default `now`).
+   */
+  startFocus: (
+    taskId?: string,
+    billable?: boolean,
+    fromOverlay?: boolean,
+    kickoffSeconds?: number,
+    kickoffSource?: KickoffSource,
+    kickoffEscalateMinutes?: number | null
+  ) => Promise<void>;
+  startKickoff: (seconds: number, source?: KickoffSource, escalateMinutes?: number | null) => Promise<void>;
   stopKickoff: () => Promise<void>;
   /**
    * A task handed over from another view (Plan's "Start on"), consumed once by
@@ -130,6 +149,9 @@ export const useTimerStore = create<TimerStore>()(
       lastTaskTitle: null,
       durationMinutes: DEFAULT_DURATION_MINUTES,
       kickoff: null,
+      kickoffSource: null,
+      kickoffEscalateMinutes: null,
+      raycastFocus: false,
       pendingSelection: null,
 
       setIntention: (intention: string) => {
@@ -157,7 +179,7 @@ export const useTimerStore = create<TimerStore>()(
         set({ currentBillable: billable });
       },
 
-  startFocus: async (taskId?: string, billable?: boolean, fromOverlay?: boolean, kickoffSeconds?: number) => {
+  startFocus: async (taskId?: string, billable?: boolean, fromOverlay?: boolean, kickoffSeconds?: number, kickoffSource?: KickoffSource, kickoffEscalateMinutes?: number | null) => {
     const state = get();
 
     if (state.overlayOpen && !fromOverlay) {
@@ -189,14 +211,16 @@ export const useTimerStore = create<TimerStore>()(
     const isLongBreak = nextSessionCount % SESSIONS_UNTIL_LONG_BREAK === 0;
     const nextBreakMins = getBreakMinutes(state.durationMinutes, isLongBreak) as 5 | 10;
 
+    let raycastFocus = false;
     try {
-      await window.timerAPI.startMainTimer(
+      const result = await window.timerAPI.startMainTimer(
         timerSecs,
         'focus',
         nextBreakMins,
         taskId || undefined,
         kickoffSecs ? focusSecs : undefined
       );
+      raycastFocus = result?.raycastFocus === true;
     } catch (error) {
       console.error('[Timer] Failed to start main process timer:', error);
       return;
@@ -211,15 +235,18 @@ export const useTimerStore = create<TimerStore>()(
       isPaused: false,
       intervalId: 999999,
       sessionStartTime: now,
-      kickoff: kickoffSecs ? 'warmup' : null
+      kickoff: kickoffSecs ? 'warmup' : null,
+      kickoffSource: kickoffSecs ? kickoffSource ?? 'now' : null,
+      kickoffEscalateMinutes: kickoffSecs ? kickoffEscalateMinutes ?? null : null,
+      raycastFocus
     });
   },
 
-  startKickoff: async (seconds: number) => {
+  startKickoff: async (seconds: number, source: KickoffSource = 'now', escalateMinutes: number | null = null) => {
     const state = get();
     if (state.status === 'focus') return;
     const taskId = await resolveLastTaskId(state);
-    await get().startFocus(taskId, undefined, false, seconds);
+    await get().startFocus(taskId, undefined, false, seconds, source, escalateMinutes);
   },
 
   /** "Stop" on the kickoff prompt: end it and keep what ran as its own session. */
@@ -261,6 +288,9 @@ export const useTimerStore = create<TimerStore>()(
       intervalId: null,
       sessionStartTime: null,
       kickoff: null,
+      kickoffSource: null,
+      kickoffEscalateMinutes: null,
+      raycastFocus: false,
       lastTaskId: currentTaskId ?? get().lastTaskId
     });
     window.timerAPI.updateTrayTime('Ready');
@@ -296,7 +326,10 @@ export const useTimerStore = create<TimerStore>()(
       isPaused: false,
       intervalId: 999999,
       sessionStartTime: new Date(),
-      kickoff: null
+      kickoff: null,
+      kickoffSource: null,
+      kickoffEscalateMinutes: null,
+      raycastFocus: false
     });
 
     // Give the overlay's break pill its real progress denominator
@@ -406,6 +439,9 @@ export const useTimerStore = create<TimerStore>()(
       lastTaskId: state.currentTaskId,
       lastTaskTitle: taskTitle,
       kickoff: null,
+      kickoffSource: null,
+      kickoffEscalateMinutes: null,
+      raycastFocus: false,
     });
 
     // Update tray
@@ -627,6 +663,9 @@ export const useTimerStore = create<TimerStore>()(
         sessionStartTime: null,
         overlayOpen: earlyOverlayShown,
         kickoff: null,
+        kickoffSource: null,
+        kickoffEscalateMinutes: null,
+        raycastFocus: false,
       });
 
       // Update tray
@@ -670,7 +709,10 @@ export const useTimerStore = create<TimerStore>()(
       isPaused: false,
       intervalId: null,
       sessionStartTime: null,
-      kickoff: null
+      kickoff: null,
+      kickoffSource: null,
+      kickoffEscalateMinutes: null,
+      raycastFocus: false
     });
   },
 
@@ -789,6 +831,10 @@ export function checkTimerHydration() {
       isPaused: false,
       intervalId: null,
       sessionStartTime: null,
+      kickoff: null,
+      kickoffSource: null,
+      kickoffEscalateMinutes: null,
+      raycastFocus: false,
     });
 
     // Update tray
@@ -855,7 +901,7 @@ export function setupMainTimerListeners() {
       if (state.status === 'focus') return;
       void resolveLastTaskId(state).then((taskId) => useTimerStore.getState().startFocus(taskId));
     } else if (command.type === 'kickoff') {
-      void state.startKickoff(command.seconds);
+      void state.startKickoff(command.seconds, command.source, command.escalateMinutes);
     } else if (command.type === 'stop-kickoff') {
       void state.stopKickoff();
     }

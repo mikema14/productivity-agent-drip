@@ -2,7 +2,7 @@ import { BrowserWindow } from 'electron';
 import { updateTray } from './tray';
 import { sendTickToOverlay, sampleActiveDisplay } from './overlayWindow';
 import { saveSetting } from '../src/services/db';
-import { raycastFocusStart, raycastFocusEnd } from './raycastFocus';
+import { raycastFocusStart, raycastFocusEnd, isRaycastFocusEnabled } from './raycastFocus';
 import { atCountdownZero, raycastSecondsFor } from './kickoff';
 
 interface TimerState {
@@ -118,6 +118,9 @@ function formatTrayTime(seconds: number): string {
 /**
  * `kickoffRolloverSeconds` (focus only) makes this a kickoff: at zero the
  * session extends itself by that much instead of completing.
+ *
+ * Returns whether Raycast Focus is being asked to start with this timer
+ * (focus + enabled), so the renderer can show it.
  */
 export function startTimer(
   duration: number,
@@ -125,7 +128,7 @@ export function startTimer(
   nextBreakDuration?: 5 | 10,
   taskId?: string,
   kickoffRolloverSeconds?: number
-) {
+): boolean {
   // Clear any existing interval
   if (state.intervalId) {
     console.log('[MainTimer] Clearing existing interval before starting new timer');
@@ -156,6 +159,7 @@ export function startTimer(
   writeTimerState();
 
   // Mirror into Raycast Focus (breaks end any running Focus session)
+  const raycastFocus = timerType === 'focus' && isRaycastFocusEnabled();
   if (timerType === 'focus') {
     raycastFocusStart(raycastSecondsFor(state), taskId);
   } else {
@@ -166,6 +170,8 @@ export function startTimer(
   state.intervalId = setInterval(() => {
     tick();
   }, 1000);
+
+  return raycastFocus;
 }
 
 function tick() {

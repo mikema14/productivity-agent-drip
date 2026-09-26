@@ -32,6 +32,10 @@ describe('SessionEndOverlay — idle nudge', () => {
     kickoffAt: new Date(Date.now() + 15 * 60_000).toISOString(),
     kickoffSeconds: 120,
     snoozeSeconds: 900,
+    escalateMinutes: 15,
+    taskId: '689742',
+    taskTitle: 'Automatizovať dokumentáciu',
+    raycastFocus: true,
   };
 
   it('renders the red nudge with its idle time and three actions', () => {
