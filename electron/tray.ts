@@ -1,7 +1,10 @@
 import { Tray, Menu, nativeImage, BrowserWindow, app } from 'electron';
 import { join } from 'path';
+import { getNudgePausedUntil, onNudgePauseChange, pauseNudges, resumeNudges } from './idleNudge';
+import { buildTrayMenuTemplate, trayToolTip } from './trayMenu';
 
 let tray: Tray | null = null;
+let unsubscribePause: (() => void) | null = null;
 
 export function createTray(mainWindow: BrowserWindow | null) {
   // Don't create duplicate tray icons
@@ -11,9 +14,11 @@ export function createTray(mainWindow: BrowserWindow | null) {
   const icon = createTrayIcon();
 
   tray = new Tray(icon);
-  tray.setToolTip('Drip');
 
   updateTrayMenu(mainWindow);
+  // "Pause nudges" ↔ "Resume nudges": the menu follows the pause wherever it
+  // came from (the nudge card's Snooze, this menu, expiry, a focus starting).
+  unsubscribePause = onNudgePauseChange(() => updateTrayMenu(mainWindow));
 
   // Show window on tray click
   tray.on('click', () => {
@@ -31,27 +36,27 @@ export function createTray(mainWindow: BrowserWindow | null) {
 function updateTrayMenu(mainWindow: BrowserWindow | null) {
   if (!tray) return;
 
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: 'Show App',
-      click: () => {
+  const pausedUntil = getNudgePausedUntil();
+  const now = Date.now();
+  const contextMenu = Menu.buildFromTemplate(
+    buildTrayMenuTemplate(pausedUntil, now, {
+      showApp: () => {
         if (mainWindow) {
           mainWindow.show();
           mainWindow.focus();
         }
-      }
-    },
-    { type: 'separator' },
-    {
-      label: 'Quit',
-      click: () => {
+      },
+      quit: () => {
         app.isQuitting = true;
         app.quit();
-      }
-    }
-  ]);
+      },
+      pauseNudges: (choice) => pauseNudges(choice),
+      resumeNudges: () => resumeNudges()
+    })
+  );
 
   tray.setContextMenu(contextMenu);
+  tray.setToolTip(trayToolTip(pausedUntil, now));
 }
 
 let lastTrayTitle = '';
@@ -76,6 +81,10 @@ export function updateTray(title: string) {
 }
 
 export function destroyTray() {
+  if (unsubscribePause) {
+    unsubscribePause();
+    unsubscribePause = null;
+  }
   if (tray) {
     tray.destroy();
     tray = null;
