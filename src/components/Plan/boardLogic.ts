@@ -70,13 +70,14 @@ export function partition(items: ListItem[], opts: PartitionOptions): Partition 
     if (opts.scope === 'list' && item.list_id !== opts.listId) continue;
     if (filterActive && !opts.filters!.has(item.list_id)) continue;
     const bucket = columns[item.column];
-    if (!bucket) continue;
     if (item.completed === 1) {
+      // Done takes every completed item whatever its `column` says (the old
+      // AllListsOverview listed all of them); only the inline mode needs a bucket.
       if (opts.completedMode === 'column') doneColumn.push(item);
-      else if (opts.completedMode === 'inline') bucket.done.push(item);
-    } else {
-      bucket.open.push(item);
+      else if (opts.completedMode === 'inline' && bucket) bucket.done.push(item);
+      continue;
     }
+    if (bucket) bucket.open.push(item);
   }
 
   for (const key of DATA_ORDER) {

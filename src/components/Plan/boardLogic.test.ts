@@ -55,6 +55,18 @@ describe('partition', () => {
     expect(p.doneColumn.map(i => i.id)).toEqual(['td', 'bd']);
   });
 
+  it('column mode: a completed item whose column is not one of the three keys still lands in Done', () => {
+    const odd = item('odd', { column: 'someday' as ListItem['column'], completed: 1, order: 5 });
+    const p = partition([...items, odd], { scope: 'all', completedMode: 'column' });
+    expect(p.doneColumn.map(i => i.id)).toEqual(['td', 'bd', 'odd']);
+    // An open item with an unknown column still has no bucket to show in.
+    const openOdd = item('open-odd', { column: 'someday' as ListItem['column'] });
+    const q = partition([openOdd], { scope: 'all', completedMode: 'column' });
+    expect(q.columns.today.open).toEqual([]);
+    expect(q.columns.this_week.open).toEqual([]);
+    expect(q.columns.backlog.open).toEqual([]);
+  });
+
   it('hidden mode: completed items appear nowhere', () => {
     const p = partition(items, { scope: 'all', completedMode: 'hidden' });
     expect(p.doneColumn).toEqual([]);
