@@ -35,6 +35,8 @@ export default {
         idle: {
           DEFAULT: '#64748b',
         },
+        // Semantic error red (tokens.js); KeyButton danger / TaskCard Delete / Review row errors
+        alert: COLOR.alert,
         txt: COLOR.txt,
       },
       boxShadow: {

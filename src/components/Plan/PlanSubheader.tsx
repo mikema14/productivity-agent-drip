@@ -1,29 +1,10 @@
 import type { TaskList } from '../../types';
 import TaskIdBadge from '../shared/TaskIdBadge';
 import BillableToggle from '../shared/BillableToggle';
+import { Pill } from '../shared/Pill';
 
-interface PillProps {
-  pressed: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  className?: string;
-}
-
-/** 26px hairline toggle pill (Group by list / Done / IDs / list filters). */
-export function Pill({ pressed, onClick, children, className = '' }: PillProps) {
-  return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      onClick={onClick}
-      className={`h-[26px] inline-flex items-center gap-1.5 px-2.5 border rounded-[2px] font-display text-[12px] transition-colors duration-150 ${
-        pressed ? 'border-focus/30 bg-focus/10 text-txt-primary' : 'border-drip-border text-txt-secondary hover:text-txt-primary hover:bg-focus/5'
-      } ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
+// `Pill` lives in shared/ since Phase 3 (Review uses it too); re-exported so Plan imports stay unchanged.
+export { Pill } from '../shared/Pill';
 
 export interface AllScopeProps {
   scope: 'all';

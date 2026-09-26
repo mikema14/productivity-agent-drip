@@ -10,16 +10,18 @@ import TimelineView from './TimelineView';
 import TimelineItem from '../shared/TimelineItem';
 import EndDayModal from './EndDayModal';
 import CalendarPopover from './CalendarPopover';
+import ReviewHeader from './ReviewHeader';
+import { dayStats, shiftDate, todayString, buildEPLink } from './reviewLogic';
+import type { ViewId } from '../Layout/views';
 import { mergeEntriesByTaskId } from '../../utils/mergeEntries';
 import { forceSyncCalendar, getLastSyncTime, invalidateCalendarCache } from '../../services/calendar';
 
-const formatTotalTime = (minutes: number) => {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${hours}h ${mins}m`;
-};
+interface DailyLogProps {
+  /** R18: the 401 banner's `Open Settings` navigates through the App router. */
+  onNavigate?: (view: ViewId) => void;
+}
 
-export default function DailyLog() {
+export default function DailyLog({ onNavigate }: DailyLogProps) {
   const {
     entries,
     selectedDate,
@@ -49,7 +51,6 @@ export default function DailyLog() {
   const [successCount, setSuccessCount] = useState(0);
   const [isGrouped, setIsGrouped] = useState(false);
   const [dayLocked, setDayLocked] = useState(false);
-  const [showCalendar, setShowCalendar] = useState(false);
   const [showMoveCalendar, setShowMoveCalendar] = useState(false);
   const [moveSingleId, setMoveSingleId] = useState<string | null>(null);
 
@@ -60,16 +61,6 @@ export default function DailyLog() {
       return () => clearTimeout(timer);
     }
   }, [showSuccessToast]);
-
-  const buildEPLink = (date: string): string => {
-    const params = new URLSearchParams({
-      only_me: 'true',
-      set_filter: '1',
-      spent_on: `${date}|${date}`,
-      user_id: '28668'
-    });
-    return `https://es.easyproject.com/easy_time_entries?${params}`;
-  };
 
   // Merge entries by task ID for display (toggleable)
   const mergedEntries = useMemo(
@@ -108,9 +99,7 @@ export default function DailyLog() {
   }, [selectedDate, isDayLocked]);
 
   const handleDateChange = (days: number) => {
-    const date = new Date(selectedDate);
-    date.setDate(date.getDate() + days);
-    setSelectedDate(date.toISOString().split('T')[0]);
+    setSelectedDate(shiftDate(selectedDate, days));
   };
 
   const handleAddEntry = async (entry: any) => {
@@ -287,123 +276,24 @@ export default function DailyLog() {
     window.timerAPI.showNotification('Day Complete', 'Your shutdown ritual has been saved!');
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (dateStr === today.toISOString().split('T')[0]) {
-      return 'Today';
-    } else if (dateStr === yesterday.toISOString().split('T')[0]) {
-      return 'Yesterday';
-    }
-
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const {
-    workEntries, breakEntries, totalDuration, totalBreakMinutes,
-    markedCount, loggedCount, toggleableCount, allSelected
-  } = useMemo(() => {
-    const workEntries = mergedEntries.filter(e => e.source !== 'break');
-    const breakEntries = mergedEntries.filter(e => e.source === 'break');
-    const totalDuration = workEntries.reduce((sum, e) => sum + e.durationMinutes, 0);
-    const totalBreakMinutes = breakEntries.reduce((sum, e) => sum + e.durationMinutes, 0);
-    const markedCount = mergedEntries.filter(e => e.markedToLog && !e.logged).length;
-    const loggedCount = mergedEntries.filter(e => e.logged).length;
-    const toggleableCount = mergedEntries.filter(e => !e.logged && !e.isProposal && e.source !== 'break').length;
-    const allSelected = toggleableCount > 0 && markedCount === toggleableCount;
-    return { workEntries, breakEntries, totalDuration, totalBreakMinutes, markedCount, loggedCount, toggleableCount, allSelected };
-  }, [mergedEntries]);
+  const stats = useMemo(() => dayStats(mergedEntries), [mergedEntries]);
+  const { workEntries } = useMemo(() => ({
+    workEntries: mergedEntries.filter(e => e.source !== 'break'),
+  }), [mergedEntries]);
+  const { markedCount, toggleableCount, allSelected } = stats;
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-8 pt-8 pb-6">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-2xl font-display font-bold text-txt-primary tracking-tight">Daily Log</h1>
-          <div className="h-px flex-1 bg-gradient-to-r from-focus/20 to-transparent" />
-          {/* Date navigation */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => handleDateChange(-1)}
-              className="px-2 py-1 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary transition-all"
-            >
-              ←
-            </button>
-            <div className="relative">
-              <button
-                onClick={() => setShowCalendar(!showCalendar)}
-                className="px-3 py-1 text-txt-secondary text-sm rounded-xl hover:bg-focus/5 flex items-center gap-1.5 transition-all"
-              >
-                <span>{formatDate(selectedDate)}</span>
-                <svg
-                  width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"
-                  strokeWidth="1.5" strokeLinecap="round"
-                  className={`text-txt-dim transition-transform ${showCalendar ? 'rotate-180' : ''}`}
-                >
-                  <path d="M2 4L5 7L8 4" />
-                </svg>
-              </button>
-              {showCalendar && (
-                <CalendarPopover
-                  selectedDate={selectedDate}
-                  onSelectDate={(date) => {
-                    setSelectedDate(date);
-                    setShowCalendar(false);
-                  }}
-                  onClose={() => setShowCalendar(false)}
-                />
-              )}
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSyncCalendar();
-              }}
-              disabled={isSyncing}
-              className="px-1.5 py-1 text-txt-muted hover:text-txt-primary hover:bg-focus/5 rounded-xl disabled:opacity-50 transition-all"
-              title={isSyncing ? 'Syncing calendar...' : 'Sync calendar'}
-            >
-              <span className={`text-sm ${isSyncing ? 'animate-spin inline-block' : ''}`}>🔄</span>
-            </button>
-            <button
-              onClick={() => handleDateChange(1)}
-              className="px-2 py-1 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary transition-all"
-            >
-              →
-            </button>
-          </div>
-        </div>
-        {/* Stats subtitle */}
-        <p className="text-txt-dim text-sm mt-1 font-display flex items-center gap-2">
-          <span>Total: {formatTotalTime(totalDuration)}</span>
-          {totalBreakMinutes > 0 && (
-            <>
-              <span>·</span>
-              <span className="text-emerald-400">{totalBreakMinutes}m break</span>
-            </>
-          )}
-          {markedCount > 0 && (
-            <>
-              <span>·</span>
-              <span className="text-focus">{markedCount} to log</span>
-            </>
-          )}
-          {loggedCount > 0 && (
-            <>
-              <span>·</span>
-              <span className="text-emerald-400">{loggedCount} logged</span>
-            </>
-          )}
-        </p>
-      </div>
+      <ReviewHeader
+        date={selectedDate}
+        today={todayString()}
+        onPrev={() => handleDateChange(-1)}
+        onNext={() => handleDateChange(1)}
+        onSelectDate={setSelectedDate}
+        onSync={handleSyncCalendar}
+        isSyncing={isSyncing}
+        stats={stats}
+      />
 
       {/* Content */}
       <div className="flex-1 overflow-auto">

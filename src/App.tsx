@@ -64,7 +64,7 @@ function App() {
       case 'timer':
         return <Timer onNavigate={setCurrentView} />;
       case 'daily-log':
-        return <DailyLog />;
+        return <DailyLog onNavigate={setCurrentView} />;
       case 'progress':
         return <ProgressPage />;
       case 'settings':
