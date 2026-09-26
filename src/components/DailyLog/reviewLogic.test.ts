@@ -20,12 +20,20 @@ describe('reviewLogic.dayStats', () => {
       makeEntry('proposal', { id: 'f', durationMinutes: 45 }),
     ));
     expect(stats.trackedMinutes).toBe(25 + 30 + 60 + 15 + 45);
-    expect(stats.billableMinutes).toBe(25 + 60 + 15 + 45);
+    expect(stats.billableMinutes).toBe(25 + 60 + 15);
     expect(stats.breakMinutes).toBe(5);
     expect(stats.markedCount).toBe(3);
     expect(stats.loggedCount).toBe(1);
     expect(stats.toggleableCount).toBe(3);
     expect(stats.allSelected).toBe(true);
+  });
+
+  it('an unaccepted proposal counts as tracked (old Daily Log total parity) but never as billable', () => {
+    const stats = dayStats(rows(makeEntry('proposal', { id: 'p', durationMinutes: 510, billable: true })));
+    expect(stats.trackedMinutes).toBe(510);
+    expect(stats.billableMinutes).toBe(0);
+    const accepted = dayStats(rows(makeEntry('calendar', { id: 'c', durationMinutes: 510, billable: true })));
+    expect(accepted.billableMinutes).toBe(510);
   });
 
   it('allSelected is false with no toggleable rows or with an unmarked one', () => {

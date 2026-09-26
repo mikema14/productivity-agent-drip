@@ -74,12 +74,20 @@ export interface DayStats {
   allSelected: boolean;
 }
 
-/** Header stats over the rows on screen (merged or flat), as DailyLog computed them, plus billable. */
+/**
+ * Header stats over the rows on screen (merged or flat). `tracked` is the old
+ * Daily Log `Total:` verbatim (every non-break row, including unaccepted
+ * calendar proposals, which `loadDay` lists). `billable` is new in the
+ * redesign and never counts an unaccepted proposal: nothing is billable
+ * until it is accepted.
+ */
 export function dayStats(entries: MergedEntry[]): DayStats {
   const work = entries.filter(e => e.source !== 'break');
   const breaks = entries.filter(e => e.source === 'break');
   const trackedMinutes = work.reduce((sum, e) => sum + e.durationMinutes, 0);
-  const billableMinutes = work.filter(e => e.billable !== false).reduce((sum, e) => sum + e.durationMinutes, 0);
+  const billableMinutes = work
+    .filter(e => !e.isProposal && e.billable !== false)
+    .reduce((sum, e) => sum + e.durationMinutes, 0);
   const breakMinutes = breaks.reduce((sum, e) => sum + e.durationMinutes, 0);
   const markedCount = entries.filter(e => e.markedToLog && !e.logged).length;
   const loggedCount = entries.filter(e => e.logged).length;
