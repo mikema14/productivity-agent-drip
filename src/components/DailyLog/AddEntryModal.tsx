@@ -93,14 +93,14 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-drip-bg/95 backdrop-blur-2xl border border-focus/30 rounded-2xl shadow-glass w-full max-w-lg mx-4">
+      <div className="bg-drip-bg/95 backdrop-blur-2xl border border-focus/30 rounded-[2px] shadow-glass w-full max-w-lg mx-4">
         <div className="px-6 py-4 border-b border-focus/20">
           <h2 className="text-xl font-display font-semibold text-txt-primary">Add Manual Entry</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
           {error && (
-            <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl">
+            <div className="px-4 py-3 bg-alert/10 border border-alert/20 text-alert rounded-[2px]">
               {error}
             </div>
           )}
@@ -117,7 +117,7 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
                     key={template.id}
                     type="button"
                     onClick={() => applyTemplate(template)}
-                    className="px-3 py-1.5 text-sm bg-focus/10 text-focus border border-focus/20 rounded-xl hover:bg-focus/20 transition-colors"
+                    className="px-3 py-1.5 text-sm bg-focus/10 text-focus border border-focus/20 rounded-[2px] hover:bg-focus/20 transition-colors"
                   >
                     {template.name}
                   </button>
@@ -135,7 +135,7 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="What did you work on?"
-              className="w-full px-3 py-2 bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
+              className="w-full px-3 py-2 bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-[2px] focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
               disabled={isSubmitting}
               autoFocus
             />
@@ -159,7 +159,7 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full px-3 py-2 bg-transparent border border-focus/30 text-txt-primary rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
+                className="w-full px-3 py-2 bg-transparent border border-focus/30 text-txt-primary rounded-[2px] focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
                 disabled={isSubmitting}
               />
             ) : (
@@ -170,7 +170,7 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
                   const now = new Date();
                   setStartTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`);
                 }}
-                className="w-full px-3 py-2 bg-transparent border border-focus/30 border-dashed text-txt-muted rounded-xl hover:bg-focus/5 transition-colors text-sm text-left"
+                className="w-full px-3 py-2 bg-transparent border border-focus/30 border-dashed text-txt-muted rounded-[2px] hover:bg-focus/5 transition-colors text-sm text-left"
               >
                 No start time (unscheduled) — click to set
               </button>
@@ -187,7 +187,7 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
               onChange={(e) => setDurationMinutes(parseInt(e.target.value) || 0)}
               min="1"
               step="1"
-              className="w-full px-3 py-2 bg-transparent border border-focus/30 text-txt-primary rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
+              className="w-full px-3 py-2 bg-transparent border border-focus/30 text-txt-primary rounded-[2px] focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
               disabled={isSubmitting}
             />
             <div className="mt-2 flex gap-2">
@@ -196,7 +196,7 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
                   key={mins}
                   type="button"
                   onClick={() => setDurationMinutes(mins)}
-                  className="px-3 py-1 text-sm bg-transparent border border-focus/20 text-txt-secondary hover:bg-focus/5 rounded-xl transition-colors"
+                  className="px-3 py-1 text-sm bg-transparent border border-focus/20 text-txt-secondary hover:bg-focus/5 rounded-[2px] transition-colors"
                   disabled={isSubmitting}
                 >
                   {mins >= 60 ? `${mins / 60}h` : `${mins}m`}
@@ -226,7 +226,7 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
               onChange={(e) => setComment(e.target.value)}
               placeholder="Additional details..."
               rows={3}
-              className="w-full px-3 py-2 bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-xl focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
+              className="w-full px-3 py-2 bg-transparent border border-focus/30 text-txt-primary placeholder-txt-dim rounded-[2px] focus:outline-none focus:ring-2 focus:ring-focus/30 focus:border-focus/30 transition-all"
               disabled={isSubmitting}
             />
           </div>
@@ -241,7 +241,7 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-transparent border border-focus/20 text-txt-secondary rounded-xl hover:bg-focus/5 transition-all"
+            className="px-4 py-2 bg-transparent border border-focus/20 text-txt-secondary rounded-[2px] hover:bg-focus/5 transition-all"
             disabled={isSubmitting}
           >
             Cancel
@@ -249,7 +249,7 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
           <button
             type="button"
             onClick={handleSubmit}
-            className="px-4 py-2 text-sm font-medium bg-focus text-drip-bg rounded-xl hover:bg-focus/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-medium bg-focus text-drip-bg rounded-[2px] hover:bg-focus/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isSubmitting}
           >
             {isSubmitting ? 'Adding...' : 'Add Entry'}

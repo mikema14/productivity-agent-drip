@@ -558,7 +558,3 @@ export interface TimerControlsProps {
   onSkip: () => void;
   onCancel: () => void;
 }
-
-export interface SessionHistoryProps {
-  sessions: PomodoroSession[];
-}
