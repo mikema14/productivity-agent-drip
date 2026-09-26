@@ -31,8 +31,9 @@ export default function NowAside({ sessions, calendarProposals, adhocEntries, on
   const unlogged = countUnlogged(sessions, adhocEntries, calendarProposals);
 
   const openReview = () => {
+    // R1: select today (which loads it) so Review lands on this day, not the last viewed one.
     const today = new Date().toISOString().split('T')[0];
-    void useLogStore.getState().loadDay(today);
+    useLogStore.getState().setSelectedDate(today);
     onNavigate('daily-log');
   };
 

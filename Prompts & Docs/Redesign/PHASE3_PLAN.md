@@ -290,6 +290,30 @@ Assertions added: no `#` in any `[data-testid="entry-task-id"]`; `Log … to Eas
 
 Each item: what the mockup shows vs what exists, the options, and my recommendation. I will proceed on the recommendation unless told otherwise.
 
+### Decided (owner, 2026-09-26)
+
+- **R1** Decided: (a) stop persisting `selectedDate`; Review and `Review day →` open on today (confirmed by the owner).
+- **R2** Decided: (a) rows from the Today column, no carry badge, no caps — **OVERRIDE of the Drop mapping:** `Drop` moves the item to **Backlog** (`moveItem(id,'backlog',order)`, non-destructive); it never deletes. `Done` → complete, `Carry` → leave in Today, `To week` → move to This week. No `confirm` on any outcome.
+- **R3** Decided: (a) aside textarea drafts the modal's Reflection (`initialReflection`); `End day` opens the unchanged modal.
+- **R4** Decided: (b) the aside shows the next workday (Mon–Fri) and the same date is passed into `EndDayModal` (`tomorrowDate` prop) so Friday's intentions land on Monday; `free = 6h − meetings` with `DAY_TARGET_MINUTES` reused (confirmed by the owner).
+- **R5** Decided: (a) title primary, `· comment` muted when it differs.
+- **R6** Decided: (a) break rows kept, muted, emerald dot; `Nm break` header stat kept.
+- **R7** Decided: (a) additive `calendar_proposals.billable INTEGER DEFAULT 1` via an idempotent migration guarded by `PRAGMA table_info`; pill live everywhere. (`db.updateCalendarProposal` gained a `billable` field: it whitelists columns, contrary to §3.2's note.)
+- **R8** Decided: (a) `Assign task` opens the inline editor; saving a proposal with an id = accept + assign.
+- **R9** Decided: (a) id-less rows stay markable; footer shows `M need a task`.
+- **R10** Decided: (a) 40px toolbar row at the top of the `Time entries` section.
+- **R11** Decided: (a) `CalendarPopover` kept as is, re-tokenised only.
+- **R12** Decided: (a) `Nm break` / `N logged` appended when > 0.
+- **R13** Decided: (a) `KeyButton` md footer keys.
+- **R14** Decided: (a) `Log to Easy8` rendered disabled with a `title` at 0.
+- **R15** Decided: (a) `Day ended` + saved reflection read-only; no unlock.
+- **R16** Decided: (a) toast kept, re-tokenised.
+- **R17** Decided: (a) delete all five dead files after grepping importers.
+- **R18** Decided: (a) per-row `role=alert` errors + 401 / not-configured banner with `Open Settings`.
+- **R19** Decided: (a) the §7.1 walk and the §7.2 guard additions.
+- **R20** Decided: (a) `Fri 25 Sep` with a muted `· Today` suffix.
+- **R21** Decided: square `rounded-[2px]` radii + hairlines.
+
 **R1. Review opens on the last viewed day (known quirk).** `logStore` persists `selectedDate` (`:941`), `App.tsx:35-39` loads it at boot, and `NowAside.openReview` loads today without selecting it (`:33-37`). Options: (a) stop persisting `selectedDate` (boot = today) and make `Review day →` call `setSelectedDate(today)`; the date chosen inside a session still sticks while the app runs; (b) keep persisting, only fix `NowAside`; (c) keep everything, add a `Today` shortcut in the header. **Recommend (a).** Review is the end-of-*this*-day screen; the month popover already has `Today` for the rare relaunch-mid-review case.
 
 **R2. `Today's 3` section with Done / Carry / To week / Drop and `Carried 3×`.** Nothing records outcomes or carries; the Today column (`list_items.column='today'`) is the only "today" data (inventory §3). Options: (a) rows = today-column items across lists; outcomes map to existing store ops — `Done` ⇔ `completed`, `Carry` = leave in Today (pressed by default), `To week` = move to `this_week`, `Drop` = delete with `confirm`; no `Carried 3×` (no data), no caps (heading `Today · N`); (b) show the day's text intentions (`daily_intentions`) read-only instead; (c) drop the section. **Recommend (a).** It gives End Day a real triage step without schema; a `carried_count` column is a clean follow-up if the section proves useful.

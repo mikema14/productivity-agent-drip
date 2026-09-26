@@ -6,7 +6,7 @@ import { cleanup } from '@testing-library/react';
 Element.prototype.scrollIntoView = vi.fn();
 
 /**
- * Minimal stubs for the preload bridges the Timer, Rail and Lists panel touch.
+ * Minimal stubs for the preload bridges the Timer, Rail, Lists panel and Review touch.
  * Tests override individual methods (e.g. `window.logAPI.searchTasks = vi.fn(...)`) as needed.
  */
 function installBridgeStubs() {
@@ -20,6 +20,16 @@ function installBridgeStubs() {
     getAdhocEntries: vi.fn(async () => []),
     getSessions: vi.fn(async () => []),
     getTaskMinutesByRange: vi.fn(async () => ({})),
+    updateSession: vi.fn(async () => undefined),
+    deleteSession: vi.fn(async () => undefined),
+    addAdhocEntry: vi.fn(async () => 'new-adhoc'),
+    updateAdhocEntry: vi.fn(async () => undefined),
+    deleteAdhocEntry: vi.fn(async () => undefined),
+    updateCalendarProposal: vi.fn(async () => undefined),
+    acceptCalendarProposal: vi.fn(async () => undefined),
+    dismissCalendarProposal: vi.fn(async () => undefined),
+    getTemplates: vi.fn(async () => []),
+    cacheTask: vi.fn(async () => undefined),
   } as unknown as Window['logAPI'];
 
   window.timerAPI = {
@@ -30,6 +40,9 @@ function installBridgeStubs() {
     getIssue: vi.fn(async () => {
       throw new Error('Issue not found');
     }),
+    // Review posts through this IPC stub only; the fetch trap below catches any other path.
+    postTimeEntry: vi.fn(async () => 1001),
+    openExternal: vi.fn(async () => undefined),
     getSessions: vi.fn(async () => []),
     getLastSessionWithTask: vi.fn(async () => null),
     startMainTimer: vi.fn(async () => undefined),
@@ -42,6 +55,8 @@ function installBridgeStubs() {
     showSessionOverlay: vi.fn(async () => ({ shown: false })),
     hideSessionOverlay: vi.fn(async () => undefined),
     getDaysSinceLastLog: vi.fn(async () => null),
+    fetchCalendarFeed: vi.fn(async () => ({ data: '', fetchedAt: 0, fromCache: true })),
+    onCalendarFeedUpdated: vi.fn(() => () => {}),
     // Main-process event subscriptions registered at App boot
     onTimerTick: vi.fn(),
     onTimerComplete: vi.fn(),
@@ -70,12 +85,23 @@ function installBridgeStubs() {
   window.dashboardAPI = {
     getDailyIntentions: vi.fn(async () => null),
     setDailyIntentions: vi.fn(async () => undefined),
+    isDayLocked: vi.fn(async () => false),
+    getShutdownRitual: vi.fn(async () => null),
+    saveShutdownRitual: vi.fn(async () => undefined),
+    unlockDay: vi.fn(async () => undefined),
+    computeWeeklySummary: vi.fn(async () => undefined),
+    getShutdownReflectionsInRange: vi.fn(async () => []),
   } as unknown as Window['dashboardAPI'];
 }
 
 beforeEach(() => {
   installBridgeStubs();
   vi.mocked(Element.prototype.scrollIntoView).mockClear();
+  // Safety net (PHASE3_PLAN.md §3.2): nothing under test may reach the network
+  // directly. Every legitimate call goes through the IPC stubs above.
+  globalThis.fetch = vi.fn(() => {
+    throw new Error('network call in test');
+  }) as unknown as typeof fetch;
 });
 
 afterEach(() => {

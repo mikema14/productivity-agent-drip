@@ -89,6 +89,8 @@ export interface CalendarProposal {
   task_id: string | null;
   comment: string | null;
   logged: 0 | 1;
+  /** R7: added by migration; undefined on rows read before it ran (treated as billable). */
+  billable?: 0 | 1;
 }
 
 export interface CalendarFeedResult {

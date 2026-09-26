@@ -6,9 +6,13 @@ interface EndDayModalProps {
   date: string;
   onClose: () => void;
   onSuccess: () => void;
+  /** R3: the Review aside's draft, seeded into the Reflection textarea. */
+  initialReflection?: string;
+  /** R4: where tomorrow's intentions land (next workday); defaults to the calendar day after `date`. */
+  tomorrowDate?: string;
 }
 
-export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalProps) {
+export default function EndDayModal({ date, onClose, onSuccess, initialReflection, tomorrowDate }: EndDayModalProps) {
   const { getIntentions, addIntention } = useIntentionsStore();
   const { saveRitual } = useShutdownStore();
 
@@ -24,7 +28,7 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
   const todayIntentions = getIntentions(date);
 
   // User inputs
-  const [reflection, setReflection] = useState('');
+  const [reflection, setReflection] = useState(initialReflection ?? '');
   const [notes, setNotes] = useState('');
   const [tomorrowIntention1, setTomorrowIntention1] = useState('');
   const [tomorrowIntention2, setTomorrowIntention2] = useState('');
@@ -114,12 +118,15 @@ export default function EndDayModal({ date, onClose, onSuccess }: EndDayModalPro
 
       // Auto-populate tomorrow's intentions
       if (tomorrowIntentions.length > 0) {
-        const tomorrow = new Date(date);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowDate = tomorrow.toISOString().split('T')[0];
+        let target = tomorrowDate;
+        if (!target) {
+          const tomorrow = new Date(date);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          target = tomorrow.toISOString().split('T')[0];
+        }
 
         for (const intention of tomorrowIntentions) {
-          await addIntention(tomorrowDate, intention);
+          await addIntention(target, intention);
         }
       }
 

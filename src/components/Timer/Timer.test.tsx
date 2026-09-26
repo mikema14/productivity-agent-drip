@@ -164,11 +164,13 @@ describe('Timer — ready states', () => {
       makeSession(1), makeSession(2), makeSession(3, { logged: 1 }), makeSession(4, { source: 'break' }),
     ]);
     const loadDay = vi.fn(async () => undefined);
-    useLogStore.setState({ loadDay });
+    // R1: the link must select today even when Review was left on another day
+    useLogStore.setState({ loadDay, selectedDate: '2020-01-01' });
     const { user, nav } = await renderTimer();
     expect(await screen.findByText('2 unlogged')).toBeInTheDocument();
 
     await user.click(key(/review day/i));
+    expect(useLogStore.getState().selectedDate).toBe(today);
     expect(loadDay).toHaveBeenCalledWith(today);
     expect(nav).toHaveBeenCalledWith('daily-log');
   });

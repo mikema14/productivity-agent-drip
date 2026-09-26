@@ -377,6 +377,14 @@ function runMigrations(database: Database.Database) {
       database.exec('ALTER TABLE calendar_proposals ADD COLUMN logged INTEGER DEFAULT 0');
       console.log('Migration complete: calendar_proposals.logged');
     }
+
+    // R7: billable flag per meeting (default 1 = today's effective behaviour when logging)
+    const hasBillableColumn = tableInfo.some((col: any) => col.name === 'billable');
+    if (!hasBillableColumn) {
+      console.log('Running migration: Adding billable column to calendar_proposals');
+      database.exec('ALTER TABLE calendar_proposals ADD COLUMN billable INTEGER DEFAULT 1');
+      console.log('Migration complete: calendar_proposals.billable');
+    }
   } catch (error) {
     console.error('Migration error:', error);
   }
@@ -1123,6 +1131,10 @@ export function updateCalendarProposal(id: string, updates: any): void {
   if (updates.logged !== undefined) {
     fields.push('logged = ?');
     values.push(updates.logged);
+  }
+  if (updates.billable !== undefined) {
+    fields.push('billable = ?');
+    values.push(updates.billable);
   }
 
   if (fields.length === 0) return;
