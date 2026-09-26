@@ -280,3 +280,35 @@ Only surfaces covered by the design proposal get redesigned:
 - Phase 4: idle nudge + Kickoff overlays
 
 Settings, Insights (Progress) and every other view are out of scope. They stay hosted unchanged behind the rail.
+
+## 9. Calm running state — added by owner (2026-09-26)
+
+Spec: `mockups/Running.dc.html` (880×360, "Focus running — calm state"). The two-column focus block felt crowded while a session runs. Running, paused and the kickoff warmup on Now become a single column inside the same bordered block; ready states and break keep the split layout (`CountdownDisplay` + right column) untouched.
+
+### Mapping (mockup → code)
+
+| Mockup element | Implementation |
+|---|---|
+| Single-column block, amber top rule | `FocusBlock` gets an optional `countdown`; without it the section renders its children in one column (same border / top rule / padding). Top rule stays `dim` when paused |
+| Header row: LED dot + `FOCUS`, task id, spacer, `ENDS 22:06` | New `ActiveFocus.tsx` (`data-testid=focus-header`): `.now-label`, state word in `text-focus` with the 4px LED (`bg-focus shadow-led`; `bg-txt-dim` when paused, word `PAUSED` in muted), id mono muted (never `#`), `ENDS <primary>hh:mm</primary>` from `sessionStartTime + totalDuration` (so `+5 min` moves it; paused keeps it, as the old `PAUSED ·` window did). Kickoff: word `KICKOFF`, right side `ROLLS INTO 25M` (existing semantics) instead of ENDS |
+| Title 28px Outfit 500 | `font-display text-[28px] font-medium leading-[1.2] tracking-[-0.3px] truncate` with `title=`. Falls back to the intention text (secondary, 15px) or `No task attached` (muted) exactly as the old right column did. A session note, when set, stays as the quiet 13px `border-l-2` line under the title (parity; not in the mockup) |
+| Countdown 124px + ruler at 330px, labels 00/05/10/15 | Existing `.now-digits` (160px, 120px below `wide:`) over the ghost `88:88`, extracted into `CountdownDigits.tsx` and shared with `CountdownDisplay`; `TickRuler` directly beneath in the same `w-full wide:w-[330px]` group, `ref={clockRef}` so the RAF `--progress` wiring is unchanged; `dimmed` when paused |
+| PAUSE solid light keycap | `KeyButton variant="light"` (new: `bg-txt-primary text-drip-bg shadow-key-light`, token `key-light: 0 3px 0 txt.dim`). Paused: `RESUME` uses the same light key |
+| FINISH outline keycap | `KeyButton variant="outline"` (unchanged) |
+| `+5 MIN`, `CANCEL` quiet text buttons | `KeyButton variant="text"` (new: no border, no drop edge, `text-txt-secondary` → primary on hover) and `variant="text-danger"` (muted → `text-alert` on hover). `+5 min` only while running (kickoff included), never paused; Cancel keeps the > 300 s confirm |
+| Radii | mockup 3px → existing `KeyButton` `rounded-[3px]`; nothing else rounded |
+
+### Dropped from running / paused / kickoff by design
+- The start time (`11:40 →`) — only `ENDS hh:mm` remains.
+- `SESSION n/8` + the 8 squares (still shown in ready states and in break).
+- Project name: today's running card already passes `project_name: null`, so nothing visible is lost.
+
+### Kept exactly (parity checks — each has a test)
+- Pause ⇄ Resume, Finish (`finishEarly` + selection cleared), Cancel (confirm when elapsed > 300 s, immediate otherwise), `+5 min` → `extendMainTimer(300)` only while running.
+- RAF-driven ruler progress (`clockRef`, `--progress`), ruler scale = `totalDuration` (2 minutes in kickoff, full duration after roll-over).
+- Intention row with SET INTENTION / EDIT above the block in every state; NowHeader pill; aside; keyboard handlers; billable state; `01 FOCUS` section header; break layout; Q8 responsive rules (digits group is full width below `wide:`, the action row wraps).
+- e2e `smoke.mjs` selectors (`/^pause$/i`, `/^resume$/i`, `/\+5 min/i`, `/^cancel$/i`) unchanged.
+
+### Tests
+- Updated (assertions that pinned removed elements): running window label `FOCUS · 11:40 → 12:05` → header `FOCUS` + id + `ENDS 12:05`; `PAUSED ·` → header `PAUSED` + ENDS; kickoff `KICKOFF · ROLLS INTO 25M` single text node → header text; kickoff compact counter / squares → no counter, no squares; running `SESSION 1/8` → no counter, no start time.
+- Added: header row per state, key set + variants per state, `+5 min` absent while paused, ruler present with the `--progress` wiring, no-task fallbacks.
