@@ -188,6 +188,38 @@ describe('DailyLog (Review)', () => {
     expect(vi.mocked(window.timerAPI.openExternal).mock.calls[0]?.[0]).toContain(FIXTURE_DATE);
   });
 
+  it('renders per-row log errors; 401 shows the banner and Open Settings → onNavigate("settings")', async () => {
+    const { user, logSelected, onNavigate } = await renderLog([makeEntry('pomodoro'), makeEntry('adhoc', { id: 'a1' })]);
+    vi.mocked(logSelected).mockResolvedValue({
+      success: 0, failed: 2,
+      errors: [{ entryId: 'pomodoro-1', error: 'Issue not found (404)' }, { entryId: 'a1', error: 'Invalid API key (401)' }],
+    });
+    await user.click(within(footer()).getByRole('button', { name: 'Log 2 to Easy8' }));
+    const rows = await screen.findAllByTestId('entry-row');
+    expect(within(rows[0]).getByRole('alert')).toHaveTextContent('Issue not found (404)');
+    expect(within(rows[1]).getByRole('alert')).toHaveTextContent('Invalid API key (401)');
+    expect(screen.getByTestId('auth-banner')).toHaveTextContent('Invalid API key (401)');
+    expect(window.timerAPI.showNotification).toHaveBeenCalledWith('Logging Failed', 'Failed to log 2 entries');
+    await user.click(within(screen.getByTestId('auth-banner')).getByRole('button', { name: 'Open Settings' }));
+    expect(onNavigate).toHaveBeenCalledWith('settings');
+    expect(screen.queryByText(/entry logged|entries logged/)).toBeNull();
+  });
+
+  it('a row error clears on the next log attempt and on edit', async () => {
+    const { user, logSelected } = await renderLog([makeEntry('pomodoro')]);
+    vi.mocked(logSelected).mockResolvedValueOnce({ success: 0, failed: 1, errors: [{ entryId: 'pomodoro-1', error: 'API error: 500' }] });
+    await user.click(within(footer()).getByRole('button', { name: 'Log 1 to Easy8' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('API error: 500');
+    vi.mocked(logSelected).mockResolvedValueOnce({ success: 1, failed: 0, errors: [] });
+    await user.click(within(footer()).getByRole('button', { name: 'Log 1 to Easy8' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    vi.mocked(logSelected).mockResolvedValueOnce({ success: 0, failed: 1, errors: [{ entryId: 'pomodoro-1', error: 'API error: 500' }] });
+    await user.click(within(footer()).getByRole('button', { name: 'Log 1 to Easy8' }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Billable' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+
   it('footer counts marked rows without a task as needing one', async () => {
     await renderLog([makeEntry('adhoc', { taskId: null })]);
     expect(footer()).toHaveTextContent('1 needs a task');

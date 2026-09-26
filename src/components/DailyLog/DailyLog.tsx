@@ -8,7 +8,7 @@ import TemplateManagerModal from './TemplateManagerModal';
 import TimelineView from './TimelineView';
 import EndDayModal from './EndDayModal';
 import ReviewHeader from './ReviewHeader';
-import { dayStats, selectionSummary, shiftDate, todayString, buildEPLink } from './reviewLogic';
+import { dayStats, selectionSummary, shiftDate, todayString, buildEPLink, errorHint } from './reviewLogic';
 import type { ViewId } from '../Layout/views';
 import { mergeEntriesByTaskId } from '../../utils/mergeEntries';
 import { forceSyncCalendar, invalidateCalendarCache } from '../../services/calendar';
@@ -50,6 +50,8 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
   const [dayLocked, setDayLocked] = useState(false);
   const [showMoveCalendar, setShowMoveCalendar] = useState(false);
   const [moveSingleId, setMoveSingleId] = useState<string | null>(null);
+  // R18: last log error per entry id; cleared for a row on its next attempt or edit
+  const [logErrors, setLogErrors] = useState<Record<string, string>>({});
 
   // Auto-dismiss toast after 10 seconds
   useEffect(() => {
@@ -125,8 +127,18 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     }
   };
 
+  const clearLogError = (ids: string[]) => {
+    setLogErrors(prev => {
+      if (!ids.some(id => id in prev)) return prev;
+      const next = { ...prev };
+      ids.forEach(id => { delete next[id]; });
+      return next;
+    });
+  };
+
   const handleUpdateMerged = async (entryId: string, changes: any) => {
     const mergedEntry = mergedEntries.find(e => e.id === entryId);
+    clearLogError(mergedEntry?.isMerged ? mergedEntry.sourceEntries.map(e => e.id) : [entryId]);
 
     if (mergedEntry?.isMerged) {
       // Update all source entries with the same changes
@@ -229,8 +241,16 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
 
   const handleLogSelected = async () => {
     setIsLogging(true);
+    clearLogError(entries.filter(e => e.markedToLog).map(e => e.id));
     try {
       const result = await logSelected();
+      if (result.errors.length > 0) {
+        setLogErrors(prev => {
+          const next = { ...prev };
+          result.errors.forEach(({ entryId, error }) => { next[entryId] = error; });
+          return next;
+        });
+      }
       // Show result notification
       if (result.success > 0) {
         setSuccessCount(result.success);
@@ -285,6 +305,9 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
   }), [mergedEntries]);
 
   const openSettings = onNavigate ? () => onNavigate('settings') : undefined;
+  const authError = Object.values(logErrors).find(e => errorHint(e).action === 'settings');
+  const rowError = (entry: (typeof mergedEntries)[number]) =>
+    entry.isMerged ? entry.sourceEntries.map(e => logErrors[e.id]).find(Boolean) : logErrors[entry.id];
 
   const renderRow = (entry: (typeof mergedEntries)[number]) => (
     <EntryRow
@@ -298,6 +321,7 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
       onMove={stableMove}
       onAssignTask={stableAssign}
       onToggleBillable={stableBillable}
+      error={rowError(entry)}
       onOpenSettings={openSettings}
     />
   );
@@ -344,6 +368,14 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
 
       <div className="flex flex-1 min-h-0">
         <div className="flex-1 min-w-0 p-7 gap-5 flex flex-col overflow-hidden">
+          {authError && (
+            <div role="alert" data-testid="auth-banner" className="shrink-0 h-9 px-3 flex items-center justify-between gap-3 border border-alert/40 rounded-[2px] font-display text-[12.5px] text-alert">
+              <span className="truncate">Easy8 rejected the request: {authError}</span>
+              {openSettings && (
+                <button type="button" onClick={openSettings} className="shrink-0 underline hover:text-txt-primary">Open Settings</button>
+              )}
+            </div>
+          )}
           <EntriesTable
             viewMode={viewMode}
             onViewModeChange={setViewMode}
