@@ -6,8 +6,8 @@ import BoundaryConfirmDialog from './BoundaryConfirmDialog';
 import NowAside from './NowAside';
 import DurationSegments from './DurationSegments';
 import TaskPicker from './TaskPicker';
-import TaskCard from './TaskCard';
 import TaskCardWithPicker from './TaskCardWithPicker';
+import ActiveFocus from './ActiveFocus';
 import IntentionRow from './IntentionRow';
 import NowHeader, { type NowPillState } from './NowHeader';
 import FocusBlock, { SectionHeader } from './FocusBlock';
@@ -340,15 +340,13 @@ export default function Timer({ onNavigate }: TimerProps) {
     : isBreak ? 'break'
     : 'ready';
 
+  // Split-layout label (ready / break). Running, paused and kickoff render the calm
+  // single-column ActiveFocus, whose header carries the state word and ENDS hh:mm.
   const sessionWindow = sessionStartTime && estimatedEnd
     ? `${formatTimeRange(sessionStartTime)} → ${formatTimeRange(estimatedEnd)}`
     : '';
-  const countdownLabel =
-    isKickoff ? `KICKOFF · ROLLS INTO ${durationMinutes}M`
-    : focusState === 'running' ? `FOCUS · ${sessionWindow}`
-    : focusState === 'paused' ? `PAUSED · ${sessionWindow}`
-    : isBreak ? `BREAK · ${sessionWindow}`
-    : 'READY';
+  const countdownLabel = isBreak ? `BREAK · ${sessionWindow}` : 'READY';
+  const endsAt = estimatedEnd ? formatTimeRange(estimatedEnd) : null;
 
   const tone = isBreak ? 'emerald' : 'amber';
   const topRule = isBreak ? 'emerald' : focusState === 'paused' ? 'dim' : 'amber';
@@ -362,9 +360,9 @@ export default function Timer({ onNavigate }: TimerProps) {
   const showIdlePicker = focusState === 'ready-empty';
   const showBreakSelected = isBreak && focusState === 'ready-selected' && !!selectedTask;
 
-  const activeTask: { task_id: string; title: string; project_name: string | null } | null =
+  const activeTask: { task_id: string; title: string } | null =
     isActive && currentTaskId
-      ? { task_id: currentTaskId, title: resolvedTaskName || '', project_name: null }
+      ? { task_id: currentTaskId, title: resolvedTaskName || '' }
       : null;
 
   return (
@@ -391,95 +389,90 @@ export default function Timer({ onNavigate }: TimerProps) {
 
           <SectionHeader>01 Focus</SectionHeader>
 
-          <FocusBlock
-            topRule={topRule}
-            countdown={
-              <CountdownDisplay
-                label={countdownLabel}
-                sessionCount={sessionCount}
-                sessionLabel={isBreak ? 'done' : 'next'}
-                currentGlows={focusState === 'running'}
-                compactCounter={isKickoff}
+          {/* running / paused / kickoff — the calm single-column block */}
+          {isActive && (
+            <FocusBlock topRule={topRule}>
+              <ActiveFocus
+                state={isKickoff ? 'kickoff' : focusState === 'paused' ? 'paused' : 'running'}
+                task={activeTask}
+                note={intention}
+                endsAt={endsAt}
+                rollsIntoMinutes={isKickoff ? durationMinutes : undefined}
                 remainingSeconds={displaySeconds}
-                running={focusState === 'running'}
-                paused={focusState === 'paused'}
-                tone={tone}
                 rulerMinutes={rulerMinutes}
-                elapsedSeconds={isActive || isBreak ? elapsedSeconds : 0}
-                active={isActive}
+                elapsedSeconds={elapsedSeconds}
                 rulerRef={clockRef}
+                onPause={() => pause()}
+                onResume={() => resume()}
+                onFinish={handleFinish}
+                onCancel={handleCancelClick}
+                onExtend={() => extendSession(5)}
               />
-            }
-          >
-            {/* ready-empty */}
-            {focusState === 'ready-empty' && !isBreak && (
-              <>
-                <p className="font-display text-[15px] text-txt-muted">Pick a task below</p>
-                <DurationSegments value={durationMinutes} onChange={handleDurationChange} />
-                <div className="flex flex-wrap gap-2">
-                  <KeyButton variant="amber" kbd="↵" disabled onClick={handleStart}>Begin Focus</KeyButton>
-                  <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>
-                </div>
-              </>
-            )}
+            </FocusBlock>
+          )}
 
-            {/* ready-selected */}
-            {focusState === 'ready-selected' && selectedTask && !isBreak && (
-              <>
-                <TaskCardWithPicker
-                  task={selectedTask}
-                  note={intention}
-                  recentTasks={recentTasks}
-                  pickerOpen={pickerOpen}
-                  onToggle={() => setPickerOpen(p => !p)}
-                  onSelectTask={(t) => { setSelectedTask(t); setPickerOpen(false); }}
-                  onNoteChange={setIntention}
-                  searchRef={searchRef}
-                  beforeNote={<DurationSegments value={durationMinutes} onChange={handleDurationChange} />}
+          {/* ready / break — countdown column + context column */}
+          {!isActive && (
+            <FocusBlock
+              topRule={topRule}
+              countdown={
+                <CountdownDisplay
+                  label={countdownLabel}
+                  sessionCount={sessionCount}
+                  sessionLabel={isBreak ? 'done' : 'next'}
+                  remainingSeconds={displaySeconds}
+                  tone={tone}
+                  rulerMinutes={rulerMinutes}
+                  elapsedSeconds={isBreak ? elapsedSeconds : 0}
+                  rulerRef={clockRef}
                 />
-                <div className="flex flex-wrap items-center gap-2">
-                  <KeyButton variant="amber" kbd="↵" onClick={handleStart}>Begin Focus</KeyButton>
-                  <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>
-                  <BillableToggle checked={currentBillable} onChange={setCurrentBillable} size="sm" className="ml-auto" />
-                </div>
-              </>
-            )}
+              }
+            >
+              {/* ready-empty */}
+              {focusState === 'ready-empty' && !isBreak && (
+                <>
+                  <p className="font-display text-[15px] text-txt-muted">Pick a task below</p>
+                  <DurationSegments value={durationMinutes} onChange={handleDurationChange} />
+                  <div className="flex flex-wrap gap-2">
+                    <KeyButton variant="amber" kbd="↵" disabled onClick={handleStart}>Begin Focus</KeyButton>
+                    <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>
+                  </div>
+                </>
+              )}
 
-            {/* running / paused / kickoff */}
-            {isActive && (
-              <>
-                {activeTask ? (
-                  <TaskCard task={activeTask} note={intention} isReadonly={true} />
-                ) : intention ? (
-                  <p className="text-[13px] text-txt-secondary border-l-2 border-drip-border pl-3">{intention}</p>
-                ) : (
-                  <p className="font-display text-[15px] text-txt-muted">No task attached</p>
-                )}
-                <div className="flex flex-wrap items-center gap-2">
-                  {focusState === 'paused' ? (
-                    <KeyButton variant="amber" onClick={() => resume()}>Resume</KeyButton>
-                  ) : (
-                    <KeyButton variant="outline" onClick={() => pause()}>Pause</KeyButton>
-                  )}
-                  <KeyButton variant="outline" onClick={handleFinish}>Finish</KeyButton>
-                  <KeyButton variant="danger" onClick={handleCancelClick}>Cancel</KeyButton>
-                  {focusState === 'running' && (
-                    <KeyButton variant="ghost" size="sm" className="ml-auto" onClick={() => extendSession(5)}>+5 min</KeyButton>
-                  )}
-                </div>
-              </>
-            )}
+              {/* ready-selected */}
+              {focusState === 'ready-selected' && selectedTask && !isBreak && (
+                <>
+                  <TaskCardWithPicker
+                    task={selectedTask}
+                    note={intention}
+                    recentTasks={recentTasks}
+                    pickerOpen={pickerOpen}
+                    onToggle={() => setPickerOpen(p => !p)}
+                    onSelectTask={(t) => { setSelectedTask(t); setPickerOpen(false); }}
+                    onNoteChange={setIntention}
+                    searchRef={searchRef}
+                    beforeNote={<DurationSegments value={durationMinutes} onChange={handleDurationChange} />}
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <KeyButton variant="amber" kbd="↵" onClick={handleStart}>Begin Focus</KeyButton>
+                    <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>
+                    <BillableToggle checked={currentBillable} onChange={setCurrentBillable} size="sm" className="ml-auto" />
+                  </div>
+                </>
+              )}
 
-            {/* break */}
-            {isBreak && (
-              <>
-                <p className="font-display text-[15px] text-txt-muted">Take a breather</p>
-                <div className="flex gap-2">
-                  <KeyButton variant="outline" onClick={() => skip()}>Skip Break</KeyButton>
-                </div>
-              </>
-            )}
-          </FocusBlock>
+              {/* break */}
+              {isBreak && (
+                <>
+                  <p className="font-display text-[15px] text-txt-muted">Take a breather</p>
+                  <div className="flex gap-2">
+                    <KeyButton variant="outline" onClick={() => skip()}>Skip Break</KeyButton>
+                  </div>
+                </>
+              )}
+            </FocusBlock>
+          )}
 
           {/* 02 TASKS — idle picker only; once a task is selected re-selection goes through the card (Q3) */}
           {showIdlePicker && (

@@ -223,7 +223,7 @@ describe('Timer — active states', () => {
   });
   afterEach(() => resetTimer());
 
-  it('running: Pause / Finish / Cancel / +5 min present, Begin Focus absent, window + pill + digits', async () => {
+  it('running: Pause / Finish / Cancel / +5 min present, Begin Focus absent, header FOCUS + id + ENDS, pill + digits', async () => {
     const start = new Date(2026, 8, 25, 11, 40, 0);
     setTimer({ status: 'focus', isPaused: false, sessionStartTime: start, totalDuration: 1500, remainingSeconds: 1200, currentTaskId: '600001', intervalId: 1 });
     await renderTimer();
@@ -233,10 +233,71 @@ describe('Timer — active states', () => {
     expect(key(/\+5 min/i)).toBeInTheDocument();
     expect(queryKey(/begin focus/i)).toBeNull();
     expect(queryKey(/kickoff/i)).toBeNull();
-    expect(screen.getByText('FOCUS · 11:40 → 12:05')).toBeInTheDocument();
+    const header = screen.getByTestId('focus-header');
+    expect(header).toHaveTextContent(/^Focus600001Ends 12:05$/);
+    expect(within(header).getByText('Focus')).toHaveTextContent(/^Focus$/);
+    expect(screen.getByTestId('active-task-id')).toHaveTextContent('600001');
+    expect(screen.queryByText('#600001')).toBeNull();
     expect(screen.getByTestId('now-pill')).toHaveTextContent('Focusing');
     expect(screen.getByRole('timer')).toHaveTextContent('20:00');
     expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('running: calm single-column block — no start time, no session counter or squares, title from the cache', async () => {
+    window.logAPI.getCachedTask = vi.fn(async () => makeTasks(1)[0]);
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(2026, 8, 25, 22, 22, 0), totalDuration: 900, remainingSeconds: 800, currentTaskId: '600001', intervalId: 1, sessionCount: 0 });
+    await renderTimer();
+    expect(screen.getByRole('region', { name: 'Focus' })).toHaveAttribute('data-layout', 'calm');
+    expect(screen.queryByTestId('countdown-label')).toBeNull();
+    expect(screen.queryByText(/22:22/)).toBeNull();
+    expect(screen.queryByText(/Session/)).toBeNull();
+    expect(screen.queryAllByTestId('session-square')).toHaveLength(0);
+    expect(screen.getByTestId('focus-header')).toHaveTextContent('Ends 22:37');
+    expect(await screen.findByTestId('active-task-title')).toHaveTextContent('Task number 1');
+  });
+
+  it('running: key set and variants — Pause light, Finish outline, +5 min text, Cancel text-danger', async () => {
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, intervalId: 1 });
+    await renderTimer();
+    expect(key(/^pause$/i)).toHaveAttribute('data-variant', 'light');
+    expect(key(/^finish$/i)).toHaveAttribute('data-variant', 'outline');
+    expect(key(/\+5 min/i)).toHaveAttribute('data-variant', 'text');
+    expect(key(/^cancel$/i)).toHaveAttribute('data-variant', 'text-danger');
+    expect(queryKey(/resume/i)).toBeNull();
+  });
+
+  it('running: the ruler is scaled to the session and the RAF effect writes --progress on it', async () => {
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(Date.now() - 600_000), totalDuration: 1500, remainingSeconds: 900, intervalId: 1 });
+    await renderTimer();
+    const ruler = screen.getByTestId('tick-ruler');
+    expect(ruler.querySelectorAll('[data-tick]')).toHaveLength(26);
+    expect(ruler.querySelectorAll('[data-lit]')).toHaveLength(10);
+    expect(ruler).not.toHaveClass('opacity-50');
+    await waitFor(() => {
+      const progress = parseFloat(ruler.style.getPropertyValue('--progress'));
+      expect(progress).toBeGreaterThan(0.39);
+      expect(progress).toBeLessThan(0.41);
+    });
+  });
+
+  it('running: Finish calls finishEarly; a later idle render has no task selected', async () => {
+    const finishEarly = vi.fn(async () => undefined);
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, currentTaskId: '600001', intervalId: 1, finishEarly });
+    const { user } = await renderTimer();
+    await user.click(key(/^finish$/i));
+    expect(finishEarly).toHaveBeenCalledTimes(1);
+    setTimer({ status: 'idle', sessionStartTime: null, intervalId: null, currentTaskId: null });
+    expect(await screen.findByRole('button', { name: /begin focus/i })).toBeDisabled();
+  });
+
+  it('running with no task: the intention stands in for the title; with neither, "No task attached"', async () => {
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, currentTaskId: null, intention: 'Write the spec', intervalId: 1 });
+    await renderTimer();
+    expect(screen.getByText('Write the spec')).toBeInTheDocument();
+    expect(screen.queryByTestId('active-task-id')).toBeNull();
+    expect(screen.queryByTestId('active-task-title')).toBeNull();
+    setTimer({ intention: '' });
+    expect(await screen.findByText('No task attached')).toBeInTheDocument();
   });
 
   it('+5 min extends the main timer by 300 s', async () => {
@@ -246,13 +307,28 @@ describe('Timer — active states', () => {
     expect(window.timerAPI.extendMainTimer).toHaveBeenCalledWith(300);
   });
 
-  it('paused: Resume present, Pause absent, label PAUSED', async () => {
-    setTimer({ status: 'focus', isPaused: true, sessionStartTime: new Date(2026, 8, 25, 11, 40), totalDuration: 1500, remainingSeconds: 900, intervalId: 1 });
+  it('paused: Resume (light) present, Pause and +5 min absent, header PAUSED + ENDS, digits and ruler dimmed', async () => {
+    setTimer({ status: 'focus', isPaused: true, sessionStartTime: new Date(2026, 8, 25, 11, 40), totalDuration: 1500, remainingSeconds: 900, currentTaskId: '600001', intervalId: 1 });
     await renderTimer();
-    expect(key(/resume/i)).toBeInTheDocument();
+    expect(key(/resume/i)).toHaveAttribute('data-variant', 'light');
     expect(queryKey(/pause/i)).toBeNull();
-    expect(screen.getByText(/^PAUSED ·/)).toBeInTheDocument();
+    expect(queryKey(/\+5 min/i)).toBeNull();
+    expect(key(/^finish$/i)).toBeInTheDocument();
+    expect(key(/^cancel$/i)).toBeInTheDocument();
+    const header = screen.getByTestId('focus-header');
+    expect(header).toHaveTextContent(/^Paused600001Ends 12:05$/);
+    expect(screen.getByRole('timer')).toHaveClass('text-txt-secondary');
+    expect(screen.getByTestId('tick-ruler')).toHaveClass('opacity-50');
+    expect(screen.getByRole('region', { name: 'Focus' })).toHaveClass('border-t-drip-border');
     expect(screen.getByTestId('now-pill')).toHaveTextContent('Paused');
+  });
+
+  it('+5 min moves ENDS by five minutes', async () => {
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(2026, 8, 25, 11, 40), totalDuration: 1500, remainingSeconds: 1200, intervalId: 1 });
+    await renderTimer();
+    expect(screen.getByTestId('focus-header')).toHaveTextContent('Ends 12:05');
+    setTimer({ totalDuration: 1800, remainingSeconds: 1500 });
+    await waitFor(() => expect(screen.getByTestId('focus-header')).toHaveTextContent('Ends 12:10'));
   });
 
   it('Cancel after 400 s asks for confirmation; after 60 s stops immediately', async () => {
@@ -340,25 +416,27 @@ describe('Timer — active states', () => {
     expect(screen.queryByText('Yesterday work')).toBeNull();
   });
 
-  it('kickoff warmup: label reads KICKOFF · ROLLS INTO 25M and the pill says Kickoff', async () => {
-    setTimer({ status: 'focus', isPaused: false, kickoff: 'warmup', sessionStartTime: new Date(), totalDuration: 120, remainingSeconds: 100, intervalId: 1, durationMinutes: 25 });
+  it('kickoff warmup: header reads KICKOFF · ROLLS INTO 25M (no ENDS), the pill says Kickoff, +5 min present', async () => {
+    setTimer({ status: 'focus', isPaused: false, kickoff: 'warmup', sessionStartTime: new Date(), totalDuration: 120, remainingSeconds: 100, currentTaskId: '600001', intervalId: 1, durationMinutes: 25 });
     await renderTimer();
-    expect(screen.getByText('KICKOFF · ROLLS INTO 25M')).toBeInTheDocument();
+    const header = screen.getByTestId('focus-header');
+    expect(header).toHaveTextContent(/^Kickoff600001Rolls into 25m$/);
+    expect(header).not.toHaveTextContent(/Ends/);
     expect(screen.getByTestId('now-pill')).toHaveTextContent('Kickoff');
     expect(key(/\+5 min/i)).toBeInTheDocument();
+    expect(key(/^pause$/i)).toHaveAttribute('data-variant', 'light');
   });
 
-  it('kickoff: the full label is rendered untruncated and the session counter is compact (no SESSION word)', async () => {
+  it('kickoff: calm layout with a 2-minute ruler and no session counter', async () => {
     setTimer({ status: 'focus', isPaused: false, kickoff: 'warmup', sessionStartTime: new Date(), totalDuration: 120, remainingSeconds: 100, intervalId: 1, durationMinutes: 25, sessionCount: 0 });
     await renderTimer();
-    const label = screen.getByTestId('countdown-label');
-    expect(label).toHaveTextContent('KICKOFF · ROLLS INTO 25M');
-    expect(label).not.toHaveClass('truncate');
-    expect(label).toHaveClass('shrink-0');
-    expect(label.parentElement).toHaveClass('whitespace-nowrap');
-    expect(screen.queryByText(/^Session/)).toBeNull();
-    expect(screen.getByText('/8', { exact: false })).toHaveTextContent('1/8');
-    expect(screen.getAllByTestId('session-square')).toHaveLength(8);
+    expect(screen.getByRole('region', { name: 'Focus' })).toHaveAttribute('data-layout', 'calm');
+    expect(screen.queryByTestId('countdown-label')).toBeNull();
+    expect(screen.queryByText(/Session/)).toBeNull();
+    expect(screen.queryByText('/8', { exact: false })).toBeNull();
+    expect(screen.queryAllByTestId('session-square')).toHaveLength(0);
+    const labels = Array.from(screen.getByTestId('tick-ruler').querySelectorAll('[data-label]')).map(l => l.textContent);
+    expect(labels).toEqual(['00', '01', '02']);
   });
 
   it('running with an intention: EDIT stays available and opens SetIntentionModal (parity)', async () => {
@@ -390,12 +468,15 @@ describe('Timer — active states', () => {
     expect(screen.getByText("Today's intentions")).toBeInTheDocument();
   });
 
-  it('running: label untruncated and the counter keeps the SESSION word', async () => {
-    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(2026, 8, 25, 22, 22, 0), totalDuration: 900, remainingSeconds: 800, intervalId: 1, sessionCount: 0 });
+  it('ready and break keep the split layout with the session counter', async () => {
+    setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(), totalDuration: 300, remainingSeconds: 200, intervalId: 1, sessionCount: 2 });
     await renderTimer();
-    const label = screen.getByTestId('countdown-label');
-    expect(label).toHaveTextContent('FOCUS · 22:22 → 22:37');
-    expect(label).not.toHaveClass('truncate');
-    expect(screen.getByText(/^Session/)).toHaveTextContent('Session 1/8');
+    expect(screen.getByRole('region', { name: 'Focus' })).toHaveAttribute('data-layout', 'split');
+    expect(screen.getAllByTestId('session-square')).toHaveLength(8);
+    expect(screen.queryByTestId('focus-header')).toBeNull();
+    setTimer({ status: 'idle', sessionStartTime: null, intervalId: null });
+    await waitFor(() => expect(screen.getByTestId('countdown-label')).toHaveTextContent('READY'));
+    expect(screen.getByRole('region', { name: 'Focus' })).toHaveAttribute('data-layout', 'split');
+    expect(screen.getByText(/^Session/)).toHaveTextContent('Session 3/8');
   });
 });
