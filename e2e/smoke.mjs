@@ -252,16 +252,18 @@ async function reviewWalk(page, shot) {
   await page.getByRole('heading', { name: 'Manage Templates' }).waitFor({ state: 'hidden' });
 
   // 10b. Weekends have no entries: walk back to the latest day with rows, look, return (reads + safe proposal syncs)
-  if (!(await page.getByTestId('entry-row').count())) {
+  // Proposal-only days (synced from the calendar) don't count: we want real rows
+  const realRows = () => page.locator('[data-testid="entry-row"]:not([data-kind="proposal"])');
+  if (!(await realRows().count())) {
     let back = 0;
-    while (back < 7 && !(await page.getByTestId('entry-row').count())) {
+    while (back < 7 && !(await realRows().count())) {
       await page.getByRole('button', { name: 'Previous day', exact: true }).click();
       back++;
       await page.waitForTimeout(700);
     }
-    if (await page.getByTestId('entry-row').count()) {
+    if (await realRows().count()) {
       await shot('review-past-day');
-      await page.getByTestId('entry-row').first().hover();
+      await realRows().first().hover();
       await shot('review-past-row-hover');
       await toolbar.getByRole('button', { name: 'Timeline', exact: true }).click();
       await page.locator('text=/^\\d\\d:00$/').first().waitFor();
