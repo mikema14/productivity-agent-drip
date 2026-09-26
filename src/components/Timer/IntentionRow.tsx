@@ -3,19 +3,18 @@ import KeyButton from './KeyButton';
 interface Props {
   intentions: string[];
   onEdit: () => void;
-  /** When true the row is display-only (running states). */
-  readonly?: boolean;
 }
 
 /**
- * Today's intention above the focus block. With none set it is the entry
- * point for setting one (the job the old sidebar button had), unless readonly.
+ * Today's intention above the focus block, in every timer state. With none
+ * set it is the entry point for setting one (the job the old sidebar button
+ * had); with one set, EDIT opens the same modal. The old app allowed editing
+ * while a session or break ran, so no state renders this row read-only.
  */
-export default function IntentionRow({ intentions, onEdit, readonly = false }: Props) {
+export default function IntentionRow({ intentions, onEdit }: Props) {
   const primary = intentions[0];
 
   if (!primary) {
-    if (readonly) return null;
     return (
       <div className="flex items-center h-9 border-b border-drip-elevated">
         <KeyButton variant="ghost" size="sm" onClick={onEdit}>Set intention</KeyButton>
@@ -33,9 +32,7 @@ export default function IntentionRow({ intentions, onEdit, readonly = false }: P
         <span className="now-label text-txt-muted shrink-0">Intention</span>
         <span className="text-[13px] text-txt-secondary truncate">{primary}</span>
       </div>
-      {!readonly && (
-        <KeyButton variant="ghost" size="sm" onClick={onEdit}>Edit</KeyButton>
-      )}
+      <KeyButton variant="ghost" size="sm" onClick={onEdit}>Edit</KeyButton>
     </div>
   );
 }

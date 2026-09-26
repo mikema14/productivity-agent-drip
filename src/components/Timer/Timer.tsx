@@ -361,10 +361,8 @@ export default function Timer({ onNavigate }: TimerProps) {
         {/* MAIN COLUMN */}
         <div className="flex-1 min-w-0 flex flex-col gap-4 px-7 py-5 overflow-y-auto">
 
-          {/* Intention row */}
-          {!isBreak && (
-            <IntentionRow intentions={intentions} onEdit={() => setShowIntentionModal(true)} readonly={isActive} />
-          )}
+          {/* Intention row — every state, editable (parity with the old app's Edit + sidebar button) */}
+          <IntentionRow intentions={intentions} onEdit={() => setShowIntentionModal(true)} />
 
           {/* Continue previous — the 44px slot is reserved in idle ready states so it never pops in.
               During a break the CTA still shows when a previous session exists (Q6), but no empty

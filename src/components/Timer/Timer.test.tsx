@@ -253,7 +253,7 @@ describe('Timer — active states', () => {
     await waitFor(() => expect(window.timerAPI.stopMainTimer).toHaveBeenCalledTimes(1));
   });
 
-  it('break: Skip Break only; no picker, no intention row, no duration strip', async () => {
+  it('break: Skip Break only; no picker, intention row editable, no duration strip', async () => {
     setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(), totalDuration: 300, remainingSeconds: 200, intervalId: 1, sessionCount: 2 });
     await renderTimer();
     expect(key(/skip break/i)).toBeInTheDocument();
@@ -261,7 +261,7 @@ describe('Timer — active states', () => {
     expect(queryKey(/pause/i)).toBeNull();
     expect(queryKey(/kickoff/i)).toBeNull();
     expect(screen.queryByRole('listbox')).toBeNull();
-    expect(queryKey(/set intention/i)).toBeNull();
+    expect(key(/set intention/i)).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Duration in minutes' })).toBeNull();
     expect(screen.getByTestId('now-pill')).toHaveTextContent('Break');
     expect(screen.getByText(/^BREAK ·/)).toBeInTheDocument();
@@ -311,6 +311,35 @@ describe('Timer — active states', () => {
     expect(screen.queryByText(/^Session/)).toBeNull();
     expect(screen.getByText('/8', { exact: false })).toHaveTextContent('1/8');
     expect(screen.getAllByTestId('session-square')).toHaveLength(8);
+  });
+
+  it('running with an intention: EDIT stays available and opens SetIntentionModal (parity)', async () => {
+    useIntentionsStore.setState({ intentions: new Map([[today, ['Ship the rail']]]) });
+    window.dashboardAPI.getDailyIntentions = vi.fn(async () => ({ date: today, intentions: ['Ship the rail'] }));
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, intervalId: 1 });
+    const { user } = await renderTimer();
+    expect(screen.getByRole('group', { name: "Today's intention: Ship the rail" })).toBeInTheDocument();
+    await user.click(key(/^edit$/i));
+    expect(screen.getByText("Today's intentions")).toBeInTheDocument();
+  });
+
+  it('paused with no intention: a compact SET INTENTION key sits in the row and opens the modal', async () => {
+    setTimer({ status: 'focus', isPaused: true, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, intervalId: 1 });
+    const { user } = await renderTimer();
+    const set = key(/set intention/i);
+    expect(set).toHaveClass('h-7');
+    await user.click(set);
+    expect(screen.getByText("Today's intentions")).toBeInTheDocument();
+  });
+
+  it('break with an intention: the row shows it with EDIT, which opens the modal', async () => {
+    useIntentionsStore.setState({ intentions: new Map([[today, ['Ship the rail']]]) });
+    window.dashboardAPI.getDailyIntentions = vi.fn(async () => ({ date: today, intentions: ['Ship the rail'] }));
+    setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(), totalDuration: 300, remainingSeconds: 200, intervalId: 1 });
+    const { user } = await renderTimer();
+    expect(screen.getByText('Ship the rail')).toBeInTheDocument();
+    await user.click(key(/^edit$/i));
+    expect(screen.getByText("Today's intentions")).toBeInTheDocument();
   });
 
   it('running: label untruncated and the counter keeps the SESSION word', async () => {
