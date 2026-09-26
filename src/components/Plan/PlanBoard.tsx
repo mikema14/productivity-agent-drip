@@ -81,6 +81,19 @@ export default function PlanBoard({ scope, onNavigate }: PlanBoardProps) {
     if (scope === 'list' && !selectedListId && lists.length > 0) selectList(lists[0].id);
   }, [scope, lists, selectedListId]);
 
+  // The list filter pills render only with 2+ lists, but the filter set outlives the
+  // lists it names (archive a filtered list and the rest would stay hidden with no pill
+  // to clear). Prune it to existing ids; with fewer than two lists there is nothing to filter.
+  useEffect(() => {
+    setActiveListFilters(prev => {
+      if (prev.size === 0) return prev;
+      if (lists.length < 2) return new Set();
+      const ids = new Set(lists.map(l => l.id));
+      const kept = [...prev].filter(id => ids.has(id));
+      return kept.length === prev.size ? prev : new Set(kept);
+    });
+  }, [lists]);
+
   // Resolve item task ids to names for the badge tooltips.
   useEffect(() => {
     const ids = items.filter(i => i.task_id && !taskNames[i.task_id]).map(i => i.task_id!);

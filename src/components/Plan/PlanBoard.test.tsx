@@ -170,6 +170,31 @@ describe('PlanBoard — all scope', () => {
     expect(filters.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('a filter on a list that disappears is pruned: the remaining list shows again', async () => {
+    const { user } = renderBoard();
+    await user.click(within(screen.getByTestId('plan-list-filters')).getByRole('button', { name: 'Ops' }));
+    expect(screen.queryByText('Title w1')).toBeNull();
+    // Ops gets archived: one list left, no pills — Bound's items must not stay hidden.
+    act(() => { useListsStore.setState({ lists: [bound] }); });
+    expect(screen.queryByTestId('plan-list-filters')).toBeNull();
+    expect(screen.getByText('Title w1')).toBeInTheDocument();
+  });
+
+  it('with three lists, archiving a filtered one keeps the other filter and shows the rest of the pills', async () => {
+    const third: TaskList = { ...ops, id: 'l3', name: 'Third', order: 2 };
+    const items = [...baseItems, item('x1', { list_id: 'l3', column: 'today', order: 5 })];
+    const { user } = renderBoard('all', items, [ops, bound, third]);
+    const pills = () => within(screen.getByTestId('plan-list-filters'));
+    await user.click(pills().getByRole('button', { name: 'Ops' }));
+    await user.click(pills().getByRole('button', { name: 'Third' }));
+    expect(screen.queryByText('Title w1')).toBeNull();
+    act(() => { useListsStore.setState({ lists: [bound, third] }); });
+    expect(pills().getByRole('button', { name: 'Third' })).toHaveAttribute('aria-pressed', 'true');
+    expect(pills().getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText('Title x1')).toBeInTheDocument();
+    expect(screen.queryByText('Title w1')).toBeNull();
+  });
+
   it('no filter row with a single list', () => {
     renderBoard('all', baseItems.filter(i => i.list_id === 'l1'), [ops]);
     expect(screen.queryByTestId('plan-list-filters')).toBeNull();
