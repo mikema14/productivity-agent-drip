@@ -65,8 +65,8 @@ Out of scope (untouched files): `electron/idleWatcher.ts`, `electron/kickoff.ts`
 | `Just start. At 0:00 this rolls into a 25m focus session.` (`:29`) | `<p data-testid="kickoff-copy">` 14px muted | `durationMinutes` | `Nm` from the store, as `KICKOFF · ROLLS INTO Nm` does |
 | Footer left `Started automatically after 15m idle` (`:33`) | `<span data-testid="kickoff-source">` 12.5px muted | `timerStore.kickoffSource` (K6) | `auto` → `Started automatically after 15m idle` (15 = `escalateAfterMs / 60000`, carried in the command); `nudge` → `Started from the nudge`; `now` → `Started from Now`; `deeplink` → `Started from Raycast` |
 | Footer right `esc Stop` hairline button (`:34`) | `KeyButton variant="ghost" size="sm"` `Stop` with `kbd="esc"` shown only while `document.hasFocus()` (N3) | → K2: `reset()` (Now's Cancel path: no row, no confirm under 300 s) | Window `keydown` Escape → the same handler, guarded by the takeover being mounted and no `<input>` focused. |
-| Not drawn: Pause / Finish / `+5 min` | none during the warmup (K3) | – | Reachable through `drip://pause` etc. and again on the Now screen the moment the kickoff rolls over (`kickoff: 'rolled'` renders Now's normal running state) |
-| Not drawn: paused kickoff (`drip://pause` during the warmup) | digits dim, colon static, copy `Paused — resume from Raycast or stop.`, Stop stays | `isPaused` | Reflects the existing state; adds no control |
+| Not drawn: Pause / Finish / `+5 min` | K3 override: a quiet secondary row (`data-testid="kickoff-secondary"`, `KeyButton variant="ghost" size="sm"`, low contrast) left of `esc Stop` with Pause / Resume, Finish and `+5 min` | `isPaused` | Wired to `pause` / `resume` / `finishEarly` / `extendSession(5)` — the handlers Now uses during the warmup. `+5 min` hidden while paused, as on Now. Also reachable through `drip://pause` etc. |
+| Not drawn: paused kickoff (Pause key or `drip://pause` during the warmup) | digits dim, colon static, copy `Paused — resume or stop.`, Resume replaces Pause in the secondary row, Stop stays | `isPaused` | Reflects the existing state |
 
 ### 2.3 Not covered by either mockup → unchanged
 
@@ -252,41 +252,75 @@ Assertions added: the takeover's id pill (if any) has no `#`; `main.log` contain
 
 ## 9. Owner decisions needed
 
-Each item: what the mockup shows vs what exists, the options, and my recommendation. I will proceed on the recommendation unless told otherwise.
+Each item: what the mockup shows vs what exists, the options, and my recommendation. **Owner decisions recorded 2026-09-26** — every item below carries a `Decided:` line; the build follows those lines, and K3 overrides the recommendation.
 
 **N1. Nudge card shell — glass vs the mockup's solid card; radius.** Mockup: `#141418` solid, 16px radius, red hairline + red halo. Existing: the overlay's `GLASS` shell (near-solid dark HUD, 24px radius, `drip-arrive`) with a red 1px border — the owner's stated pattern ("red, same pattern as the session/break overlay"). Owner rule: square 2px radii on main-window surfaces. Options: (a) keep the `GLASS` shell (fill, blur, 24px, arrive) and add the mockup's red halo + red border — the nudge looks like the session-end card's red sibling; (b) the mockup literally (solid, 16px), leaving the session-end card at 24px — two shells in one window; (c) 2px radius on the nudge only; (d) 2px on every overlay card (touches the session-end look, which is out of scope). **Recommend (a).** It is what the owner asked for and keeps the overlay family coherent; the mockup's content and hierarchy are taken in full.
 
+**Decided: (a).** Overlay `GLASS` shell (fill, blur, `radiusCard`, `drip-arrive`) + the mockup's red border and red halo.
+
 **N2. `×` dismiss.** Not drawn. Existing: `×` + Esc → `dismiss` (hides the card; escalation continues). Options: (a) keep the `×` after the countdown, as on the session-end card; (b) Esc only. **Recommend (a).** A mouse user has no other way to hide the card, and the session-end card keeps its `×`.
+
+**Decided: (a).** `×` kept after the countdown; Esc → `dismiss` unchanged.
 
 **N3. `↵` on `Start focus` (and `esc` on the takeover's `Stop`).** Both windows are raised without keyboard focus by design (`showInactive`), so the key does nothing until the user clicks into the window — a printed hint would be an inert affordance (Q4). Options: (a) render the kbd hint only while `document.hasFocus()`; bind Enter / Escape regardless; (b) always render the hint; (c) focus the window when raising it (steals focus from what the user is typing — the exact thing the overlay was built not to do); (d) drop the hints. **Recommend (a).** Honest hint, no focus theft, the binding is there the moment the window is clicked.
 
+**Decided: (a).** Hints render only while `document.hasFocus()`; the Enter / Escape bindings exist regardless.
+
 **N4. The target task in the nudge copy.** Mockup names `689742`. The kickoff's task is resolved in the renderer (`current → today's last session task → persisted lastTaskId`); main has the DB half. Options: (a) main predicts from `getLastSessionWithTask(today)` + `getCachedTask` and the copy degrades to `on your last task` / no clause when it finds nothing; (b) round-trip to the renderer (`ipcRenderer.invoke` from main is not a thing; it needs a request/response pair) for the exact answer; (c) no task in the copy. **Recommend (a).** Matches the real answer whenever a session ran today, which is the case the nudge is for.
+
+**Decided: (a).** Main predicts the task from today's last session + the task cache; the copy degrades to `on your last task` / no clause. The flag stays in this plan.
 
 **N5. Nudge card width.** Mockup 480, `CARD_W` 440. Options: (a) 440, shared with the other cards; (b) 480 for the nudge only; (c) 480 for all (changes the session-end look). **Recommend (a).**
 
+**Decided: (a).** 440px, shared with the other cards.
+
 **K1. Where the takeover lives.** Mockup: a 1200×800 frame with no rail. Options: (a) a `fixed inset-0 z-50` layer in the main renderer over every view, window raised as today (`showInactive` + `moveTop` for auto, `show()` for the nudge button / deeplink); (b) additionally `setFullScreen(true)` / `maximize()` for the warmup and restore after ("over the whole screen" literally) — window-state churn, restore edge cases on multi-display, and two minutes of a fullscreen Drip on top of whatever the user was reading; (c) a new transparent full-display overlay window (a fifth window kind; no keyboard, no focus). **Recommend (a).** The mockup is the window; the takeover is the whole window.
+
+**Decided: (a).** `fixed inset-0 z-50` layer in the main renderer; window raised exactly as today.
 
 **K2. `esc Stop` semantics during the warmup.** Mockup: one `Stop`. Existing: Now's `Cancel` → `reset` (no row, no confirm under 300 s) and `Finish` → `finishEarly` (rejects < 1 min); the roll-over prompt's `Stop` → `stopKickoff` (saves what ran as a `Kickoff` session, ≥ 1 min). Options: (a) `stopKickoff` — consistent with the prompt's `Stop`, but records 1-minute `Kickoff` rows whenever the user bails at 0:40, and the e2e could no longer exit a kickoff safely without a second key; (b) `reset` — "not now" leaves nothing behind, the idle clock restarts, the prompt's `Stop` keeps its save semantics after the roll-over; (c) both keys (`Stop` saves, `Cancel` doesn't). **Recommend (b).** A warmup abandoned in its first two minutes is not work worth a row; after the roll-over the prompt already offers the saving `Stop`.
 
+**Decided: (b).** `esc Stop` during the warmup = `reset()` — no row, no confirm, same as Now's Cancel under 300 s.
+
 **K3. Now's controls during the warmup (Pause / Finish / `+5 min` / Cancel).** The takeover covers the Now screen, so for ≤ 2 minutes they are reachable only through `drip://pause` etc. Options: (a) takeover shows only `Stop` (mockup); Now's warmup rendering and tests stay as the layer underneath, nothing deleted; (b) add a second small row (Pause / `+5 min`) to the takeover; (c) render the takeover inside `Timer` instead of over the app (rail and other views stay reachable — not a takeover). **Recommend (a).** The kickoff is two minutes of "just start"; the deeplinks cover the rare pause, and every control returns the moment it rolls over.
+
+**Decided: OVERRIDE — none of (a)/(b)/(c) as written.** The takeover must not hide working controls. `esc Stop` stays the primary action as drawn, and a quiet secondary row (small mono, low contrast, `KeyButton` ghost keys) carries Pause / Resume, Finish and `+5 min`, wired to exactly the handlers Now uses during the warmup (`pause` / `resume` / `finishEarly` / `extendSession(5)`). The paused state renders sensibly on the takeover (digits dimmed, Resume shown, `+5 min` hidden as on Now). Each key has its own test. Now's warmup rendering stays as the layer underneath; nothing deleted.
 
 **K4. Digits typeface and format.** Mockup: JetBrains Mono 200 at 240px, `1:37`. Now: Barlow Condensed 700 (`.now-digits`), `01:37`. Options: (a) `.now-digits` condensed at 240px (160px below `wide:`), `m:ss` as drawn, amber, blinking colon; (b) the mockup's thin mono (adds a 200-weight font load); (c) condensed with `mm:ss`. **Recommend (a).** One display face across Now and the takeover; the mockup's `m:ss` reads better for a two-minute clock.
 
+**Decided: (a).** `.now-digits` condensed at 240px (160px below `wide:`), `m:ss`, amber, blinking colon.
+
 **K5. Raycast Focus indicator signal.** Nothing tells the renderer whether Raycast is on (`raycastFocus.active` is private). Options: (a) `start-main-timer` returns `{ raycastFocus }` (enabled + Raycast present at start time), stored in `timerStore.raycastFocus`, cleared with `kickoff`; (b) a new main → renderer event on every `raycastFocusStart` / `End` (more channels, tracks pause / resume exactly); (c) no indicator (`Raycast Focus` line dropped). **Recommend (a).** One return value, no new channel; pause shows `off` because main ends the Raycast session on pause anyway. Note: the indicator says what Drip *asked* Raycast to do — Raycast has no status API (`raycastFocus.ts:9-10`), so "on" cannot be verified.
+
+**Decided: (a).** `start-main-timer` returns `{ raycastFocus }`, mirrored into `timerStore.raycastFocus`.
 
 **K6. Source line.** Mockup: `Started automatically after 15m idle`. The command has no source today. Options: (a) `IdleCommand.kickoff.source` (`auto` / `nudge` / `deeplink`) + `escalateMinutes` from `cfg`, `now` when started on the Now screen; lines `Started automatically after 15m idle` / `Started from the nudge` / `Started from Raycast` / `Started from Now`; (b) always the mockup sentence (wrong three times out of four); (c) no line. **Recommend (a).**
 
+**Decided: (a).** `IdleCommand.kickoff.source` + `escalateMinutes`; four source lines.
+
 **K7. "A huge 2-min button over the whole screen to just start" vs the mockup.** The mockup is the *running* takeover; the "start" affordance stays as Now's `Kickoff 2m` key, the nudge's `Kickoff 2m` key, `drip://kickoff`, and — the actual takeover — the automatic start 15 minutes after the nudge, which needs no button at all. Options: (a) mockup as drawn: the ridiculous part is that it starts *itself* and fills the window; (b) instead of auto-starting at escalation, take over with one huge `KICKOFF 2M` key and wait for the click — changes the escalation semantics (an ignored nudge would no longer start anything), so it breaks the parity rule; (c) (a) plus a huge `KICKOFF 2M` `KeyButton` as the nudge card's primary action (demotes `Start focus`). **Recommend (a).** Flagged because it is a real difference from the original words; the mockup is the later, more specific instruction.
+
+**Decided: (a).** Mockup as drawn — the running takeover that starts itself; the start affordances stay where they are.
 
 **K8. Roll-over prompt (`Kickoff done`, Keep going / Stop, 10-s timeout).** Not in the mockups. Options: (a) extract verbatim into `KickoffPromptCard.tsx`, no restyle; (b) restyle to match the new nudge (red → amber twin). **Recommend (a).** Out of the mockups' coverage; extraction only so the two idle-family cards stop sharing one `if`.
 
+**Decided: (a).** Verbatim extraction into `KickoffPromptCard.tsx`, no restyle.
+
 **E1. How the e2e screenshots the overlays.** `DRIP_TEST_MODE` keeps the idle watcher off and no session completes in the walk. Options: (a) preload-less fixture `BrowserWindow`s loading `overlay.html?state=…` — by construction no IPC, no DB, no `raycast://`; the real overlay module is never touched; (b) a `DRIP_E2E`-gated IPC that calls `showOverlay(fixture, { force })` on the real window — screenshots the real geometry but any click would fire real actions and the window is transparent on the desktop; (c) unit tests only. **Recommend (a).**
+
+**Decided: (a).** Preload-less fixture `BrowserWindow`s loading `overlay.html?state=…`, created only under `DRIP_TEST_MODE` / `DRIP_E2E`; no IPC, no DB, no `raycast://` by construction.
 
 **E2. Deeplink kickoff in the e2e.** Options: (a) add the `drip://kickoff` step (Esc within 45 s), proving main → renderer → takeover; (b) Now's `Kickoff 2m` only. **Recommend (a).** It is the only exercise of `idleNudge.startKickoff` the suite can have.
 
+**Decided: (a).** The `drip://kickoff` step is added.
+
 **E3. Exiting the kickoff in the e2e.** The takeover covers Now's `Cancel`. Options: (a) `Escape` (K2 → `reset`); (b) click the takeover's `Stop`. **Recommend (a)** (and assert the `Stop` key exists, never `stopKickoff`).
 
+**Decided: (a).** Exit with `Escape` (→ `reset`), never `stopKickoff`; the `Stop` key is asserted, not clicked.
+
 **D1. Docs.** Options: (a) a short "Overlay & Kickoff tokens" section in `UI_DESIGN_SYSTEM.md`, `CLAUDE.md` unchanged (no operational facts change); (b) also update the stale `FEATURE_INVENTORY.md` §1.11 row. **Recommend (a)**; the inventory is a dated snapshot by its own header.
+
+**Decided: (a).** "Overlay & Kickoff tokens" section in `UI_DESIGN_SYSTEM.md`; `CLAUDE.md` and `FEATURE_INVENTORY.md` unchanged.
 
 ### Critical files for implementation
 - `/Users/marekmikesz/Documents/Claude workplace/Drip/productivity-agent-drip/src/overlay/SessionEndOverlay.tsx` (idle branch extracted; session-end branches byte-identical)
