@@ -100,7 +100,7 @@ import {
   extendTimer,
   cleanupTimer
 } from './timer';
-import { initIdleNudge, stopIdleNudge, startKickoff, handleIdleOverlayAction } from './idleNudge';
+import { initIdleNudge, stopIdleNudge, startKickoff, handleIdleOverlayAction, getNudgePausedUntil, resumeNudges } from './idleNudge';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -498,6 +498,25 @@ ipcMain.on('overlay:action', (_event, type: OverlayActionType, data?: OverlayAct
 
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('overlay-action', type);
+  }
+});
+
+// Nudge pause (Snooze 15m / 1h / Rest of day, tray "Pause nudges"): the Now
+// header reads it and offers Resume; changes arrive as `idle-nudge-paused`.
+ipcMain.handle('idle-nudge:get-pause', async () => {
+  try {
+    return { success: true, pausedUntil: getNudgePausedUntil() };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('idle-nudge:resume', async () => {
+  try {
+    resumeNudges();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
   }
 });
 

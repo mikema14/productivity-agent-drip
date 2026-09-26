@@ -65,6 +65,10 @@ function installBridgeStubs() {
     onUrlStartFocus: vi.fn(),
     onOverlayAction: vi.fn(),
     onUrlTimerAction: vi.fn(),
+    // Idle nudge pause (Now header line + Resume)
+    getIdleNudgePause: vi.fn(async () => null),
+    resumeIdleNudges: vi.fn(async () => undefined),
+    onIdleNudgePauseChanged: vi.fn(() => () => {}),
   } as unknown as Window['timerAPI'];
 
   window.listsAPI = {

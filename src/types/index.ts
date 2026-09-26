@@ -333,6 +333,12 @@ export interface TimerAPI {
   setOverlayEnabled: (enabled: boolean) => Promise<void>;
   onOverlayAction: (callback: (type: OverlayActionType) => void) => void;
   onIdleCommand: (callback: (command: IdleCommand) => void) => void;
+  // Idle nudge pause (Snooze 15m / 1h / Rest of day, tray "Pause nudges")
+  /** Epoch ms the current pause ends, or null when nudges are not paused. */
+  getIdleNudgePause?: () => Promise<number | null>;
+  resumeIdleNudges?: () => Promise<void>;
+  /** Fires with the new end (or null) whenever the pause changes. Returns the unsubscribe. */
+  onIdleNudgePauseChanged?: (callback: (pausedUntil: number | null) => void) => () => void;
 }
 
 export interface LogAPI {

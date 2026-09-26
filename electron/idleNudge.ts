@@ -1,6 +1,6 @@
 import { BrowserWindow, powerMonitor } from 'electron';
-import { getSetting, getCalendarProposals, getLastSessionWithTask, getCachedTask } from '../src/services/db';
-import type { IdleCommand, KickoffSource, OverlayActionData, OverlayActionType } from '../src/types';
+import { getSetting, saveSetting, getCalendarProposals, getLastSessionWithTask, getCachedTask } from '../src/services/db';
+import type { IdleCommand, KickoffSource, OverlayActionData, OverlayActionType, SnoozeChoice } from '../src/types';
 import { getVisibleOverlayKind, hideOverlay, sampleActiveDisplay, showOverlay } from './overlayWindow';
 import { getTimerState, setTimerListener } from './timer';
 import { raycastFocusEnd, isRaycastFocusEnabled } from './raycastFocus';
@@ -10,8 +10,10 @@ import {
   IDLE_FAST,
   INITIAL_IDLE_STATE,
   nextIdleAction,
+  onResume,
   onSnooze,
   onTimerStatus,
+  pausedUntil,
   snoozeUntilFor,
   type IdleAction,
   type IdleState,
@@ -26,9 +28,17 @@ import { resolveKickoffPrompt, type KickoffPromptOutcome } from './kickoff';
  * Timer logic stays in the main-window renderer (session recording, task,
  * billable): kickoff and "start focus" are relayed there as idle commands, the
  * same way overlay buttons are.
+ *
+ * A pause (the card's Snooze choice, the tray's "Pause nudges") lives in the
+ * machine as the 'snoozed' phase. Its end is mirrored into the settings table
+ * so it survives a restart, and broadcast (listeners here, `idle-nudge-paused`
+ * to the main window) so the tray menu and the Now header can show it.
  */
 
 const cfg = process.env.DRIP_IDLE_FAST === '1' ? IDLE_FAST : IDLE_DEFAULTS;
+
+/** Settings key: epoch ms the current pause ends; empty when not paused. */
+export const PAUSE_SETTING_KEY = 'idleNudgePausedUntil';
 
 let state: IdleState = { ...INITIAL_IDLE_STATE };
 let getWindow: () => BrowserWindow | null = () => null;
@@ -36,6 +46,80 @@ let pollTimer: NodeJS.Timeout | null = null;
 let promptTimer: NodeJS.Timeout | null = null;
 let screenLocked = false;
 let suspended = false;
+
+type PauseListener = (until: number | null) => void;
+const pauseListeners = new Set<PauseListener>();
+
+/** End of the current nudge pause (epoch ms), or null. */
+export function getNudgePausedUntil(): number | null {
+  return pausedUntil(state);
+}
+
+/** Called with the new end whenever a pause starts, ends, or is resumed. Returns the unsubscribe. */
+export function onNudgePauseChange(listener: PauseListener): () => void {
+  pauseListeners.add(listener);
+  return () => {
+    pauseListeners.delete(listener);
+  };
+}
+
+function persistPause(until: number | null): void {
+  try {
+    saveSetting(PAUSE_SETTING_KEY, until === null ? '' : String(until));
+  } catch (error) {
+    console.error('[IdleNudge] Failed to persist the pause:', error);
+  }
+}
+
+function readPersistedPause(): number | null {
+  try {
+    const raw = getSetting(PAUSE_SETTING_KEY);
+    const until = raw ? Number(raw) : NaN;
+    return Number.isFinite(until) ? until : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The one place the state changes: any change to the pause end is persisted
+ * and announced, whichever path caused it (poll expiry, snooze, resume, a
+ * focus starting).
+ */
+function setState(next: IdleState): void {
+  const before = pausedUntil(state);
+  if (next.phase !== state.phase) console.log(`[IdleNudge] ${state.phase} → ${next.phase}`);
+  state = next;
+  const after = pausedUntil(state);
+  if (after === before) return;
+  persistPause(after);
+  for (const listener of pauseListeners) {
+    try {
+      listener(after);
+    } catch (error) {
+      console.error('[IdleNudge] Pause listener failed:', error);
+    }
+  }
+  const win = getWindow();
+  if (win && !win.isDestroyed()) win.webContents.send('idle-nudge-paused', after);
+}
+
+/** Pause nudge and escalation for the given choice. Returns when the pause ends. */
+export function pauseNudges(choice: SnoozeChoice): number {
+  hideIdleNudge();
+  const now = Date.now();
+  const until = snoozeUntilFor(choice, now, cfg);
+  setState(onSnooze(state, now, until));
+  console.log(`[IdleNudge] Paused (${choice}) until ${new Date(until).toISOString()}`);
+  return until;
+}
+
+/** End the pause now: a fresh idle clock starts. */
+export function resumeNudges(): void {
+  if (state.phase !== 'snoozed') return;
+  setState(onResume(state, Date.now()));
+  console.log('[IdleNudge] Resumed');
+}
 
 function isEnabled(): boolean {
   // DRIP_TEST_MODE: agent/QA runs against the real database must not nudge or take over
@@ -84,10 +168,7 @@ function hideIdleNudge(): void {
 }
 
 function apply(result: { state: IdleState; action: IdleAction }): void {
-  if (result.state.phase !== state.phase) {
-    console.log(`[IdleNudge] ${state.phase} → ${result.state.phase}`);
-  }
-  state = result.state;
+  setState(result.state);
 
   switch (result.action.type) {
     case 'show-nudge':
@@ -219,14 +300,9 @@ export function handleIdleOverlayAction(type: OverlayActionType, data?: OverlayA
     case 'idle-kickoff':
       startKickoff('nudge');
       return true;
-    case 'idle-snooze': {
-      hideIdleNudge();
-      const choice = data?.snooze ?? '15m';
-      const now = Date.now();
-      state = onSnooze(state, now, snoozeUntilFor(choice, now, cfg));
-      console.log(`[IdleNudge] Snoozed (${choice}) until ${new Date(state.snoozeUntil ?? now).toISOString()}`);
+    case 'idle-snooze':
+      pauseNudges(data?.snooze ?? '15m');
       return true;
-    }
     case 'kickoff-keep':
       finishKickoffPrompt('keep-going');
       return true;
@@ -287,6 +363,19 @@ export function initIdleNudge(windowGetter: () => BrowserWindow | null): void {
   });
 
   if (cfg !== IDLE_DEFAULTS) console.log('[IdleNudge] DRIP_IDLE_FAST=1 — seconds instead of minutes');
+
+  // A pause survives a restart; a stale one is cleared.
+  const persisted = readPersistedPause();
+  if (persisted !== null) {
+    const now = Date.now();
+    if (persisted > now) {
+      setState(onSnooze(state, now, persisted));
+      console.log(`[IdleNudge] Pause restored until ${new Date(persisted).toISOString()}`);
+    } else {
+      persistPause(null);
+    }
+  }
+
   poll();
   pollTimer = setInterval(poll, cfg.pollMs);
 }

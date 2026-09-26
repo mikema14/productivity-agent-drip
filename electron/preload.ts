@@ -206,6 +206,24 @@ const timerAPI: TimerAPI = {
 
   onIdleCommand: (callback: (command: IdleCommand) => void) => {
     ipcRenderer.on('idle-command', (_event, command: IdleCommand) => callback(command));
+  },
+
+  // Idle nudge pause
+  getIdleNudgePause: async (): Promise<number | null> => {
+    const result = await ipcRenderer.invoke('idle-nudge:get-pause');
+    if (result?.success) return typeof result.pausedUntil === 'number' ? result.pausedUntil : null;
+    throw new Error(result?.error || 'Failed to read the nudge pause');
+  },
+
+  resumeIdleNudges: async (): Promise<void> => {
+    const result = await ipcRenderer.invoke('idle-nudge:resume');
+    if (!result?.success) throw new Error(result?.error || 'Failed to resume nudges');
+  },
+
+  onIdleNudgePauseChanged: (callback: (pausedUntil: number | null) => void) => {
+    const handler = (_event: unknown, pausedUntil: number | null) => callback(pausedUntil);
+    ipcRenderer.on('idle-nudge-paused', handler);
+    return () => ipcRenderer.removeListener('idle-nudge-paused', handler);
   }
 };
 
