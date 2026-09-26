@@ -37,6 +37,7 @@ vi.mock('./CalendarPopover', () => ({
     </div>
   ),
 }));
+vi.mock('./TodaysThree', () => ({ default: () => <section aria-label="Today">TodayStub</section> }));
 vi.mock('./TimelineView', () => ({
   default: ({ entries }: { entries: LogEntry[] }) => <div data-testid="timeline-view">{entries.length} timeline entries</div>,
 }));

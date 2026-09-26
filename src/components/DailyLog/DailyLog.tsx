@@ -8,6 +8,7 @@ import TemplateManagerModal from './TemplateManagerModal';
 import TimelineView from './TimelineView';
 import EndDayModal from './EndDayModal';
 import ReviewHeader from './ReviewHeader';
+import TodaysThree from './TodaysThree';
 import { dayStats, selectionSummary, shiftDate, todayString, buildEPLink, errorHint } from './reviewLogic';
 import type { ViewId } from '../Layout/views';
 import { mergeEntriesByTaskId } from '../../utils/mergeEntries';
@@ -376,6 +377,7 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
               )}
             </div>
           )}
+          <TodaysThree />
           <EntriesTable
             viewMode={viewMode}
             onViewModeChange={setViewMode}
