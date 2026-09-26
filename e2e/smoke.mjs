@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * E2E smoke: walks the Now screen through every state (PHASE1_PLAN.md §3.2)
- * and the Plan screen read-only (PHASE2_PLAN.md §7.1), screenshotting each
+ * E2E smoke: walks the Now screen through every state (PHASE1_PLAN.md §3.2),
+ * the Plan screen read-only (PHASE2_PLAN.md §7.1) and the Review screen
+ * read-only (PHASE3_PLAN.md §7.1), screenshotting each
  * view at 1200×800 and 800×600 against the real database under the guard.
  * Quit the installed Drip first.
  *
@@ -148,6 +149,120 @@ async function planWalk(page, shot) {
   }
 }
 
+/** Review must have opened on today (R1) and never show a '#' before an id (rule 6). */
+async function assertReviewInvariants(page) {
+  const label = await page.getByTestId('review-date').textContent();
+  if (!/· Today$/.test((label || '').trim())) throw new Error(`Review date label is "${label}", expected it to end with "· Today"`);
+  const ids = await page.getByTestId('entry-task-id').allTextContents();
+  const hashed = ids.filter(t => t.includes('#'));
+  if (hashed.length) throw new Error(`Review id pill(s) with '#': ${hashed.join(', ')}`);
+}
+
+/**
+ * Review walk (PHASE3_PLAN.md §7.1), read-only by construction. Never clicks:
+ * any `Log this entry` checkbox, the Billable pill, Assign task, Accept,
+ * Dismiss, Edit → Save, Move (row or bulk confirm), Delete, Select all, any
+ * outcome pill in Today, Sync calendar, `Log N to Easy8`, End Day inside the
+ * modal, Add Entry inside the modal, or anything inside the Templates manager
+ * except its close. The reflection textarea is never typed into.
+ */
+async function reviewWalk(page, shot) {
+  const table = page.locator('section[aria-label="Time entries"]');
+  const toolbar = page.getByTestId('entries-toolbar');
+  const footer = page.getByTestId('entries-footer');
+  const aside = page.locator('aside[aria-label="Tomorrow"]');
+
+  // 1. Landing (writes: calendar_proposals sync inserts for today + next workday; safe rows)
+  await page.getByRole('heading', { name: 'Review', exact: true }).waitFor();
+  await table.waitFor();
+  await aside.waitFor();
+  await page.waitForTimeout(800); // day load + tomorrow sync
+  await shot('review-day');
+
+  // 2. R1 proof + rule 6; the log key is asserted, never clicked
+  await assertReviewInvariants(page);
+  const logKey = footer.getByRole('button', { name: /^Log( \d+)? to Easy8$/ });
+  if (!(await logKey.count())) throw new Error('Log to Easy8 key missing');
+  console.log('[smoke] Log to Easy8 key present (not clicked)');
+
+  // 3. Today section (nothing clicked)
+  if (await page.locator('section[aria-label="Today"]').count()) await shot('review-today-section');
+
+  // 4. Timeline → List (localStorage viewMode; restored)
+  await toolbar.getByRole('button', { name: 'Timeline', exact: true }).click();
+  await page.locator('text=/^\\d\\d:00$/').first().waitFor();
+  await shot('review-timeline');
+  await toolbar.getByRole('button', { name: 'List', exact: true }).click();
+  await page.getByTestId('entries-columns').waitFor();
+
+  // 5. Group by task (session state only)
+  const group = toolbar.getByRole('button', { name: 'Group by task', exact: true });
+  if (await group.count()) {
+    await group.click();
+    await shot('review-grouped');
+    await group.click();
+  }
+
+  // 6. Hover the first open row; Edit → Cancel restores the buffer (no writes)
+  const openRow = page.locator('[data-testid="entry-row"][data-kind="open"]').first();
+  if (await openRow.count()) {
+    await openRow.hover();
+    await shot('review-row-hover');
+    const edit = openRow.getByRole('button', { name: 'Edit', exact: true });
+    if (await edit.count()) {
+      await edit.click();
+      await page.getByTestId('entry-editor').waitFor();
+      await shot('review-row-edit');
+      await openRow.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await page.getByTestId('entry-editor').waitFor({ state: 'hidden' });
+    }
+  } else {
+    console.warn('[smoke] no open entries today; skipping review-row-hover / review-row-edit');
+  }
+
+  // 7. Date popover → Esc (no writes)
+  await page.getByTestId('review-date').click();
+  await page.getByTestId('calendar-popover').waitFor();
+  await shot('review-date-popover');
+  await page.keyboard.press('Escape');
+  await page.getByTestId('calendar-popover').waitFor({ state: 'hidden' });
+
+  // 8. Yesterday and back (writes: calendar_proposals sync for yesterday + its next workday; safe rows)
+  const todayLabel = await page.getByTestId('review-date').textContent();
+  await page.getByRole('button', { name: 'Previous day', exact: true }).click();
+  await waitFor(async () => (await page.getByTestId('review-date').textContent()) !== todayLabel, 10_000, 'yesterday label');
+  await page.waitForTimeout(800);
+  await shot('review-yesterday');
+  await page.getByRole('button', { name: 'Next day', exact: true }).click();
+  await waitFor(async () => (await page.getByTestId('review-date').textContent()) === todayLabel, 10_000, 'today label');
+  await assertReviewInvariants(page);
+
+  // 9. + Entry → Cancel (no writes)
+  await footer.getByRole('button', { name: '+ Entry', exact: true }).click();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).waitFor();
+  await shot('review-add-entry');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+
+  // 10. Templates → close (getTemplates is a read)
+  await toolbar.getByRole('button', { name: 'Templates', exact: true }).click();
+  await page.getByRole('heading', { name: 'Manage Templates' }).waitFor();
+  await shot('review-templates');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('heading', { name: 'Manage Templates' }).waitFor({ state: 'hidden' });
+
+  // 11. End day → modal → Cancel (saveRitual only fires from the modal's End Day key, never clicked)
+  const endDay = aside.getByRole('button', { name: 'End day', exact: true });
+  if (await endDay.count()) {
+    await endDay.click();
+    await page.getByRole('heading', { name: /^End Day - \d{4}-\d{2}-\d{2}$/ }).waitFor();
+    await shot('review-end-day-modal');
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await page.getByRole('heading', { name: /^End Day - / }).waitFor({ state: 'hidden' });
+  } else {
+    console.log('[smoke] day is locked (Day ended); skipping review-end-day-modal');
+  }
+}
+
 async function main() {
   await preflight();
   // Set by VS Code's terminal; it makes Electron start as plain Node.
@@ -283,7 +398,7 @@ async function main() {
       await nav.getByRole('button', { name: 'Plan' }).click();
       await planWalk(page, shot);
       await nav.getByRole('button', { name: 'Review' }).click();
-      await page.waitForTimeout(800);
+      await reviewWalk(page, shot);
       await shot('review');
       await nav.getByRole('button', { name: 'Insights' }).click();
       await page.waitForTimeout(800);
@@ -295,6 +410,8 @@ async function main() {
       await nav.getByRole('button', { name: 'Now' }).click();
       await key(/review day/i).click();
       await nav.getByRole('button', { name: 'Review' }).and(page.locator('[aria-current="page"]')).waitFor();
+      await page.getByTestId('review-date').waitFor();
+      await assertReviewInvariants(page); // R1: Review day → lands on today
     }
   } catch (error) {
     console.error('[smoke] failed:', error);

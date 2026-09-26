@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Real-database safety protocol for the e2e smoke (PHASE1_PLAN.md §4,
- * PHASE2_PLAN.md §7.2).
+ * PHASE2_PLAN.md §7.2, PHASE3_PLAN.md §7.2).
  *
  *   node e2e/db-guard.mjs prepare                       → backup + snapshot, prints the backup dir
  *   node e2e/db-guard.mjs verify-and-clean <backupDir> <main.log>
@@ -38,6 +38,20 @@ const MUST_BE_EMPTY = ['pomodoro_sessions', 'adhoc_entries', 'lists', 'list_item
  */
 const CACHE_TABLES = ['task_cache'];
 const LOGGED_TABLES = ['pomodoro_sessions', 'adhoc_entries', 'calendar_proposals'];
+/**
+ * Entry tables (Phase 3): the Review walk never toggles, edits, accepts,
+ * dismisses, moves or bills anything, so any change to these columns on a
+ * pre-existing row is a violation (restored from the backup).
+ */
+const ENTRY_TABLES = {
+  pomodoro_sessions: ['task_id', 'comment', 'duration_minutes', 'billable', 'start_at', 'logged'],
+  adhoc_entries: ['date', 'duration_minutes', 'title', 'task_id', 'comment', 'marked_to_log', 'logged', 'billable', 'start_time'],
+  calendar_proposals: ['accepted', 'dismissed', 'task_id', 'comment', 'date', 'start_at', 'end_at', 'duration_minutes', 'logged', 'billable'],
+};
+/** The ICS sync may legitimately rewrite these on an existing proposal when the feed changed: restore + report, not a violation. */
+const FEED_DRIFT_COLUMNS = ['title', 'start_at', 'end_at', 'duration_minutes'];
+/** Only End Day and the intention modal write these; the walk uses neither → restore + violation. */
+const MUST_NOT_CHANGE = ['shutdown_rituals', 'daily_intentions'];
 
 function usage(code = 0) {
   console.log(`Usage:
@@ -49,7 +63,11 @@ Preconditions (enforced by smoke.mjs): the installed Drip is quit and no
 "npm run dev" is running, because both share ${DB_PATH}.
 The Plan walk toggles Done / IDs and restores them; localStorage is outside
 the guard. task_cache rows fetched during the run are deleted and reported,
-not violations.`);
+not violations. The Review walk navigates one day back and forth (calendar
+sync inserts for those days are deleted), opens and cancels the Add Entry /
+Templates / End Day modals, and never marks, edits, logs or ends a day: any
+change to a pre-existing entry row, shutdown ritual or daily intention is a
+violation (restored from the backup).`);
   process.exit(code);
 }
 
@@ -108,7 +126,13 @@ export function prepare() {
       ? sql('SELECT id, archived, completed, "column", "order" FROM list_items ORDER BY id')
       : [],
     logged: {},
+    entries: {},
   };
+  for (const [t, cols] of Object.entries(ENTRY_TABLES)) {
+    if (!tableExists(t)) continue;
+    const present = cols.filter(c => columns(t).includes(c));
+    snapshot.entries[t] = { cols: present, rows: sql(`SELECT id, ${present.map(c => `"${c}"`).join(', ')} FROM ${t} ORDER BY id`) };
+  }
   for (const t of ROWID_TABLES) {
     if (!tableExists(t)) continue;
     const [row] = sql(`SELECT max(rowid) AS maxRowid, count(*) AS count FROM ${t}`);
@@ -194,7 +218,7 @@ export function verifyAndClean(backupDir, logPath) {
   }
   line('settings', 0, 0, settingsUpdated, settingsUpdated);
 
-  // (c) date-keyed tables → restore changed rows
+  // (c) date-keyed tables → restore changed rows; rituals / intentions are violations (Phase 3)
   for (const [t, rows] of Object.entries(snapshot.content)) {
     const pk = primaryKey(t);
     const now = new Map(sql(`SELECT * FROM ${t}`).map(r => [String(r[pk]), r]));
@@ -215,7 +239,37 @@ export function verifyAndClean(backupDir, logPath) {
         console.log(`[db-guard] ${t}: ${key} added → removed`);
       }
     }
+    if (updated && MUST_NOT_CHANGE.includes(t)) violations.push(`${t}: ${updated} row(s) changed during the run (restored)`);
     line(t, 0, 0, updated, updated);
+  }
+
+  // (c) entry-table drift (Phase 3): pre-existing rows whose tracked columns
+  // changed are restored from the backup. Feed-driven columns on
+  // calendar_proposals are reported as drift; everything else is a violation.
+  for (const [t, snap] of Object.entries(snapshot.entries ?? {})) {
+    if (!tableExists(t)) continue;
+    const before = new Map(snap.rows.map(r => [String(r.id), r]));
+    const cols = snap.cols;
+    const now = sql(`SELECT id, ${cols.map(c => `"${c}"`).join(', ')} FROM ${t}`);
+    let feedDrift = 0;
+    let changed = 0;
+    for (const r of now) {
+      const was = before.get(String(r.id));
+      if (!was) continue; // inserts are handled above
+      const diff = cols.filter(c => JSON.stringify(was[c] ?? null) !== JSON.stringify(r[c] ?? null));
+      if (!diff.length) continue;
+      const onlyFeed = t === 'calendar_proposals' && diff.every(c => FEED_DRIFT_COLUMNS.includes(c));
+      withBackup(`DELETE FROM main.${t} WHERE id=${q(r.id)}; INSERT INTO main.${t} SELECT * FROM bk.${t} WHERE id=${q(r.id)}`);
+      if (onlyFeed) {
+        feedDrift++;
+        console.log(`[db-guard] ${t}: ${r.id} feed drift on ${diff.join(', ')} → restored`);
+      } else {
+        changed++;
+        console.log(`[db-guard] ${t}: ${r.id} changed ${diff.join(', ')} (was ${JSON.stringify(was)}, now ${JSON.stringify(r)}) — VIOLATION, restored`);
+      }
+    }
+    if (changed) violations.push(`${t}: ${changed} row(s) changed during the run (restored)`);
+    line(`${t} (entry drift)`, 0, 0, changed + feedDrift, changed + feedDrift);
   }
 
   // (c) list_items state drift: `archived` flips alone are archiveOldCompleted

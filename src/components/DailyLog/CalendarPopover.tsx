@@ -129,6 +129,7 @@ export default function CalendarPopover({ selectedDate, onSelectDate, onClose }:
   return (
     <div
       ref={popoverRef}
+      data-testid="calendar-popover"
       className="absolute top-full right-0 mt-2 z-50 w-72 bg-drip-elevated border border-focus/30 rounded-xl shadow-glass p-4 animate-scale-in"
       onMouseDown={(e) => e.stopPropagation()}
     >
