@@ -471,6 +471,19 @@ describe('PlanBoard — list scope', () => {
     expect(within(done).getByTitle('Delete')).toBeInTheDocument();
   });
 
+  it('backlog age badge stays in list scope even after Group by list was turned on in All tasks', async () => {
+    useListsStore.setState({ lists: [ops, bound], items: baseItems, archivedLists: [], selectedListId: 'l1' });
+    const user = userEvent.setup();
+    const { rerender } = render(<PlanBoard scope="all" onNavigate={vi.fn()} />);
+    expect(within(card('Title b2')).getByText('20d')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Group by list' }));
+    // All scope grouped by list: age groups are off, so is the badge (unchanged).
+    expect(within(card('Title b2')).queryByText('20d')).toBeNull();
+    // The same component instance switches to list scope: the badge is back.
+    rerender(<PlanBoard scope="list" onNavigate={vi.fn()} />);
+    expect(within(card('Title b2')).getByText('20d')).toBeInTheDocument();
+  });
+
   it('TaskDetailInline in list scope receives the list task id', async () => {
     const { user } = renderList('l2');
     await user.click(screen.getByText('Title w1'));

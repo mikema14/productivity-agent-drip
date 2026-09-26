@@ -268,7 +268,7 @@ export default function PlanBoard({ scope, onNavigate }: PlanBoardProps) {
         showListTag={scope === 'all' && !groupByList}
         taskName={item.task_id ? taskNames[item.task_id] || null : null}
         minutesLabel={item.completed === 1 ? null : minutesFor(item, column)}
-        ageBadge={column === 'backlog' && !groupByList ? ageBadge(item, now) : null}
+        ageBadge={column === 'backlog' && !(scope === 'all' && groupByList) ? ageBadge(item, now) : null}
         expanded={expandedItemId === item.id}
         checklistOpen={expandedChecklistId === item.id}
         pickerOpen={openListPickerId === item.id}
