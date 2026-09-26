@@ -94,6 +94,17 @@ function loggedQuery(table) {
   return `SELECT ${cols.join(', ')} FROM ${table} WHERE logged=1 ORDER BY id`;
 }
 
+/**
+ * Columns present in both the live table and the backup: a migration during
+ * the run (e.g. calendar_proposals.billable) adds columns the backup lacks.
+ */
+let backupPath = null;
+function sharedCols(table) {
+  const live = columns(table);
+  const bk = sql(`ATTACH ${q(backupPath)} AS bk; SELECT name FROM pragma_table_info(${q(table)}, 'bk')`).map(r => r.name);
+  return live.filter(c => bk.includes(c)).map(c => `"${c}"`).join(', ');
+}
+
 function tableExists(name) {
   return sql(`SELECT name FROM sqlite_master WHERE type='table' AND name=${q(name)}`).length > 0;
 }
@@ -164,12 +175,13 @@ export function verifyAndClean(backupDir, logPath) {
   // (c) Inserts. A rowid above the snapshot can also be an INSERT OR REPLACE of
   // an existing key (task_cache): restore those from the backup instead of deleting.
   const bk = join(backupDir, 'productivity.db');
+  backupPath = bk;
   const withBackup = (query) => sql(`ATTACH ${q(bk)} AS bk; ${query}`);
   for (const [t, snap] of Object.entries(snapshot.rowid)) {
     const pk = primaryKey(t);
     const replaced = pk === 'rowid' ? [] : withBackup(`SELECT "${pk}" AS k FROM main.${t} WHERE rowid > ${snap.maxRowid} AND "${pk}" IN (SELECT "${pk}" FROM bk.${t})`);
     for (const { k } of replaced) {
-      withBackup(`DELETE FROM main.${t} WHERE "${pk}"=${q(k)}; INSERT INTO main.${t} SELECT * FROM bk.${t} WHERE "${pk}"=${q(k)}`);
+      withBackup(`DELETE FROM main.${t} WHERE "${pk}"=${q(k)}; INSERT INTO main.${t} (${sharedCols(t)}) SELECT ${sharedCols(t)} FROM bk.${t} WHERE "${pk}"=${q(k)}`);
       console.log(`[db-guard] ${t}: ${k} was replaced → restored from backup`);
     }
     const rows = sql(`SELECT rowid AS __rowid, * FROM ${t} WHERE rowid > ${snap.maxRowid}`)
@@ -259,7 +271,7 @@ export function verifyAndClean(backupDir, logPath) {
       const diff = cols.filter(c => JSON.stringify(was[c] ?? null) !== JSON.stringify(r[c] ?? null));
       if (!diff.length) continue;
       const onlyFeed = t === 'calendar_proposals' && diff.every(c => FEED_DRIFT_COLUMNS.includes(c));
-      withBackup(`DELETE FROM main.${t} WHERE id=${q(r.id)}; INSERT INTO main.${t} SELECT * FROM bk.${t} WHERE id=${q(r.id)}`);
+      withBackup(`DELETE FROM main.${t} WHERE id=${q(r.id)}; INSERT INTO main.${t} (${sharedCols(t)}) SELECT ${sharedCols(t)} FROM bk.${t} WHERE id=${q(r.id)}`);
       if (onlyFeed) {
         feedDrift++;
         console.log(`[db-guard] ${t}: ${r.id} feed drift on ${diff.join(', ')} → restored`);

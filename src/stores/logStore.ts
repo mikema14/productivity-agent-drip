@@ -943,6 +943,11 @@ export const useLogStore = create<LogState>()(
       partialize: (state) => ({
         viewMode: state.viewMode,
       }),
+      // Storage written before R1 still holds a selectedDate; never rehydrate it.
+      merge: (persisted, current) => {
+        const { selectedDate: _stale, ...rest } = (persisted ?? {}) as Partial<LogState>;
+        return { ...current, ...rest };
+      },
     }
   )
 );

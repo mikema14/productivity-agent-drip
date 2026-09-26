@@ -333,4 +333,12 @@ describe('logStore — marks, edits, deletes, moves', () => {
     const after = JSON.parse(localStorage.getItem('log-storage') || '{}');
     expect(after.state).toEqual({ viewMode: 'timeline' });
   });
+
+  it('ignores a selectedDate left in storage by older builds (R1)', async () => {
+    useLogStore.setState({ selectedDate: '2026-09-25', viewMode: 'list' });
+    localStorage.setItem('log-storage', JSON.stringify({ state: { viewMode: 'timeline', selectedDate: '2026-09-10' }, version: 0 }));
+    await useLogStore.persist.rehydrate();
+    expect(useLogStore.getState().selectedDate).toBe('2026-09-25');
+    expect(useLogStore.getState().viewMode).toBe('timeline');
+  });
 });
