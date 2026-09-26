@@ -70,7 +70,7 @@ change to a pre-existing entry row, shutdown ritual or daily intention is a
 violation (restored from the backup). The kickoff steps stop the timer with
 Escape (reset, no row) well before the 120-s roll-over; overlay states are
 screenshotted from preload-less fixture windows that cannot reach IPC. Any
-"[RaycastFocus] Started", "[IdleNudge] off → counting" or "Kickoff rolled
+"[RaycastFocus] Started", "[IdleNudge] … → nudged" or "Kickoff rolled
 over" line in main.log is a violation.`);
   process.exit(code);
 }
@@ -325,8 +325,11 @@ export function verifyAndClean(backupDir, logPath) {
   // (d) Phase 4: the test-mode gates held and no kickoff reached its roll-over
   const raycastStarted = (log.match(/\[RaycastFocus\] Started/g) || []).length;
   if (raycastStarted) violations.push(`main.log: ${raycastStarted} "[RaycastFocus] Started" line(s) — a Raycast Focus session was started during a test run`);
-  const idleRan = (log.match(/\[IdleNudge\] (off → counting|\w+ → nudged)/g) || []).length;
-  if (idleRan) violations.push(`main.log: ${idleRan} "[IdleNudge] … → counting/nudged" line(s) — the idle watcher ran during a test run`);
+  // `off → counting` is the pure machine reacting to a timer stop; with the
+  // watcher disabled the next poll turns it off again. Only a shown nudge or
+  // an escalation means DRIP_TEST_MODE failed.
+  const idleRan = (log.match(/\[IdleNudge\] (\w+ → nudged|Nudge ignored)/g) || []).length;
+  if (idleRan) violations.push(`main.log: ${idleRan} "[IdleNudge] … → nudged / Nudge ignored" line(s) — the idle nudge fired during a test run`);
   const rolled = (log.match(/Kickoff rolled over/g) || []).length;
   if (rolled) violations.push(`main.log: ${rolled} "Kickoff rolled over" line(s) — a kickoff reached its roll-over; stopKickoff or the prompt may have run`);
   for (const t of LOGGED_TABLES) {
