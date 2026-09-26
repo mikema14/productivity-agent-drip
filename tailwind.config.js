@@ -48,6 +48,8 @@ export default {
         // Physical keycap buttons and the 4px LED squares of the Now screen
         'key-amber': `0 3px 0 ${COLOR.focus.shadow}, inset 0 1px 0 rgba(255,255,255,0.35)`,
         'key-dark': '0 3px 0 #000',
+        // Solid light keycap (PAUSE / RESUME in the calm running state)
+        'key-light': `0 3px 0 ${COLOR.txt.dim}`,
         'key-sm': '0 2px 0 #000',
         'led': '0 0 5px rgba(245,158,11,0.8)',
       },
