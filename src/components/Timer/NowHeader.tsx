@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { formatPausedUntil } from '../../utils/nudgePause';
 
 export type NowPillState = 'ready' | 'focusing' | 'paused' | 'break' | 'kickoff';
 
@@ -6,6 +7,9 @@ interface Props {
   state: NowPillState;
   /** Injected for tests; defaults to today. */
   date?: Date;
+  /** End of the idle nudge pause (epoch ms); the muted "Nudges paused …" line shows while set. */
+  nudgePausedUntil?: number | null;
+  onResumeNudges?: () => void;
 }
 
 const PILL_LABEL: Record<NowPillState, string> = {
@@ -17,13 +21,14 @@ const PILL_LABEL: Record<NowPillState, string> = {
 };
 
 const dragRegion = { WebkitAppRegion: 'drag' } as CSSProperties;
+const noDrag = { WebkitAppRegion: 'no-drag' } as CSSProperties;
 
 function formatHeaderDate(date: Date): string {
   return date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
 /** 52px Now header: title, date, dot grille, state pill. Draggable like a title bar. */
-export default function NowHeader({ state, date = new Date() }: Props) {
+export default function NowHeader({ state, date = new Date(), nudgePausedUntil = null, onResumeNudges }: Props) {
   const active = state === 'focusing' || state === 'paused' || state === 'kickoff';
   const isBreak = state === 'break';
 
@@ -35,6 +40,19 @@ export default function NowHeader({ state, date = new Date() }: Props) {
       <div className="flex items-baseline gap-2.5">
         <h1 className="font-display text-[15px] font-medium text-txt-primary">Now</h1>
         <span className="font-display text-[13px] text-txt-muted">{formatHeaderDate(date)}</span>
+        {nudgePausedUntil !== null && (
+          <span data-testid="now-nudge-paused" className="font-display text-[12px] text-txt-muted ml-1">
+            Nudges paused {formatPausedUntil(nudgePausedUntil, date.getTime())} ·{' '}
+            <button
+              type="button"
+              onClick={onResumeNudges}
+              style={noDrag}
+              className="text-txt-secondary hover:text-focus transition-colors duration-150"
+            >
+              Resume
+            </button>
+          </span>
+        )}
         <span
           aria-hidden
           className="self-center w-[84px] h-[14px] ml-2"

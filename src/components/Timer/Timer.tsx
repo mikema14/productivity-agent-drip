@@ -10,6 +10,7 @@ import TaskCard from './TaskCard';
 import TaskCardWithPicker from './TaskCardWithPicker';
 import IntentionRow from './IntentionRow';
 import NowHeader, { type NowPillState } from './NowHeader';
+import { useNudgePause } from '../../hooks/useNudgePause';
 import FocusBlock, { SectionHeader } from './FocusBlock';
 import CountdownDisplay from './CountdownDisplay';
 import KeyButton from './KeyButton';
@@ -65,6 +66,7 @@ export default function Timer({ onNavigate }: TimerProps) {
 
   // Local state
   const [selectedTask, setSelectedTask] = useState<TaskCache | null>(null);
+  const nudgePause = useNudgePause();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [recentTasks, setRecentTasks] = useState<RankedTask[]>([]);
   const [previousSession, setPreviousSession] = useState<PomodoroSession | null>(null);
@@ -369,7 +371,7 @@ export default function Timer({ onNavigate }: TimerProps) {
 
   return (
     <div className="flex flex-col h-full animate-fade-in">
-      <NowHeader state={pillState} />
+      <NowHeader state={pillState} nudgePausedUntil={nudgePause.pausedUntil} onResumeNudges={nudgePause.resume} />
 
       <div className="flex-1 min-h-0 flex">
         {/* MAIN COLUMN */}
