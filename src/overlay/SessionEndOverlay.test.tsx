@@ -80,3 +80,162 @@ describe('SessionEndOverlay — kickoff prompt', () => {
     expect(overlayAPI.action).toHaveBeenCalledWith('kickoff-stop');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 4 step 1: the session-end, break-end and break-pill cards pinned as they
+// are today, before the idle branch is extracted (PHASE4_PLAN.md §6.1).
+// ---------------------------------------------------------------------------
+
+vi.mock('./chime', () => ({ playEscalationChime: vi.fn() }));
+
+const focusDone: SessionOverlayPayload = {
+  kind: 'focus-complete',
+  sessionId: 's1',
+  taskId: '643749',
+  taskTitle: 'Session-end overlay window',
+  durationMinutes: 25,
+  startedAt: new Date(2026, 8, 25, 9, 0).toISOString(),
+  endedAt: new Date(2026, 8, 25, 9, 25).toISOString(),
+  note: '',
+  nextBreakMinutes: 5,
+  isLongBreak: false,
+};
+
+describe('SessionEndOverlay — focus-complete card (pinned)', () => {
+  it('renders the label, time range, id, focused note input and the three keys', () => {
+    show(focusDone);
+    expect(screen.getByText('Focus complete')).toBeInTheDocument();
+    expect(screen.getByText('09:00 – 09:25')).toBeInTheDocument();
+    expect(screen.getByText('643749')).toBeInTheDocument();
+    expect(screen.getByText('Session-end overlay window')).toBeInTheDocument();
+    const input = screen.getByPlaceholderText('What did you get done?');
+    expect(input).toHaveFocus();
+    expect(screen.getByRole('button', { name: /Start break\s*5m/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next focus' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
+  });
+
+  it('typing in the note debounces saveNote(sessionId, value) by 400 ms', () => {
+    vi.useFakeTimers();
+    try {
+      show(focusDone);
+      fireEvent.change(screen.getByPlaceholderText('What did you get done?'), { target: { value: 'shipped it' } });
+      act(() => {
+        vi.advanceTimersByTime(399);
+      });
+      expect(overlayAPI.saveNote).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(overlayAPI.saveNote).toHaveBeenCalledWith('s1', 'shipped it');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('Enter in the note relays start-break; Escape relays dismiss', () => {
+    show(focusDone);
+    const input = screen.getByPlaceholderText('What did you get done?');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(overlayAPI.action).toHaveBeenCalledWith('start-break');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(overlayAPI.action).toHaveBeenCalledWith('dismiss');
+  });
+
+  it('Start break / Next focus / Dismiss relay their actions', () => {
+    show(focusDone);
+    fireEvent.click(screen.getByRole('button', { name: /Start break/ }));
+    expect(overlayAPI.action).toHaveBeenCalledWith('start-break');
+    fireEvent.click(screen.getByRole('button', { name: 'Next focus' }));
+    expect(overlayAPI.action).toHaveBeenCalledWith('next-focus');
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(overlayAPI.action).toHaveBeenCalledWith('dismiss');
+  });
+
+  it('escalates after 60 s (halo + setEscalated(true)) and hovering the card stops it', () => {
+    vi.useFakeTimers();
+    // The real overlay window is raised with showInactive(), so the note's
+    // auto-focus does not fire a focus event (which would stop the escalation).
+    // jsdom fires it regardless, so the auto-focus is neutralised here.
+    const focusSpy = vi.spyOn(HTMLInputElement.prototype, 'focus').mockImplementation(() => {});
+    try {
+      show(focusDone);
+      act(() => {
+        vi.advanceTimersByTime(59_000);
+      });
+      expect(overlayAPI.setEscalated).not.toHaveBeenCalled();
+      expect(document.querySelector('[style*="drip-halo"]')).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(1_000);
+      });
+      expect(overlayAPI.setEscalated).toHaveBeenCalledWith(true);
+      expect(document.querySelector('[style*="drip-halo"]')).not.toBeNull();
+
+      // jsdom rects are all zero, so a move at (0,0) lands inside the card
+      fireEvent.mouseMove(window, { clientX: 0, clientY: 0 });
+      expect(overlayAPI.setEscalated).toHaveBeenLastCalledWith(false);
+      expect(document.querySelector('[style*="drip-halo"]')).toBeNull();
+    } finally {
+      focusSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('focusing the note stops the escalation clock', () => {
+    vi.useFakeTimers();
+    try {
+      show(focusDone); // jsdom auto-focuses the note, which is the "user is typing" case
+      act(() => {
+        vi.advanceTimersByTime(120_000);
+      });
+      expect(overlayAPI.setEscalated).not.toHaveBeenCalledWith(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('SessionEndOverlay — break-complete card and break pill (pinned)', () => {
+  it('break-complete renders Break over and Start focus 25m → next-focus', () => {
+    show({ kind: 'break-complete', nextFocusMinutes: 25 });
+    expect(screen.getByText('Break over')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Start focus\s*25m/ }));
+    expect(overlayAPI.action).toHaveBeenCalledWith('next-focus');
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(overlayAPI.action).toHaveBeenCalledWith('dismiss');
+  });
+
+  it('break-running renders the pill with its countdown, and onTick updates the digits', () => {
+    let tick: (seconds: number) => void = () => {};
+    overlayAPI.onTick = vi.fn((cb) => {
+      tick = cb;
+    });
+    show({ kind: 'break-running', totalSeconds: 300, remainingSeconds: 222, isLong: false });
+    expect(screen.getByText('Break')).toBeInTheDocument();
+    expect(screen.getByText('3:42')).toBeInTheDocument();
+    act(() => tick(100));
+    expect(screen.getByText('1:40')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('a long break is labelled Long break', () => {
+    show({ kind: 'break-running', totalSeconds: 600, remainingSeconds: 600, isLong: true });
+    expect(screen.getByText('Long break')).toBeInTheDocument();
+  });
+});
+
+describe('SessionEndOverlay — dev fixtures without the bridge', () => {
+  it('?state=card renders from the URL and clicking Start break calls nothing when overlayAPI is absent', () => {
+    window.history.replaceState({}, '', '/?state=card');
+    (window as { overlayAPI?: OverlayAPI }).overlayAPI = undefined;
+    try {
+      render(<SessionEndOverlay />);
+      expect(screen.getByText('Focus complete')).toBeInTheDocument();
+      expect(() => fireEvent.click(screen.getByRole('button', { name: /Start break/ }))).not.toThrow();
+      expect(overlayAPI.action).not.toHaveBeenCalled();
+      expect(overlayAPI.saveNote).not.toHaveBeenCalled();
+    } finally {
+      window.history.replaceState({}, '', '/');
+    }
+  });
+});
