@@ -93,7 +93,7 @@ export default function AddEntryModal({ onClose, onAdd }: AddEntryModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-drip-bg/95 backdrop-blur-2xl border border-focus/30 rounded-[2px] shadow-glass w-full max-w-lg mx-4">
+      <div className="bg-drip-bg/95 backdrop-blur-2xl border border-focus/30 rounded-[2px] shadow-glass w-full max-w-lg mx-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
         <div className="px-6 py-4 border-b border-focus/20">
           <h2 className="text-xl font-display font-semibold text-txt-primary">Add Manual Entry</h2>
         </div>

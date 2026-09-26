@@ -190,10 +190,11 @@ async function reviewWalk(page, shot) {
 
   // 4. Timeline → List (localStorage viewMode; restored)
   await toolbar.getByRole('button', { name: 'Timeline', exact: true }).click();
-  await page.locator('text=/^\\d\\d:00$/').first().waitFor();
+  // An empty day (weekends) shows the empty state instead of the hour grid
+  await page.locator('text=/^\\d\\d:00$/').first().or(page.getByText('No entries for this day')).first().waitFor();
   await shot('review-timeline');
   await toolbar.getByRole('button', { name: 'List', exact: true }).click();
-  await page.getByTestId('entries-columns').waitFor();
+  await page.getByTestId('entries-columns').or(page.getByText('No entries for this day')).first().waitFor();
 
   // 5. Group by task (session state only)
   const group = toolbar.getByRole('button', { name: 'Group by task', exact: true });
@@ -249,6 +250,30 @@ async function reviewWalk(page, shot) {
   await shot('review-templates');
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('heading', { name: 'Manage Templates' }).waitFor({ state: 'hidden' });
+
+  // 10b. Weekends have no entries: walk back to the latest day with rows, look, return (reads + safe proposal syncs)
+  if (!(await page.getByTestId('entry-row').count())) {
+    let back = 0;
+    while (back < 7 && !(await page.getByTestId('entry-row').count())) {
+      await page.getByRole('button', { name: 'Previous day', exact: true }).click();
+      back++;
+      await page.waitForTimeout(700);
+    }
+    if (await page.getByTestId('entry-row').count()) {
+      await shot('review-past-day');
+      await page.getByTestId('entry-row').first().hover();
+      await shot('review-past-row-hover');
+      await toolbar.getByRole('button', { name: 'Timeline', exact: true }).click();
+      await page.locator('text=/^\\d\\d:00$/').first().waitFor();
+      await shot('review-past-timeline');
+      await toolbar.getByRole('button', { name: 'List', exact: true }).click();
+    }
+    for (let i = 0; i < back; i++) {
+      await page.getByRole('button', { name: 'Next day', exact: true }).click();
+      await page.waitForTimeout(300);
+    }
+    await waitFor(async () => (await page.getByTestId('review-date').textContent()) === todayLabel, 10_000, 'back to today');
+  }
 
   // 11. End day → modal → Cancel (saveRitual only fires from the modal's End Day key, never clicked)
   const endDay = aside.getByRole('button', { name: 'End day', exact: true });
