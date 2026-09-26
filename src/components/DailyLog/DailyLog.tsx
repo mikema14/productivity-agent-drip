@@ -414,7 +414,9 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
       />
 
       <div className="flex flex-1 min-h-0">
-        <div className="flex-1 min-w-0 p-7 gap-5 flex flex-col overflow-hidden">
+        {/* The main column scrolls as a whole: Today at its natural height, then the
+            entries at theirs; the entries footer sticks to the bottom of this viewport. */}
+        <div data-testid="review-main" className="flex-1 min-w-0 min-h-0 overflow-y-auto p-7 gap-5 flex flex-col">
           {authError && (
             <div role="alert" data-testid="auth-banner" className="shrink-0 h-9 px-3 flex items-center justify-between gap-3 border border-alert/40 rounded-[2px] font-display text-[12.5px] text-alert">
               <span className="truncate">Easy8 rejected the request: {authError}</span>

@@ -29,8 +29,10 @@ const TEXT_KEY = 'h-[26px] px-2 rounded-[2px] font-display text-[12px] text-txt-
 
 /**
  * The `Time entries` section (mockup Review.dc.html:103-161): a 40px toolbar
- * for the controls the mockup omits (R10), the column header, the scrolling
- * body and the 60px footer with the selection summary and the two keys.
+ * for the controls the mockup omits (R10), the column header, the body at its
+ * natural height and the 60px footer with the selection summary and the two
+ * keys. The section never scrolls its rows itself: the Review main column does,
+ * and the footer sticks to the bottom of that viewport so `Log` stays reachable.
  */
 export default function EntriesTable(props: Props) {
   const {
@@ -55,7 +57,7 @@ export default function EntriesTable(props: Props) {
   const logLabel = isLogging ? 'Logging…' : summary.selectedCount > 0 ? `Log ${summary.selectedCount} to Easy8` : 'Log to Easy8';
 
   return (
-    <section aria-label="Time entries" className="flex-1 min-h-0 flex flex-col border border-drip-elevated rounded-[2px] overflow-hidden">
+    <section aria-label="Time entries" className="shrink-0 flex flex-col border border-drip-elevated rounded-[2px]">
       {/* Toolbar */}
       <div data-testid="entries-toolbar" className="h-10 shrink-0 px-4 flex items-center justify-between gap-3 border-b border-drip-elevated">
         <div className="flex items-center gap-3">
@@ -83,20 +85,21 @@ export default function EntriesTable(props: Props) {
         </div>
       </div>
 
-      {/* Column header + body; below `wide:` the grid keeps its width and scrolls sideways (P16 precedent) */}
-      <div className="flex-1 min-h-0 overflow-auto">
-        <div className="min-w-[640px] wide:min-w-0 flex flex-col min-h-full">
+      {/* Column header + body; below `wide:` the grid keeps its width and scrolls sideways (P16 precedent).
+          The min height keeps the empty / loading states and the timeline grid visible. */}
+      <div data-testid="entries-body" className="overflow-x-auto">
+        <div className="min-w-[640px] wide:min-w-0 min-h-[240px] flex flex-col">
           {viewMode === 'list' && (
             <div className={`${ROW_GRID} h-[38px] shrink-0 border-b border-drip-elevated now-label text-txt-muted`} data-testid="entries-columns">
               <span>Time</span><span>Dur</span><span>Task</span><span>Comment</span><span>Billable</span><span>Log</span><span />
             </div>
           )}
-          <div className="flex-1 min-h-0 flex flex-col">{children}</div>
+          <div className="flex-1 flex flex-col">{children}</div>
         </div>
       </div>
 
-      {/* Footer */}
-      <div data-testid="entries-footer" className="h-[60px] shrink-0 px-4 flex items-center justify-between gap-3 border-t border-drip-elevated">
+      {/* Footer: sticky to the bottom of the scrolling main column */}
+      <div data-testid="entries-footer" className="sticky bottom-0 z-[5] bg-drip-bg h-[60px] shrink-0 px-4 flex items-center justify-between gap-3 border-t border-drip-elevated">
         <span className="font-display text-[12.5px] text-txt-muted whitespace-nowrap truncate">
           <span className="font-mono text-txt-primary">{summary.selectedCount}</span> selected
           {summary.selectedCount > 0 && (

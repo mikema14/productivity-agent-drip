@@ -9,6 +9,17 @@ interface TimelineViewProps {
 
 const HOUR_HEIGHT = 80;
 
+/** Nearest ancestor that actually scrolls vertically, or null. */
+function findScrollParent(el: HTMLElement): HTMLElement | null {
+  let node = el.parentElement;
+  while (node) {
+    const { overflowY } = getComputedStyle(node);
+    if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
 function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() &&
     a.getMonth() === b.getMonth() &&
@@ -90,13 +101,22 @@ export default function TimelineView({ entries }: TimelineViewProps) {
     return (minutes / 60) * HOUR_HEIGHT;
   };
 
-  // Auto-scroll to current time on mount
+  // Auto-scroll to current time on mount. The grid sits at its natural height
+  // inside the scrolling Review column, so the scroll goes to the nearest
+  // scrolling ancestor (the grid itself when it is the one constrained).
   useEffect(() => {
-    if (timelineRef.current && isToday) {
-      const now = new Date();
-      const nowOffset = (now.getHours() - startHour + now.getMinutes() / 60) * HOUR_HEIGHT;
-      timelineRef.current.scrollTop = Math.max(0, nowOffset - 200);
+    const grid = timelineRef.current;
+    if (!grid || !isToday) return;
+    const now = new Date();
+    const nowOffset = (now.getHours() - startHour + now.getMinutes() / 60) * HOUR_HEIGHT;
+    const target = Math.max(0, nowOffset - 200);
+    const scroller = findScrollParent(grid);
+    if (!scroller) {
+      grid.scrollTop = target;
+      return;
     }
+    const gridTop = grid.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+    scroller.scrollTop = gridTop + target;
   }, [startHour, isToday]);
 
   const currentTimeTop = getTop(currentTime);
@@ -122,9 +142,9 @@ export default function TimelineView({ entries }: TimelineViewProps) {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* HOUR TIMELINE */}
-      <div ref={timelineRef} className="flex-1 overflow-y-auto relative">
+    <div className="flex flex-col">
+      {/* HOUR TIMELINE — natural height; the Review main column scrolls */}
+      <div ref={timelineRef} className="relative">
         <div className="relative" style={{ height: totalHours * HOUR_HEIGHT }}>
           {/* Hour labels + dashed lines */}
           {Array.from({ length: totalHours + 1 }, (_, i) => {

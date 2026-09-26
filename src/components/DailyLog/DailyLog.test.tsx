@@ -357,4 +357,14 @@ describe('DailyLog (Review)', () => {
     }
     expect(table()).toBeInTheDocument();
   });
+
+  it('the main column scrolls as a whole; the entries section is unconstrained and its footer sticky', async () => {
+    await renderLog([makeEntry('pomodoro')]);
+    const main = screen.getByTestId('review-main');
+    expect(main).toHaveClass('overflow-y-auto');
+    expect(main).not.toHaveClass('overflow-hidden');
+    expect(table()).not.toHaveClass('overflow-hidden', 'flex-1');
+    expect(screen.getByTestId('entries-body')).not.toHaveClass('overflow-auto', 'overflow-y-auto');
+    expect(footer()).toHaveClass('sticky', 'bottom-0');
+  });
 });
