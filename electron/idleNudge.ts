@@ -12,6 +12,7 @@ import {
   nextIdleAction,
   onSnooze,
   onTimerStatus,
+  snoozeUntilFor,
   type IdleAction,
   type IdleState,
 } from './idleWatcher';
@@ -220,7 +221,7 @@ export function handleIdleOverlayAction(type: OverlayActionType): boolean {
       return true;
     case 'idle-snooze':
       hideIdleNudge();
-      state = onSnooze(state, Date.now(), cfg);
+      state = onSnooze(state, Date.now(), snoozeUntilFor('15m', Date.now(), cfg));
       console.log(`[IdleNudge] Snoozed for ${Math.round(cfg.snoozeMs / 60000)}m`);
       return true;
     case 'kickoff-keep':

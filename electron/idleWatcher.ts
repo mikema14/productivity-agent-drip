@@ -18,7 +18,14 @@
  * Any gate (toggle off, away, locked/asleep, outside work hours, in a meeting)
  * drops the clock; it restarts from zero once the gate lifts. Dismissing the
  * nudge does not touch the state: an ignored nudge still escalates.
+ *
+ * A pause (Snooze 15m / 1h / Rest of day on the card, "Pause nudges" in the
+ * menu bar) holds nudge and escalation until it runs out, survives the gates,
+ * and then hands over to a fresh idle clock — never a nudge on expiry. Only a
+ * running focus/break or an explicit Resume ends it early.
  */
+
+import type { SnoozeChoice } from '../src/types';
 
 export type TimerStatus = 'idle' | 'focus' | 'break';
 
@@ -27,8 +34,10 @@ export interface IdleConfig {
   nudgeAfterMs: number;
   /** Nudge ignored this long → kickoff. */
   escalateAfterMs: number;
-  /** Snooze length; the nudge comes back when it ends. */
+  /** The short pause (the card's first choice). */
   snoozeMs: number;
+  /** The long pause (the card's second choice). */
+  snoozeLongMs: number;
   /** System input idle time at which the user counts as away from the Mac. */
   awayAfterSec: number;
   /** Days nudges may fire, 0 = Sunday. */
@@ -51,6 +60,7 @@ export const IDLE_DEFAULTS: IdleConfig = {
   nudgeAfterMs: 10 * MIN,
   escalateAfterMs: 15 * MIN,
   snoozeMs: 15 * MIN,
+  snoozeLongMs: 60 * MIN,
   awayAfterSec: 120,
   workDays: [1, 2, 3, 4, 5],
   workStartMin: 8 * 60,
@@ -69,6 +79,7 @@ export const IDLE_FAST: IdleConfig = {
   nudgeAfterMs: 20_000,
   escalateAfterMs: 30_000,
   snoozeMs: 30_000,
+  snoozeLongMs: 60_000,
   workDays: [0, 1, 2, 3, 4, 5, 6],
   workStartMin: 0,
   workEndMin: 24 * 60,
@@ -83,7 +94,7 @@ export type IdlePhase =
   | 'counting'
   /** Red nudge raised, counting towards the kickoff. */
   | 'nudged'
-  /** User snoozed; the nudge returns at snoozeUntil. */
+  /** Paused by the user; a fresh idle clock starts at snoozeUntil. */
   | 'snoozed';
 
 export interface IdleState {
@@ -92,6 +103,7 @@ export interface IdleState {
   since: number | null;
   /** Escalation counts from here: the red nudge, or the break end. */
   nudgeAt: number | null;
+  /** End of the pause (epoch ms); set only while 'snoozed'. */
   snoozeUntil: number | null;
   origin: 'idle' | 'break-end';
 }
@@ -172,16 +184,19 @@ export function nextIdleAction(
   // Backstop for a missed timer event: a running focus or break is never idle.
   if (inputs.timerStatus !== 'idle') return leave(state, off());
 
+  // A pause outlives the gates: leaving the Mac for a call must not shorten it.
+  if (state.phase === 'snoozed' && state.snoozeUntil !== null && now < state.snoozeUntil) {
+    return { state, action: NONE };
+  }
+
   if (gateReason(inputs, now, cfg)) return leave(state, off());
 
   switch (state.phase) {
     case 'off':
-      // First ungated idle poll (launch, gate lifted): the clock starts now.
-      return { state: counting(now, 'idle'), action: NONE };
-
     case 'snoozed':
-      if (state.snoozeUntil !== null && now < state.snoozeUntil) return { state, action: NONE };
-      return raise({ ...state, origin: 'idle', nudgeAt: null }, now, cfg);
+      // First ungated idle poll (launch, gate lifted) or the pause ran out:
+      // the clock starts now. No nudge on expiry.
+      return { state: counting(now, 'idle'), action: NONE };
 
     case 'counting':
       if (state.since !== null && now - state.since >= cfg.nudgeAfterMs) return raise(state, now, cfg);
@@ -220,16 +235,53 @@ export function onTimerStatus(
   return leave(state, counting(now, previous === 'break' ? 'break-end' : 'idle'));
 }
 
+/** Local midnight of the day `now` falls in, plus `minutes`. */
+function localDayAt(now: number, minutes: number): number {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime() + minutes * MIN;
+}
+
 /**
- * Snooze: no nudge and no escalation until it runs out, then the nudge comes
- * back with a fresh escalation clock. The idle start is kept for the display.
+ * When a pause of the given kind ends. `day` = the end of today's work hours
+ * (past it already: the end of the local day), so with the off-hours gate the
+ * next nudge can only come on the next workday.
  */
-export function onSnooze(state: IdleState, now: number, cfg: IdleConfig = IDLE_DEFAULTS): IdleState {
+export function snoozeUntilFor(choice: SnoozeChoice, now: number, cfg: IdleConfig = IDLE_DEFAULTS): number {
+  switch (choice) {
+    case '15m':
+      return now + cfg.snoozeMs;
+    case '1h':
+      return now + cfg.snoozeLongMs;
+    case 'day': {
+      const workEnd = localDayAt(now, cfg.workEndMin);
+      return workEnd > now ? workEnd : localDayAt(now, 24 * 60);
+    }
+  }
+}
+
+/**
+ * Pause until `untilMs`: no nudge and no escalation until then. The clock
+ * restarts from zero when the pause runs out (see nextIdleAction). A pause
+ * that is already over is the same as a fresh clock.
+ */
+export function onSnooze(state: IdleState, now: number, untilMs: number): IdleState {
+  if (untilMs <= now) return counting(now, 'idle');
   return {
     phase: 'snoozed',
-    since: state.since ?? now,
+    since: null,
     nudgeAt: null,
-    snoozeUntil: now + cfg.snoozeMs,
+    snoozeUntil: untilMs,
     origin: 'idle',
   };
+}
+
+/** Resume: the pause ends now and a fresh idle clock starts. No-op when not paused. */
+export function onResume(state: IdleState, now: number): IdleState {
+  return state.phase === 'snoozed' ? counting(now, 'idle') : state;
+}
+
+/** End of the current pause, or null. */
+export function pausedUntil(state: IdleState): number | null {
+  return state.phase === 'snoozed' ? state.snoozeUntil : null;
 }

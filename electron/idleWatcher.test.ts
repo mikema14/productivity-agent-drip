@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   IDLE_DEFAULTS,
   INITIAL_IDLE_STATE,
+  IDLE_FAST,
   nextIdleAction,
+  onResume,
   onSnooze,
   onTimerStatus,
+  pausedUntil,
+  snoozeUntilFor,
   type IdleAction,
   type IdleInputs,
   type IdleState,
@@ -114,20 +118,115 @@ describe('idle nudge', () => {
   });
 });
 
-describe('snooze', () => {
-  it('suppresses nudge and escalation for 15 minutes, then nudges again', () => {
-    const nudged = run(idleAt(WED_10), WED_10, WED_10 + 10 * MIN).state;
-    const snoozedAt = WED_10 + 11 * MIN;
-    const snoozed = onSnooze(nudged, snoozedAt);
+describe('pause (snooze)', () => {
+  const nudged = () => run(idleAt(WED_10), WED_10, WED_10 + 10 * MIN).state;
 
-    const { actions } = run(snoozed, snoozedAt, snoozedAt + 15 * MIN);
-    expect(actions).toEqual([
-      {
-        t: snoozedAt + 15 * MIN,
-        // Idle start kept for the display; escalation counts from the new nudge
-        action: { type: 'show-nudge', idleSince: WED_10, kickoffAt: snoozedAt + 30 * MIN },
-      },
-    ]);
+  it.each<[string, number]>([
+    ['15m', 15 * MIN],
+    ['1h', 60 * MIN],
+  ])('%s: no nudge and no escalation until it ends, then a fresh 10-minute clock — never a nudge on expiry', (choice, length) => {
+    const pausedAt = WED_10 + 11 * MIN;
+    const until = snoozeUntilFor(choice as '15m' | '1h', pausedAt);
+    expect(until).toBe(pausedAt + length);
+    const paused = onSnooze(nudged(), pausedAt, until);
+    expect(paused.phase).toBe('snoozed');
+    expect(pausedUntil(paused)).toBe(until);
+
+    // Nothing while paused, nothing at expiry; the nudge comes 10 minutes after
+    const { actions, state } = run(paused, pausedAt, until + 10 * MIN);
+    expect(actions).toEqual([{ t: until + 10 * MIN, action: { type: 'show-nudge', idleSince: until, kickoffAt: until + 25 * MIN } }]);
+    expect(state.phase).toBe('nudged');
+  });
+
+  it('rest of day: until the end of work hours (18:00), which with the off-hours gate means the next workday', () => {
+    const pausedAt = WED_10 + 11 * MIN;
+    const until = snoozeUntilFor('day', pausedAt);
+    expect(new Date(until).getHours()).toBe(18);
+    expect(new Date(until).getDate()).toBe(23);
+    const paused = onSnooze(nudged(), pausedAt, until);
+    // Whole afternoon quiet, and the 18:00 expiry lands in off-hours
+    const { actions } = run(paused, pausedAt, until + 60 * MIN);
+    expect(actions).toEqual([]);
+    // Thursday 08:00 the gate opens; the nudge follows 10 minutes later
+    const thu8 = new Date(2026, 8, 24, 8, 0).getTime();
+    const thu = run(paused, thu8 - 30 * MIN, thu8 + 10 * MIN);
+    expect(thu.actions).toEqual([{ t: thu8 + 10 * MIN, action: expect.objectContaining({ type: 'show-nudge' }) }]);
+  });
+
+  it('rest of day after work hours ends at local midnight, not immediately', () => {
+    const evening = new Date(2026, 8, 23, 19, 0).getTime();
+    const until = snoozeUntilFor('day', evening);
+    expect(until).toBe(new Date(2026, 8, 24, 0, 0).getTime());
+  });
+
+  it('is not shortened by the away / lock gates (a call in another room)', () => {
+    const pausedAt = WED_10 + 11 * MIN;
+    const until = snoozeUntilFor('1h', pausedAt);
+    const paused = onSnooze(nudged(), pausedAt, until);
+    const { actions, state } = run(paused, pausedAt, until - 30_000, (t) => ({
+      ...PRESENT,
+      systemIdleSec: t < pausedAt + 20 * MIN ? 900 : 5,
+      locked: t >= pausedAt + 20 * MIN && t < pausedAt + 40 * MIN,
+    }));
+    expect(actions).toEqual([]);
+    expect(state.phase).toBe('snoozed');
+    expect(pausedUntil(state)).toBe(until);
+  });
+
+  it('a gate that is down when the pause ends drops the clock; it starts once the gate lifts', () => {
+    const pausedAt = WED_10 + 11 * MIN;
+    const until = snoozeUntilFor('15m', pausedAt);
+    const paused = onSnooze(nudged(), pausedAt, until);
+    const back = until + 5 * MIN;
+    const { actions } = run(paused, pausedAt, back + 10 * MIN, (t) => ({ ...PRESENT, locked: t < back }));
+    expect(actions).toEqual([{ t: back + 10 * MIN, action: expect.objectContaining({ type: 'show-nudge' }) }]);
+  });
+
+  it('resume ends the pause now and counts 10 fresh minutes', () => {
+    const pausedAt = WED_10 + 11 * MIN;
+    const paused = onSnooze(nudged(), pausedAt, snoozeUntilFor('day', pausedAt));
+    const resumedAt = pausedAt + 3 * MIN;
+    const resumed = onResume(paused, resumedAt);
+    expect(resumed.phase).toBe('counting');
+    expect(pausedUntil(resumed)).toBeNull();
+    const { actions } = run(resumed, resumedAt, resumedAt + 10 * MIN);
+    expect(actions).toEqual([{ t: resumedAt + 10 * MIN, action: { type: 'show-nudge', idleSince: resumedAt, kickoffAt: resumedAt + 25 * MIN } }]);
+    // Not paused: nothing to resume
+    expect(onResume(resumed, resumedAt + MIN)).toBe(resumed);
+  });
+
+  it('starting a focus or break clears the pause; the next idle start is a fresh clock', () => {
+    const pausedAt = WED_10 + 11 * MIN;
+    const paused = onSnooze(nudged(), pausedAt, snoozeUntilFor('day', pausedAt));
+    const focus = onTimerStatus(paused, 'focus', 'idle', pausedAt + MIN);
+    expect(focus.state.phase).toBe('off');
+    expect(pausedUntil(focus.state)).toBeNull();
+    // Polls while focus runs keep it off
+    const during = run(focus.state, pausedAt + MIN, pausedAt + 5 * MIN, () => ({ ...PRESENT, timerStatus: 'focus' }));
+    expect(during.state.phase).toBe('off');
+    const stopped = onTimerStatus(during.state, 'idle', 'focus', pausedAt + 6 * MIN).state;
+    const { actions } = run(stopped, pausedAt + 6 * MIN, pausedAt + 16 * MIN);
+    expect(types(actions)).toEqual(['show-nudge']);
+  });
+
+  it('a pause from the menu bar while counting (no nudge up) hides nothing and holds the same way', () => {
+    const counting = idleAt(WED_10);
+    const paused = onSnooze(counting, WED_10 + 2 * MIN, snoozeUntilFor('15m', WED_10 + 2 * MIN));
+    const { actions } = run(paused, WED_10 + 2 * MIN, WED_10 + 17 * MIN);
+    expect(actions).toEqual([]);
+  });
+
+  it('a pause that is already over is a fresh clock', () => {
+    const paused = onSnooze(nudged(), WED_10 + 11 * MIN, WED_10 + 11 * MIN);
+    expect(paused.phase).toBe('counting');
+    expect(paused.since).toBe(WED_10 + 11 * MIN);
+  });
+
+  it('DRIP_IDLE_FAST scales 15m → 30s and 1h → 60s; rest of day is unchanged', () => {
+    expect(snoozeUntilFor('15m', WED_10, IDLE_FAST)).toBe(WED_10 + 30_000);
+    expect(snoozeUntilFor('1h', WED_10, IDLE_FAST)).toBe(WED_10 + 60_000);
+    // FAST work hours run to 24:00, so rest of day is local midnight
+    expect(snoozeUntilFor('day', WED_10, IDLE_FAST)).toBe(new Date(2026, 8, 24, 0, 0).getTime());
   });
 });
 
@@ -212,6 +311,7 @@ describe('break end', () => {
     expect(IDLE_DEFAULTS.nudgeAfterMs).toBe(10 * MIN);
     expect(IDLE_DEFAULTS.escalateAfterMs).toBe(15 * MIN);
     expect(IDLE_DEFAULTS.snoozeMs).toBe(15 * MIN);
+    expect(IDLE_DEFAULTS.snoozeLongMs).toBe(60 * MIN);
     expect(IDLE_DEFAULTS.awayAfterSec).toBe(120);
   });
 });
