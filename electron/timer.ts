@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { updateTray } from './tray';
-import { sendTickToOverlay, sampleActiveDisplay } from './overlayWindow';
+import { sendTickToOverlay, sampleActiveDisplay, hideBreakPill } from './overlayWindow';
 import { saveSetting } from '../src/services/db';
 import { raycastFocusStart, raycastFocusEnd, isRaycastFocusEnabled } from './raycastFocus';
 import { atCountdownZero, raycastSecondsFor } from './kickoff';
@@ -51,6 +51,8 @@ export function setTimerListener(next: TimerListener | null): void {
 function setStatus(status: TimerStatus): void {
   const previous = state.status;
   state.status = status;
+  // Skip, stop, a focus started mid-break or the break's own end: the pill goes.
+  if (previous === 'break' && status !== 'break') hideBreakPill();
   if (previous !== status || status !== 'idle') {
     try {
       listener?.onStatus(status, previous);

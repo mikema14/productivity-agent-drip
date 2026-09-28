@@ -156,3 +156,23 @@ describe('timerStore — kickoff', () => {
     expect(stored.state).not.toHaveProperty('raycastFocus');
   });
 });
+
+describe('timerStore — skip break', () => {
+  beforeEach(() => {
+    resetTimer();
+    window.timerAPI.stopMainTimer = vi.fn(async () => undefined);
+    window.timerAPI.saveSession = vi.fn(async () => 'new-session');
+  });
+  afterEach(() => resetTimer());
+
+  it('stops the main timer, clears the overlay flag and saves nothing', async () => {
+    setTimer({ status: 'break', overlayOpen: true, sessionStartTime: new Date(Date.now() - 120_000) });
+    await useTimerStore.getState().skip();
+    await flush();
+    const s = useTimerStore.getState();
+    expect(window.timerAPI.stopMainTimer).toHaveBeenCalled();
+    expect(s.status).toBe('idle');
+    expect(s.overlayOpen).toBe(false);
+    expect(window.timerAPI.saveSession).not.toHaveBeenCalled();
+  });
+});

@@ -333,6 +333,11 @@ export function hideOverlay(): void {
   state.lastKind = null;
 }
 
+/** The break pill has no end of its own: main hides it when the timer leaves break. */
+export function hideBreakPill(): void {
+  if (state.lastKind === 'break-running') hideOverlay();
+}
+
 export function setOverlayInteractive(interactive: boolean): void {
   if (!state.win || state.win.isDestroyed()) return;
   if (interactive) {

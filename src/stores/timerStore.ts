@@ -571,7 +571,8 @@ export const useTimerStore = create<TimerStore>()(
       set({ sessionCount: state.sessionCount + 1 });
       get().startBreak(isLongBreak);
     } else if (state.status === 'break') {
-      // Skip break, go to idle
+      // Skip break, go to idle. Main hid the break pill when its timer stopped.
+      set({ overlayOpen: false });
       get().reset();
     }
   },
