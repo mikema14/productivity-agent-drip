@@ -156,3 +156,53 @@ describe('timerStore — kickoff', () => {
     expect(stored.state).not.toHaveProperty('raycastFocus');
   });
 });
+
+describe('timerStore — skip break', () => {
+  beforeEach(() => {
+    resetTimer();
+    window.timerAPI.stopMainTimer = vi.fn(async () => undefined);
+    window.timerAPI.saveSession = vi.fn(async () => 'new-session');
+  });
+  afterEach(() => resetTimer());
+
+  it('stops the main timer, clears the overlay flag and saves nothing', async () => {
+    setTimer({ status: 'break', overlayOpen: true, sessionStartTime: new Date(Date.now() - 120_000) });
+    await useTimerStore.getState().skip();
+    await flush();
+    const s = useTimerStore.getState();
+    expect(window.timerAPI.stopMainTimer).toHaveBeenCalled();
+    expect(s.status).toBe('idle');
+    expect(s.overlayOpen).toBe(false);
+    expect(window.timerAPI.saveSession).not.toHaveBeenCalled();
+  });
+});
+
+// Not on the public TimerStore type; main's timer-complete event calls it.
+const completeFocus = () => (useTimerStore.getState() as unknown as { handleFocusComplete: () => Promise<void> }).handleFocusComplete();
+
+describe('timerStore — pending break', () => {
+  beforeEach(() => {
+    resetTimer();
+    window.timerAPI.stopMainTimer = vi.fn(async () => undefined);
+    window.timerAPI.saveSession = vi.fn(async () => 'new-session');
+    window.timerAPI.startMainTimer = vi.fn(async () => ({ raycastFocus: false }));
+    window.timerAPI.showSessionOverlay = vi.fn(async () => ({ shown: false }));
+  });
+  afterEach(() => resetTimer());
+
+  it('a completed focus earns a break; starting a focus instead drops it', async () => {
+    setTimer({ status: 'focus', sessionStartTime: new Date(Date.now() - 25 * 60_000), durationMinutes: 25, sessionCount: 0 });
+    await completeFocus();
+    expect(useTimerStore.getState().pendingBreakMinutes).toBe(5);
+    await useTimerStore.getState().startFocus('689742', true);
+    expect(useTimerStore.getState().pendingBreakMinutes).toBeNull();
+  });
+
+  it('the third session earns the long break; reset drops it', async () => {
+    setTimer({ status: 'focus', sessionStartTime: new Date(Date.now() - 25 * 60_000), durationMinutes: 25, sessionCount: 2 });
+    await completeFocus();
+    expect(useTimerStore.getState().pendingBreakMinutes).toBe(10);
+    await useTimerStore.getState().reset();
+    expect(useTimerStore.getState().pendingBreakMinutes).toBeNull();
+  });
+});

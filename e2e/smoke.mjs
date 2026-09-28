@@ -163,7 +163,7 @@ async function assertPlanColumns(page) {
 /**
  * Plan walk (PHASE2_PLAN.md §7.1), read-only by construction: toggles are
  * restored, cards are only expanded/hovered. Never drags; never clicks Start
- * on, Restore, Move left/right, Move to list, Delete, Mark done, Add a task,
+ * on, Restore, Move to Today/This week/Backlog, Move to list, Delete, Mark done, Add a task,
  * Archive, or anything inside TaskDetailInline.
  */
 async function planWalk(page, shot) {
@@ -443,8 +443,9 @@ async function main() {
       await pill().filter({ hasText: 'Ready' }).waitFor();
       await shot('now-ready-empty');
 
-      // Ready-selected: click a recent row only (typing an id would hit the API and write task_cache).
-      const options = page.getByRole('option');
+      // Ready-selected: click a listed row only (typing an id would hit the API and write task_cache).
+      // The list may open on Planned; skip items with no task, which only set the note.
+      const options = page.getByRole('option').filter({ hasNot: page.getByText('No task ID') });
       // Selecting a task collapses the list, so remember whether one was picked
       const hasTask = (await options.count()) > 0;
       if (hasTask) {

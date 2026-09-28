@@ -7,12 +7,14 @@ import { setTimer, resetTimer } from '../../test/timerState';
 import { useIntentionsStore } from '../../stores/intentionsStore';
 import { useLogStore } from '../../stores/logStore';
 import { useTimerStore } from '../../stores/timerStore';
+import { useListsStore } from '../../stores/listsStore';
 import type { PomodoroSession } from '../../types';
+import { getCurrentDate } from '../../utils/time';
 
 vi.mock('./TimerDayTimeline', () => ({ default: () => <div>TimelineStub</div> }));
 vi.mock('../Lists/TimerTaskList', () => ({ default: () => <div>TaskListStub</div> }));
 
-const today = new Date().toISOString().split('T')[0];
+const today = getCurrentDate();
 
 function makeSession(i: number, overrides: Partial<PomodoroSession> = {}): PomodoroSession {
   return {
@@ -346,42 +348,96 @@ describe('Timer — active states', () => {
     await waitFor(() => expect(window.timerAPI.stopMainTimer).toHaveBeenCalledTimes(1));
   });
 
-  it('break: Skip Break only; picker visible below, intention row editable, no duration strip', async () => {
+  it('break, nothing picked: Begin Focus disabled next to Skip Break, duration strip, picker below; no Kickoff', async () => {
     setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(), totalDuration: 300, remainingSeconds: 200, intervalId: 1, sessionCount: 2 });
     await renderTimer();
     expect(key(/skip break/i)).toBeInTheDocument();
-    expect(queryKey(/begin focus/i)).toBeNull();
-    expect(queryKey(/pause/i)).toBeNull();
+    expect(key(/begin focus/i)).toBeDisabled();
+    expect(key(/begin focus/i)).toHaveAttribute('title', 'Pick a task first');
+    expect(key(/^pause$/i)).toBeInTheDocument();
     expect(queryKey(/kickoff/i)).toBeNull();
     expect(screen.getByRole('listbox')).toBeInTheDocument();
     expect(key(/set intention/i)).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Duration in minutes' })).toBeNull();
+    expect(screen.getByRole('group', { name: 'Duration in minutes' })).toBeInTheDocument();
     expect(screen.getByTestId('now-pill')).toHaveTextContent('Break');
     expect(screen.getByText(/^BREAK ·/)).toBeInTheDocument();
     expect(screen.getByText(/done/i)).toHaveTextContent('2/8 done');
   });
 
-  it('break: picking the next task shows the card with note + billable, still no Begin Focus / Kickoff / duration strip', async () => {
+  it('break: picking a task shows the card with duration, note, billable and an enabled Begin Focus', async () => {
     window.logAPI.getRankedRecentTasks = vi.fn(async () => makeTasks(3));
     setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(), totalDuration: 300, remainingSeconds: 200, intervalId: 1 });
     const { user } = await renderTimer();
     await selectFirstTask(user);
-    const section = screen.getByTestId('break-selected-task');
-    expect(within(section).getByText('Task number 1')).toBeInTheDocument();
-    expect(within(section).getByPlaceholderText('Session note (optional)')).toBeInTheDocument();
-    expect(within(section).getByRole('switch')).toBeInTheDocument();
+    expect(screen.getByText('Task number 1')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Session note (optional)')).toBeInTheDocument();
+    expect(screen.getByRole('switch')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Duration in minutes' })).toBeInTheDocument();
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(key(/skip break/i)).toBeInTheDocument();
-    expect(queryKey(/begin focus/i)).toBeNull();
+    expect(key(/begin focus/i)).toBeEnabled();
     expect(queryKey(/kickoff/i)).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Duration in minutes' })).toBeNull();
-    // Enter never starts a focus during a break, even with a task picked.
+  });
+
+  it('break: Begin Focus saves the break so far (≥ 1 min) and starts the picked task at the chosen length', async () => {
+    window.logAPI.getRankedRecentTasks = vi.fn(async () => makeTasks(3));
+    window.timerAPI.saveSession = vi.fn(async () => 'break-row');
+    window.timerAPI.startMainTimer = vi.fn(async () => ({ raycastFocus: false }));
+    setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(Date.now() - 120_000), totalDuration: 300, remainingSeconds: 180, intervalId: 1 });
+    const { user } = await renderTimer();
+    await selectFirstTask(user);
+    await user.click(screen.getByRole('button', { name: '50' }));
+    // Picking a length mid-break leaves the break countdown alone.
+    expect(useTimerStore.getState().remainingSeconds).toBe(180);
+    await user.click(key(/begin focus/i));
+    await waitFor(() => expect(window.timerAPI.startMainTimer).toHaveBeenCalled());
+    expect(window.timerAPI.saveSession).toHaveBeenCalledWith(expect.objectContaining({ source: 'break', duration_minutes: 2, task_id: null }));
+    const [secs, type, , taskId] = vi.mocked(window.timerAPI.startMainTimer).mock.calls[0];
+    expect([secs, type, taskId]).toEqual([50 * 60, 'focus', makeTasks(1)[0].task_id]);
+    const saveOrder = vi.mocked(window.timerAPI.saveSession).mock.invocationCallOrder[0];
+    expect(saveOrder).toBeLessThan(vi.mocked(window.timerAPI.startMainTimer).mock.invocationCallOrder[0]);
+  });
+
+  it('break: Pause / Resume drive the main timer and the label says paused', async () => {
+    window.timerAPI.pauseMainTimer = vi.fn(async () => undefined);
+    window.timerAPI.resumeMainTimer = vi.fn(async () => undefined);
+    setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(), totalDuration: 300, remainingSeconds: 200, intervalId: 1 });
+    const { user } = await renderTimer();
+    await user.click(key(/^pause$/i));
+    expect(window.timerAPI.pauseMainTimer).toHaveBeenCalled();
+    expect(await screen.findByText('BREAK · PAUSED')).toBeInTheDocument();
+    await user.click(key(/^resume$/i));
+    expect(window.timerAPI.resumeMainTimer).toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: /^pause$/i })).toBeInTheDocument();
+  });
+
+  it('ready after a finished focus: Start break Nm starts the earned break; without one there is no key', async () => {
+    window.timerAPI.startMainTimer = vi.fn(async () => ({ raycastFocus: false }));
+    setTimer({ status: 'idle', pendingBreakMinutes: 5, sessionCount: 1, durationMinutes: 25 });
+    const { user } = await renderTimer();
+    await user.click(key(/start break 5m/i));
+    await waitFor(() => expect(window.timerAPI.startMainTimer).toHaveBeenCalledWith(300, 'break'));
+    expect(useTimerStore.getState().status).toBe('break');
+    expect(useTimerStore.getState().pendingBreakMinutes).toBeNull();
+  });
+
+  it('ready with no finished focus: no Start break key', async () => {
+    setTimer({ status: 'idle', pendingBreakMinutes: null });
+    await renderTimer();
+    expect(queryKey(/start break/i)).toBeNull();
+  });
+
+  it('break under a minute: Enter starts the focus and saves no break row', async () => {
+    window.logAPI.getRankedRecentTasks = vi.fn(async () => makeTasks(3));
+    window.timerAPI.saveSession = vi.fn(async () => 'break-row');
+    window.timerAPI.startMainTimer = vi.fn(async () => ({ raycastFocus: false }));
+    setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(Date.now() - 20_000), totalDuration: 300, remainingSeconds: 280, intervalId: 1 });
+    const { user } = await renderTimer();
+    await selectFirstTask(user);
     (document.activeElement as HTMLElement | null)?.blur();
     await user.keyboard('{Enter}');
-    expect(window.timerAPI.startMainTimer).not.toHaveBeenCalled();
-    // The picked task carries into Begin Focus once the break ends.
-    setTimer({ status: 'idle', sessionStartTime: null, intervalId: null });
-    expect(await screen.findByRole('button', { name: /begin focus/i })).toBeEnabled();
+    await waitFor(() => expect(window.timerAPI.startMainTimer).toHaveBeenCalledWith(25 * 60, 'focus', expect.anything(), makeTasks(1)[0].task_id, undefined));
+    expect(window.timerAPI.saveSession).not.toHaveBeenCalled();
   });
 
   it('break: `/` focuses the task search', async () => {
@@ -449,6 +505,18 @@ describe('Timer — active states', () => {
     expect(screen.getByText("Today's intentions")).toBeInTheDocument();
   });
 
+  it('Set intention → type → Done saves it for the local day and the row shows it', async () => {
+    window.dashboardAPI.setDailyIntentions = vi.fn(async () => undefined);
+    const { user } = await renderTimer();
+    await user.click(key(/set intention/i));
+    await user.type(screen.getByPlaceholderText(/what will you focus on today/i), 'Ship GDI scope');
+    await user.click(key(/^done$/i));
+    expect(window.dashboardAPI.setDailyIntentions).toHaveBeenCalledWith(today, ['Ship GDI scope']);
+    expect(screen.queryByText("Today's intentions")).toBeNull();
+    expect(screen.getByRole('group', { name: "Today's intention: Ship GDI scope" })).toBeInTheDocument();
+    expect(key(/^edit$/i)).toBeInTheDocument();
+  });
+
   it('paused with no intention: a compact SET INTENTION key sits in the row and opens the modal', async () => {
     setTimer({ status: 'focus', isPaused: true, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, intervalId: 1 });
     const { user } = await renderTimer();
@@ -478,5 +546,49 @@ describe('Timer — active states', () => {
     await waitFor(() => expect(screen.getByTestId('countdown-label')).toHaveTextContent('READY'));
     expect(screen.getByRole('region', { name: 'Focus' })).toHaveAttribute('data-layout', 'split');
     expect(screen.getByText(/^Session/)).toHaveTextContent('Session 3/8');
+  });
+});
+
+describe('Timer — Planned picker', () => {
+  const planList = { id: 'l1', name: 'GDI Corporation', color: '#22c55e', icon_path: null, task_id: null, order: 0, archived: 0, billable: 1, created_at: '' };
+  const planItem = (id: string, overrides: Record<string, unknown>) => ({
+    id, list_id: 'l1', title: `Item ${id}`, task_id: null, column: 'today', order: 0, completed: 0, archived: 0,
+    completed_at: null, description: null, subtasks: '[]', billable: 1, created_at: '', ...overrides,
+  });
+
+  beforeEach(() => {
+    localStorage.removeItem('now_pickerSource');
+    window.logAPI.getRankedRecentTasks = vi.fn(async () => makeTasks(3));
+    window.logAPI.getCachedTask = vi.fn(async () => null);
+    useIntentionsStore.setState({ intentions: new Map() });
+    useListsStore.setState({
+      lists: [planList] as never,
+      items: [planItem('p1', { task_id: '662962', title: 'Scope finalasing' }), planItem('p2', { title: 'Share skills', column: 'this_week' })] as never,
+    });
+  });
+  afterEach(() => {
+    resetTimer();
+    useListsStore.setState({ lists: [], items: [] });
+  });
+
+  it('break: picking a planned task selects it, takes its title as the note and enables Begin Focus', async () => {
+    setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(), totalDuration: 300, remainingSeconds: 200, intervalId: 1 });
+    const { user } = await renderTimer();
+    expect(screen.getByRole('button', { name: 'Planned' })).toHaveAttribute('aria-pressed', 'true');
+    const options = await screen.findAllByRole('option');
+    expect(options).toHaveLength(2);
+    await user.click(options[0]);
+    expect(await screen.findByDisplayValue('Scope finalasing')).toBeInTheDocument();
+    expect(useTimerStore.getState().intention).toBe('Scope finalasing');
+    expect(key(/begin focus/i)).toBeEnabled();
+  });
+
+  it('an item with no task only sets the note and keeps the picker open', async () => {
+    const { user } = await renderTimer();
+    const options = await screen.findAllByRole('option');
+    await user.click(options[1]);
+    expect(useTimerStore.getState().intention).toBe('Share skills');
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    expect(key(/begin focus/i)).toBeDisabled();
   });
 });

@@ -2,7 +2,7 @@ import type { ListItem, ListItemColumn, Subtask, TaskList } from '../../types';
 import DraggableItem from '../Lists/DraggableItem';
 import TaskDetailInline from '../Lists/TaskDetailInline';
 import TaskIdBadge from '../shared/TaskIdBadge';
-import { arrowTargets, effectiveTaskId, provenance } from './boardLogic';
+import { effectiveTaskId, moveTargets, provenance } from './boardLogic';
 
 export interface TaskCardActions {
   onToggleComplete: (item: ListItem) => void;
@@ -20,7 +20,7 @@ export interface TaskCardProps {
   item: ListItem;
   list: TaskList | undefined;
   lists: TaskList[];
-  /** True when the card sits in the 4th Done column (no column arrows, not part of the data order). */
+  /** True when the card sits in the 4th Done column (no column moves, not part of the data order). */
   inDoneColumn: boolean;
   /** Whether the id slot (pill or "No task ID") renders at all. */
   showId: boolean;
@@ -38,6 +38,7 @@ export interface TaskCardProps {
 }
 
 const iconProps = { width: 12, height: 12, viewBox: '0 0 12 12', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+const MOVE = 'h-6 px-1.5 rounded-[2px] font-display text-[11.5px] whitespace-nowrap text-txt-muted hover:text-txt-primary hover:bg-focus/10 transition-colors';
 const ACTION = 'w-6 h-6 flex items-center justify-center rounded-[2px] text-txt-muted hover:text-txt-primary hover:bg-focus/10 transition-colors';
 
 function parseSubtasks(item: ListItem): Subtask[] {
@@ -61,7 +62,7 @@ export default function TaskCard(props: TaskCardProps) {
   const color = list?.color || '#f59e0b';
   const subs = parseSubtasks(item);
   const subtaskCount = subs.length > 0 ? { done: subs.filter(s => s.completed).length, total: subs.length } : null;
-  const arrows = done || inDoneColumn ? { left: null, right: null } : arrowTargets(item.column);
+  const targets = done || inDoneColumn ? [] : moveTargets(item.column);
   const from = provenance(item);
   const effective = effectiveTaskId(item, list);
 
@@ -105,16 +106,18 @@ export default function TaskCard(props: TaskCardProps) {
 
           {/* Overlaid (not in flow) so the title keeps the full card width and never reflows on hover. */}
           <div className="plan-card-actions absolute top-[7px] right-2 flex items-center gap-0.5 pl-1.5 bg-drip-bg">
-            {arrows.left && (
-              <button type="button" onClick={(e) => { e.stopPropagation(); actions.onMoveColumn(item, arrows.left!); }} className={ACTION} title="Move left">
-                <svg {...iconProps}><path d="M7 3L4 6l3 3" /></svg>
+            {targets.map(t => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); actions.onMoveColumn(item, t.key); }}
+                className={MOVE}
+                title={`Move to ${t.label}`}
+                aria-label={`Move to ${t.label}`}
+              >
+                {t.label}
               </button>
-            )}
-            {arrows.right && (
-              <button type="button" onClick={(e) => { e.stopPropagation(); actions.onMoveColumn(item, arrows.right!); }} className={ACTION} title="Move right">
-                <svg {...iconProps}><path d="M5 3l3 3-3 3" /></svg>
-              </button>
-            )}
+            ))}
             <div className="relative" onClick={e => e.stopPropagation()}>
               <button type="button" onClick={(e) => { e.stopPropagation(); actions.onTogglePicker(item.id); }} className={ACTION} title="Move to list">
                 <svg {...iconProps}><path d="M1 3a1 1 0 011-1h2.5L5.5 3.5H10a1 1 0 011 1v5a1 1 0 01-1 1H2a1 1 0 01-1-1V3z" /></svg>

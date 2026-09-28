@@ -1,6 +1,9 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useTimerStore, KICKOFF_SECONDS } from '../../stores/timerStore';
 import { useIntentionsStore } from '../../stores/intentionsStore';
+import { useListsStore } from '../../stores/listsStore';
+import { plannedRows } from '../Plan/boardLogic';
+import type { PickerTask } from '../../hooks/useTaskPickerNav';
 import { useTaskName } from '../../hooks/useTaskName';
 import BoundaryConfirmDialog from './BoundaryConfirmDialog';
 import NowAside from './NowAside';
@@ -20,6 +23,7 @@ import SetIntentionModal from '../shared/SetIntentionModal';
 import BillableToggle from '../shared/BillableToggle';
 import type { PomodoroSession, CalendarProposal, AdhocEntry, TaskCache, RankedTask } from '../../types';
 import type { ViewId } from '../Layout/views';
+import { getCurrentDate } from '../../utils/time';
 
 type FocusState = 'ready-empty' | 'ready-selected' | 'running' | 'paused';
 
@@ -57,12 +61,30 @@ export default function Timer({ onNavigate }: TimerProps) {
     setCurrentBillable,
     kickoff,
     startKickoff,
+    startFocusFromBreak,
+    startBreakFromModal,
+    pendingBreakMinutes,
     selectionResetToken,
   } = useTimerStore();
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getCurrentDate(); // local calendar day, like Review
   const { getIntentions, loadDay, addIntention, removeIntention } = useIntentionsStore();
   const intentions = getIntentions(today);
+
+  // Plan's Today / This week, for the picker's Planned switch (the store is shared with Plan).
+  const planLists = useListsStore(s => s.lists);
+  const planItems = useListsStore(s => s.items);
+  const plannedTasks: PickerTask[] = useMemo(
+    () => plannedRows(planItems, planLists).map(r => ({
+      task_id: r.taskId ?? '',
+      title: r.title,
+      project_id: 0,
+      project_name: null,
+      last_seen_at: '',
+      planned: { itemId: r.itemId, column: r.column, listName: r.listName, listColor: r.listColor },
+    })),
+    [planItems, planLists]
+  );
 
   // Local state
   const [selectedTask, setSelectedTask] = useState<TaskCache | null>(null);
@@ -110,22 +132,30 @@ export default function Timer({ onNavigate }: TimerProps) {
   useEffect(() => {
     loadDay(today);
     loadBoundarySettings();
+    const lists = useListsStore.getState();
+    if (lists.lists.length === 0) void lists.loadLists();
+    if (lists.items.length === 0) void lists.loadItems();
   }, []);
+
+  /**
+   * A planned task (Plan hand-off, the Day aside, the Planned picker): select its
+   * task (cached, else a stub) and take the item title as the session note.
+   */
+  const selectPlanned = useCallback((taskId: string | null, title: string) => {
+    if (taskId) {
+      window.logAPI.getCachedTask(taskId).then(task => {
+        setSelectedTask(task ?? { task_id: taskId, title, project_id: 0, project_name: null, last_seen_at: new Date().toISOString() });
+      });
+    }
+    setIntention(title);
+  }, [setIntention]);
 
   // Hand-off from Plan's "Start on": consume the pending selection once, exactly
   // as picking the task in the Now aside does. Left untouched while a session runs.
   useEffect(() => {
     const { pendingSelection, status: current, setPendingSelection } = useTimerStore.getState();
     if (!pendingSelection || current !== 'idle') return;
-    const { taskId, title } = pendingSelection;
-    window.logAPI.getCachedTask(taskId).then(task => {
-      if (task) {
-        setSelectedTask(task);
-      } else {
-        setSelectedTask({ task_id: taskId, title, project_id: 0, project_name: null, last_seen_at: new Date().toISOString() });
-      }
-    });
-    setIntention(title);
+    selectPlanned(pendingSelection.taskId, pendingSelection.title);
     setPendingSelection(null);
   }, []);
 
@@ -155,13 +185,13 @@ export default function Timer({ onNavigate }: TimerProps) {
     return () => window.removeEventListener('keydown', handler);
   }, [focusState]);
 
-  // Enter = Begin Focus, only with a task selected, nothing open and no field focused.
+  // Enter = Begin Focus (ready or break), only with a task selected, nothing open and no field focused.
   const anyModalOpen = showBoundaryDialog || showIntentionModal || showCancelConfirm;
   const handleStartRef = useRef<() => void>(() => {});
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-      if (focusState !== 'ready-selected' || status !== 'idle' || pickerOpen || anyModalOpen) return;
+      if (focusState !== 'ready-selected' || status === 'focus' || pickerOpen || anyModalOpen) return;
       const el = document.activeElement as HTMLElement | null;
       const tag = el?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
@@ -243,14 +273,20 @@ export default function Timer({ onNavigate }: TimerProps) {
     }
   }
 
-  const handleTaskSelect = useCallback((task: TaskCache) => {
+  const handleTaskSelect = useCallback((task: PickerTask) => {
+    if (task.planned) {
+      selectPlanned(task.task_id || null, task.title);
+      // No task to log to: keep the picker open so one can be chosen.
+      if (task.task_id) setPickerOpen(false);
+      return;
+    }
     setSelectedTask(task);
     setPickerOpen(false);
-  }, []);
+  }, [selectPlanned]);
 
   // Pre-fill the billable toggle from the selected task's default (list item > list > global).
   useEffect(() => {
-    if (status !== 'idle') return;
+    if (status === 'focus') return;
     let cancelled = false;
     window.listsAPI?.getBillableForTask?.(selectedTask?.task_id || null)
       .then((b) => { if (!cancelled) setCurrentBillable(b); })
@@ -271,9 +307,13 @@ export default function Timer({ onNavigate }: TimerProps) {
       }
     }
 
-    startFocus(taskId, currentBillable);
+    beginFocus(taskId);
   };
   handleStartRef.current = handleStart;
+
+  // During a break the break so far is saved first; Continue previous keeps Q6 (no row).
+  const beginFocus = (taskId: string | undefined) =>
+    status === 'break' ? startFocusFromBreak(taskId, currentBillable) : startFocus(taskId, currentBillable);
 
   // Q2: the selected task wins; otherwise the store resolves one. No boundary check.
   const handleKickoff = () => {
@@ -303,7 +343,7 @@ export default function Timer({ onNavigate }: TimerProps) {
 
   const handleBoundaryContinue = () => {
     setShowBoundaryDialog(false);
-    startFocus(pendingTaskId, currentBillable);
+    beginFocus(pendingTaskId);
     setPendingTaskId(undefined);
   };
 
@@ -347,7 +387,7 @@ export default function Timer({ onNavigate }: TimerProps) {
   const sessionWindow = sessionStartTime && estimatedEnd
     ? `${formatTimeRange(sessionStartTime)} → ${formatTimeRange(estimatedEnd)}`
     : '';
-  const countdownLabel = isBreak ? `BREAK · ${sessionWindow}` : 'READY';
+  const countdownLabel = isBreak ? (isPaused ? 'BREAK · PAUSED' : `BREAK · ${sessionWindow}`) : 'READY';
   const endsAt = estimatedEnd ? formatTimeRange(estimatedEnd) : null;
 
   const tone = isBreak ? 'emerald' : 'amber';
@@ -360,7 +400,23 @@ export default function Timer({ onNavigate }: TimerProps) {
   // The picker is open whenever nothing is selected, break included: the old app let the
   // next task be picked (and its note / billable set) while the break ran.
   const showIdlePicker = focusState === 'ready-empty';
-  const showBreakSelected = isBreak && focusState === 'ready-selected' && !!selectedTask;
+
+  // Next to Begin Focus: Kickoff when ready, Skip Break during a break.
+  // Next to Begin Focus. Break: Skip / Pause. Ready: Kickoff, plus the break a finished focus
+  // earned (mirrors the overlay card's Start break, for when that card is on another screen).
+  const secondaryKey = isBreak ? (
+    <>
+      <KeyButton variant="outline" onClick={() => skip()}>Skip Break</KeyButton>
+      <KeyButton variant="ghost" onClick={() => (isPaused ? resume() : pause())}>{isPaused ? 'Resume' : 'Pause'}</KeyButton>
+    </>
+  ) : (
+    <>
+      <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>
+      {pendingBreakMinutes !== null && (
+        <KeyButton variant="outline" onClick={() => startBreakFromModal()}>Start break {pendingBreakMinutes}m</KeyButton>
+      )}
+    </>
+  );
 
   const activeTask: { task_id: string; title: string } | null =
     isActive && currentTaskId
@@ -430,20 +486,20 @@ export default function Timer({ onNavigate }: TimerProps) {
                 />
               }
             >
-              {/* ready-empty */}
-              {focusState === 'ready-empty' && !isBreak && (
+              {/* ready-empty (break too: the next task can be picked and started mid-break) */}
+              {focusState === 'ready-empty' && (
                 <>
-                  <p className="font-display text-[15px] text-txt-muted">Pick a task below</p>
+                  <p className="font-display text-[15px] text-txt-muted">{isBreak ? 'Take a breather, or pick the next task below' : 'Pick a task below'}</p>
                   <DurationSegments value={durationMinutes} onChange={handleDurationChange} />
                   <div className="flex flex-wrap gap-2">
-                    <KeyButton variant="amber" kbd="↵" disabled onClick={handleStart}>Begin Focus</KeyButton>
-                    <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>
+                    <KeyButton variant="amber" kbd="↵" disabled title="Pick a task first" onClick={handleStart}>Begin Focus</KeyButton>
+                    {secondaryKey}
                   </div>
                 </>
               )}
 
               {/* ready-selected */}
-              {focusState === 'ready-selected' && selectedTask && !isBreak && (
+              {focusState === 'ready-selected' && selectedTask && (
                 <>
                   <TaskCardWithPicker
                     task={selectedTask}
@@ -451,28 +507,20 @@ export default function Timer({ onNavigate }: TimerProps) {
                     recentTasks={recentTasks}
                     pickerOpen={pickerOpen}
                     onToggle={() => setPickerOpen(p => !p)}
-                    onSelectTask={(t) => { setSelectedTask(t); setPickerOpen(false); }}
+                    plannedTasks={plannedTasks}
+                    onSelectTask={handleTaskSelect}
                     onNoteChange={setIntention}
                     searchRef={searchRef}
                     beforeNote={<DurationSegments value={durationMinutes} onChange={handleDurationChange} />}
                   />
                   <div className="flex flex-wrap items-center gap-2">
                     <KeyButton variant="amber" kbd="↵" onClick={handleStart}>Begin Focus</KeyButton>
-                    <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>
+                    {secondaryKey}
                     <BillableToggle checked={currentBillable} onChange={setCurrentBillable} size="sm" className="ml-auto" />
                   </div>
                 </>
               )}
 
-              {/* break */}
-              {isBreak && (
-                <>
-                  <p className="font-display text-[15px] text-txt-muted">Take a breather</p>
-                  <div className="flex gap-2">
-                    <KeyButton variant="outline" onClick={() => skip()}>Skip Break</KeyButton>
-                  </div>
-                </>
-              )}
             </FocusBlock>
           )}
 
@@ -482,32 +530,13 @@ export default function Timer({ onNavigate }: TimerProps) {
               <SectionHeader>02 Tasks</SectionHeader>
               <TaskPicker
                 recentTasks={recentTasks}
+                plannedTasks={plannedTasks}
                 onSelect={handleTaskSelect}
                 searchRef={searchRef}
               />
             </div>
           )}
 
-          {/* 02 TASKS during a break with a task selected — the card, note and billable stay
-              editable; Begin Focus / Kickoff and the duration strip wait for the break to end. */}
-          {showBreakSelected && selectedTask && (
-            <div className="flex flex-col gap-3" data-testid="break-selected-task">
-              <SectionHeader>02 Tasks</SectionHeader>
-              <TaskCardWithPicker
-                task={selectedTask}
-                note={intention}
-                recentTasks={recentTasks}
-                pickerOpen={pickerOpen}
-                onToggle={() => setPickerOpen(p => !p)}
-                onSelectTask={(t) => { setSelectedTask(t); setPickerOpen(false); }}
-                onNoteChange={setIntention}
-                searchRef={searchRef}
-              />
-              <div className="flex justify-end">
-                <BillableToggle checked={currentBillable} onChange={setCurrentBillable} size="sm" />
-              </div>
-            </div>
-          )}
         </div>
 
         <NowAside
@@ -516,18 +545,7 @@ export default function Timer({ onNavigate }: TimerProps) {
           adhocEntries={adhocEntries}
           onRefresh={loadSessions}
           onNavigate={onNavigate}
-          onSelectTask={(taskId, itemTitle) => {
-            if (taskId) {
-              window.logAPI.getCachedTask(taskId).then(task => {
-                if (task) {
-                  setSelectedTask(task);
-                } else {
-                  setSelectedTask({ task_id: taskId, title: itemTitle, project_id: 0, project_name: null, last_seen_at: new Date().toISOString() });
-                }
-              });
-            }
-            setIntention(itemTitle);
-          }}
+          onSelectTask={selectPlanned}
         />
       </div>
 

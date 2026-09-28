@@ -11,6 +11,8 @@ export interface TimerState {
   intention: string;
   /** True while the always-on-top session-end overlay is up. */
   overlayOpen: boolean;
+  /** Minutes of the break a just-finished focus earned; null once a break, focus or reset follows. */
+  pendingBreakMinutes: number | null;
   durationMinutes: number;
   setIntention: (intention: string) => void;
   setDurationMinutes: (minutes: number) => void;

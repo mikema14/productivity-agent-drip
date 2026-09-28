@@ -25,6 +25,8 @@ import {
 
 export const SHOW_DONE_KEY = 'allListsOverview_showDone';
 export const SHOW_TASK_IDS_KEY = 'allListsOverview_showTaskIds';
+/** All scope: the list the last task was added to. */
+export const ADD_TASK_LIST_KEY = 'plan_addTaskList';
 
 interface PlanBoardProps {
   scope: 'all' | 'list';
@@ -169,12 +171,16 @@ export default function PlanBoard({ scope, onNavigate }: PlanBoardProps) {
     onCloseDetail: () => setExpandedItemId(null),
   };
 
-  const handleAddItem = async (column: ListItemColumn, title: string, taskId: string | null, billable?: boolean) => {
-    if (!selectedList) return;
+  const handleAddItem = async (column: ListItemColumn, listId: string, title: string, taskId: string | null, billable?: boolean) => {
+    const target = lists.find(l => l.id === listId);
+    if (!target) return;
     // Inherit the list's billable default unless the add form overrode it.
-    const resolvedBillable = billable ?? (selectedList.billable !== 0);
+    const resolvedBillable = billable ?? (target.billable !== 0);
+    if (scope === 'all') {
+      try { localStorage.setItem(ADD_TASK_LIST_KEY, listId); } catch { /* convenience only */ }
+    }
     await createItem({
-      list_id: selectedList.id,
+      list_id: listId,
       title,
       task_id: taskId,
       column,
@@ -284,18 +290,32 @@ export default function PlanBoard({ scope, onNavigate }: PlanBoardProps) {
     return null;
   };
 
+  // All scope adds to: the one filtered list, else the last list added to, else the first (P23).
+  const defaultAddListId = (): string | null => {
+    if (selectedList) return selectedList.id;
+    if (activeListFilters.size === 1) return [...activeListFilters][0];
+    let stored: string | null = null;
+    try { stored = localStorage.getItem(ADD_TASK_LIST_KEY); } catch { /* ignore */ }
+    if (stored && lists.some(l => l.id === stored)) return stored;
+    return lists[0]?.id ?? null;
+  };
+
   const dragging = activeId !== null;
   const footerFor = (column: ListItemColumn) => {
     const zone = 'h-[52px] shrink-0 mt-2.5 flex items-center justify-center border border-dashed rounded-[2px] font-display text-[12.5px] transition-colors';
-    if (scope === 'list' && selectedList) {
+    const addListId = scope === 'list' ? selectedList?.id ?? null : defaultAddListId();
+    if (addListId) {
       if (addingColumn === column) {
+        const addList = lists.find(l => l.id === addListId);
         return (
           <div className="mt-2.5 shrink-0">
             <AddItemInline
-              listId={selectedList.id}
+              listId={addListId}
               column={column}
-              defaultBillable={selectedList.billable !== 0}
-              onAdd={(title, taskId, billable) => handleAddItem(column, title, taskId, billable)}
+              defaultBillable={addList ? addList.billable !== 0 : true}
+              lists={lists}
+              chooseList={scope === 'all'}
+              onAdd={(title, taskId, billable, listId) => handleAddItem(column, listId, title, taskId, billable)}
               onCancel={() => setAddingColumn(null)}
             />
           </div>

@@ -29,6 +29,12 @@ describe('TaskCardWithPicker', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 
+  it('collapsed: names the project once, in the header', () => {
+    renderCard(false);
+    const project = makeTask(1).project_name!;
+    expect(screen.getAllByText((_, el) => el?.textContent === project || el?.textContent === `— ${project}`)).toHaveLength(1);
+  });
+
   it('open: uses the shared list and marks the current task', () => {
     renderCard(true);
     const options = screen.getAllByRole('option');
