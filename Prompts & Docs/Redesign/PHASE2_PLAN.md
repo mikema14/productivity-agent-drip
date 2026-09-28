@@ -313,6 +313,11 @@ Each item: what the mockup shows vs what exists, the options, and my recommendat
 - **P20** Decided: (a) `Archived · n` (`aria-pressed`), tests updated in the same commit.
 - **P21** Decided: (a) rule-based subtitle only (`logs to <id>` | `billable` | `not billable`).
 
+### Decided (owner, 2026-09-28, post-1.1.0 fixes)
+
+- **P22** Supersedes P4's arrow note. The ←/→ hover arrows followed the data order while the board shows Today · This week · Backlog, so "Move left" moved a card right. Each open card now offers the other two columns by name (`Today` / `This week` / `Backlog`, `title` + `aria-label` `Move to <column>`), any column in one click (`boardLogic.moveTargets`). Done cards and the Done column still get none.
+- **P23** Supersedes P14. `Add a task` sits in every Today / This week / Backlog column in both scopes (`Drop here` during a drag, none in Done, a plain drop zone when there are no lists). All scope adds to the one filtered list, else the last list added to (`localStorage` `plan_addTaskList`), else the first; the form shows a list chooser. The form (`Lists/AddItemInline`) takes an optional Easy8 task: task_cache search, or an id + Enter / blur → `getCachedTask`, then `getIssue` (which caches); an empty title takes the issue subject; an unknown id shows `role=alert` and the item can still be added. A list bound to a task turns the id field off (`logs to <id>`) and saves `task_id: null`.
+
 **P1. Week label and ‹ › arrows in the header.** Mockup: `‹ Week 39 · 21–27 Sep ›`. Nothing in Lists has a week concept ("This week" is a timeless column). Options: (a) static label of the current ISO week, no arrows; (b) arrows that do nothing visible (inert, violates the Q4 precedent); (c) drop the label. **Recommend (a).** The label gives "This week" and the tracked-week line a concrete date range.
 
 **P2. `Weekly review` button.** No review UI exists; `computeWeeklySummary` runs from End Day only. Options: (a) drop for Phase 2, roadmap item; (b) open Review on the current week. **Recommend (a).**

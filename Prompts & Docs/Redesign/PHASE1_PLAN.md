@@ -271,6 +271,14 @@ Risks: `Timer.tsx` is a 718-line rewrite of JSX with an untested store behind it
 - Q8 Below 1000px: accepted. Aside 280px, digits 120px, right column wraps.
 - Q9 Labels: accepted. Section headers `01 FOCUS` / `02 TASKS` / `03 DAY`; the block label row shows state + SESSION n/8.
 
+### Owner decisions (2026-09-28, post-1.1.0 fixes)
+
+- Q10 Break = ready for the next task. Supersedes §2's break rows (no duration strip / Begin Focus in break). During a break the state column matches ready: duration strip, task card + note + billable, `Begin Focus ↵` (disabled with `title="Pick a task first"` until a task is picked) next to `Skip Break`; no Kickoff. Begin Focus / Enter first saves the break so far as a `break` row when it ran ≥ 1 min (`timerStore.startFocusFromBreak`), then starts the focus. A length picked mid-break changes only the next focus. Continue previous keeps Q6 (no break row).
+- Q11 Break pill: main hides the overlay's `break-running` pill on every break → non-break transition of its timer (`electron/timer.ts` `setStatus` → `overlayWindow.hideBreakPill`): Skip break, `drip://skip-break` / `stop`, a focus started mid-break, the break's own end. Pausing keeps it.
+- Q12 02 Tasks has a `Recent tasks | Planned` switch (also in the card's picker): Planned = Plan's open Today then This week items, grouped, list name on the right, `No task ID` for items with none. Opens on Planned when something is planned; the choice persists (`localStorage` `now_pickerSource`). Picking one works like `Start on` (task selected, item title → note); an item with no task only sets the note and keeps the picker open.
+- Q13 One project name on the task card (header `id — project`); the bottom line keeps only `Today · n/8 sessions`.
+- Q14 `SetIntentionModal`: `Done` and a backdrop click save a typed draft; Esc and × discard it; a failed save shows `role=alert` and keeps the modal.
+
 ## 8. Roadmap scope (owner, 2026-09-25)
 
 Only surfaces covered by the design proposal get redesigned:
