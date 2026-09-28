@@ -347,42 +347,67 @@ describe('Timer — active states', () => {
     await waitFor(() => expect(window.timerAPI.stopMainTimer).toHaveBeenCalledTimes(1));
   });
 
-  it('break: Skip Break only; picker visible below, intention row editable, no duration strip', async () => {
+  it('break, nothing picked: Begin Focus disabled next to Skip Break, duration strip, picker below; no Kickoff', async () => {
     setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(), totalDuration: 300, remainingSeconds: 200, intervalId: 1, sessionCount: 2 });
     await renderTimer();
     expect(key(/skip break/i)).toBeInTheDocument();
-    expect(queryKey(/begin focus/i)).toBeNull();
+    expect(key(/begin focus/i)).toBeDisabled();
+    expect(key(/begin focus/i)).toHaveAttribute('title', 'Pick a task first');
     expect(queryKey(/pause/i)).toBeNull();
     expect(queryKey(/kickoff/i)).toBeNull();
     expect(screen.getByRole('listbox')).toBeInTheDocument();
     expect(key(/set intention/i)).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Duration in minutes' })).toBeNull();
+    expect(screen.getByRole('group', { name: 'Duration in minutes' })).toBeInTheDocument();
     expect(screen.getByTestId('now-pill')).toHaveTextContent('Break');
     expect(screen.getByText(/^BREAK ·/)).toBeInTheDocument();
     expect(screen.getByText(/done/i)).toHaveTextContent('2/8 done');
   });
 
-  it('break: picking the next task shows the card with note + billable, still no Begin Focus / Kickoff / duration strip', async () => {
+  it('break: picking a task shows the card with duration, note, billable and an enabled Begin Focus', async () => {
     window.logAPI.getRankedRecentTasks = vi.fn(async () => makeTasks(3));
     setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(), totalDuration: 300, remainingSeconds: 200, intervalId: 1 });
     const { user } = await renderTimer();
     await selectFirstTask(user);
-    const section = screen.getByTestId('break-selected-task');
-    expect(within(section).getByText('Task number 1')).toBeInTheDocument();
-    expect(within(section).getByPlaceholderText('Session note (optional)')).toBeInTheDocument();
-    expect(within(section).getByRole('switch')).toBeInTheDocument();
+    expect(screen.getByText('Task number 1')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Session note (optional)')).toBeInTheDocument();
+    expect(screen.getByRole('switch')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Duration in minutes' })).toBeInTheDocument();
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(key(/skip break/i)).toBeInTheDocument();
-    expect(queryKey(/begin focus/i)).toBeNull();
+    expect(key(/begin focus/i)).toBeEnabled();
     expect(queryKey(/kickoff/i)).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Duration in minutes' })).toBeNull();
-    // Enter never starts a focus during a break, even with a task picked.
+  });
+
+  it('break: Begin Focus saves the break so far (≥ 1 min) and starts the picked task at the chosen length', async () => {
+    window.logAPI.getRankedRecentTasks = vi.fn(async () => makeTasks(3));
+    window.timerAPI.saveSession = vi.fn(async () => 'break-row');
+    window.timerAPI.startMainTimer = vi.fn(async () => ({ raycastFocus: false }));
+    setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(Date.now() - 120_000), totalDuration: 300, remainingSeconds: 180, intervalId: 1 });
+    const { user } = await renderTimer();
+    await selectFirstTask(user);
+    await user.click(screen.getByRole('button', { name: '50' }));
+    // Picking a length mid-break leaves the break countdown alone.
+    expect(useTimerStore.getState().remainingSeconds).toBe(180);
+    await user.click(key(/begin focus/i));
+    await waitFor(() => expect(window.timerAPI.startMainTimer).toHaveBeenCalled());
+    expect(window.timerAPI.saveSession).toHaveBeenCalledWith(expect.objectContaining({ source: 'break', duration_minutes: 2, task_id: null }));
+    const [secs, type, , taskId] = vi.mocked(window.timerAPI.startMainTimer).mock.calls[0];
+    expect([secs, type, taskId]).toEqual([50 * 60, 'focus', makeTasks(1)[0].task_id]);
+    const saveOrder = vi.mocked(window.timerAPI.saveSession).mock.invocationCallOrder[0];
+    expect(saveOrder).toBeLessThan(vi.mocked(window.timerAPI.startMainTimer).mock.invocationCallOrder[0]);
+  });
+
+  it('break under a minute: Enter starts the focus and saves no break row', async () => {
+    window.logAPI.getRankedRecentTasks = vi.fn(async () => makeTasks(3));
+    window.timerAPI.saveSession = vi.fn(async () => 'break-row');
+    window.timerAPI.startMainTimer = vi.fn(async () => ({ raycastFocus: false }));
+    setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(Date.now() - 20_000), totalDuration: 300, remainingSeconds: 280, intervalId: 1 });
+    const { user } = await renderTimer();
+    await selectFirstTask(user);
     (document.activeElement as HTMLElement | null)?.blur();
     await user.keyboard('{Enter}');
-    expect(window.timerAPI.startMainTimer).not.toHaveBeenCalled();
-    // The picked task carries into Begin Focus once the break ends.
-    setTimer({ status: 'idle', sessionStartTime: null, intervalId: null });
-    expect(await screen.findByRole('button', { name: /begin focus/i })).toBeEnabled();
+    await waitFor(() => expect(window.timerAPI.startMainTimer).toHaveBeenCalledWith(25 * 60, 'focus', expect.anything(), makeTasks(1)[0].task_id, undefined));
+    expect(window.timerAPI.saveSession).not.toHaveBeenCalled();
   });
 
   it('break: `/` focuses the task search', async () => {

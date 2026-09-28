@@ -45,6 +45,8 @@ interface TimerStore extends TimerState {
     kickoffSource?: KickoffSource,
     kickoffEscalateMinutes?: number | null
   ) => Promise<void>;
+  /** Begin focus from Now; during a break the break so far is saved first (≥ 1 min). */
+  startFocusFromBreak: (taskId?: string, billable?: boolean) => Promise<void>;
   startKickoff: (seconds: number, source?: KickoffSource, escalateMinutes?: number | null) => Promise<void>;
   stopKickoff: () => Promise<void>;
   /**
@@ -100,6 +102,29 @@ function getBreakSeconds(durationMinutes: number, isLong: boolean): number {
 
 function getBreakMinutes(durationMinutes: number, isLong: boolean): number {
   return Math.max(1, Math.round(getBreakSeconds(durationMinutes, isLong) / 60));
+}
+
+/** A break row, only when at least a minute ran (rounded). */
+async function saveBreakRow(start: Date): Promise<void> {
+  if (!window.timerAPI) return;
+  const endTime = new Date();
+  const durationMinutes = Math.round((endTime.getTime() - start.getTime()) / 60000);
+  if (durationMinutes < 1) return;
+  try {
+    await window.timerAPI.saveSession({
+      start_at: formatDateTime(start),
+      end_at: formatDateTime(endTime),
+      duration_minutes: durationMinutes,
+      task_id: null,
+      source: 'break',
+      comment: 'Break',
+      logged: 0,
+      log_sent_at: null,
+      server_entry_id: null
+    });
+  } catch (error) {
+    console.error('[Timer] Failed to save break session:', error);
+  }
 }
 
 async function resolveTaskTitle(taskId: string | null): Promise<string | null> {
@@ -184,7 +209,9 @@ export const useTimerStore = create<TimerStore>()(
 
       setDurationMinutes: (minutes: number) => {
         const secs = minutes * 60;
-        set({ durationMinutes: minutes, remainingSeconds: secs, totalDuration: secs });
+        // Picked during a break: only the next focus changes, the break countdown stays.
+        if (get().status !== 'idle') set({ durationMinutes: minutes });
+        else set({ durationMinutes: minutes, remainingSeconds: secs, totalDuration: secs });
       },
 
       setCurrentBillable: (billable: boolean) => {
@@ -252,6 +279,13 @@ export const useTimerStore = create<TimerStore>()(
       kickoffEscalateMinutes: kickoffSecs ? kickoffEscalateMinutes ?? null : null,
       raycastFocus
     });
+  },
+
+  startFocusFromBreak: async (taskId?: string, billable?: boolean) => {
+    const { status, sessionStartTime } = get();
+    // Save before startFocus, which overwrites sessionStartTime.
+    if (status === 'break' && sessionStartTime) await saveBreakRow(sessionStartTime);
+    await get().startFocus(taskId, billable);
   },
 
   startKickoff: async (seconds: number, source: KickoffSource = 'now', escalateMinutes: number | null = null) => {
@@ -487,29 +521,7 @@ export const useTimerStore = create<TimerStore>()(
     }
 
     // Save break session to database
-    if (window.timerAPI && state.sessionStartTime) {
-      const endTime = new Date();
-      const durationMs = endTime.getTime() - state.sessionStartTime.getTime();
-      const durationMinutes = Math.round(durationMs / 60000);
-
-      if (durationMinutes >= 1) {
-        try {
-          await window.timerAPI.saveSession({
-            start_at: formatDateTime(state.sessionStartTime),
-            end_at: formatDateTime(endTime),
-            duration_minutes: durationMinutes,
-            task_id: null,
-            source: 'break',
-            comment: 'Break',
-            logged: 0,
-            log_sent_at: null,
-            server_entry_id: null
-          });
-        } catch (error) {
-          console.error('[Timer] Failed to save break session:', error);
-        }
-      }
-    }
+    if (state.sessionStartTime) await saveBreakRow(state.sessionStartTime);
 
     const breakOverlayShown = await raiseSessionEndOverlay(
       { kind: 'break-complete', nextFocusMinutes: get().durationMinutes },
