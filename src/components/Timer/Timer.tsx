@@ -20,6 +20,7 @@ import SetIntentionModal from '../shared/SetIntentionModal';
 import BillableToggle from '../shared/BillableToggle';
 import type { PomodoroSession, CalendarProposal, AdhocEntry, TaskCache, RankedTask } from '../../types';
 import type { ViewId } from '../Layout/views';
+import { getCurrentDate } from '../../utils/time';
 
 type FocusState = 'ready-empty' | 'ready-selected' | 'running' | 'paused';
 
@@ -60,7 +61,7 @@ export default function Timer({ onNavigate }: TimerProps) {
     selectionResetToken,
   } = useTimerStore();
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getCurrentDate(); // local calendar day, like Review
   const { getIntentions, loadDay, addIntention, removeIntention } = useIntentionsStore();
   const intentions = getIntentions(today);
 

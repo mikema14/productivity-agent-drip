@@ -8,11 +8,12 @@ import { useIntentionsStore } from '../../stores/intentionsStore';
 import { useLogStore } from '../../stores/logStore';
 import { useTimerStore } from '../../stores/timerStore';
 import type { PomodoroSession } from '../../types';
+import { getCurrentDate } from '../../utils/time';
 
 vi.mock('./TimerDayTimeline', () => ({ default: () => <div>TimelineStub</div> }));
 vi.mock('../Lists/TimerTaskList', () => ({ default: () => <div>TaskListStub</div> }));
 
-const today = new Date().toISOString().split('T')[0];
+const today = getCurrentDate();
 
 function makeSession(i: number, overrides: Partial<PomodoroSession> = {}): PomodoroSession {
   return {
@@ -447,6 +448,18 @@ describe('Timer — active states', () => {
     expect(screen.getByRole('group', { name: "Today's intention: Ship the rail" })).toBeInTheDocument();
     await user.click(key(/^edit$/i));
     expect(screen.getByText("Today's intentions")).toBeInTheDocument();
+  });
+
+  it('Set intention → type → Done saves it for the local day and the row shows it', async () => {
+    window.dashboardAPI.setDailyIntentions = vi.fn(async () => undefined);
+    const { user } = await renderTimer();
+    await user.click(key(/set intention/i));
+    await user.type(screen.getByPlaceholderText(/what will you focus on today/i), 'Ship GDI scope');
+    await user.click(key(/^done$/i));
+    expect(window.dashboardAPI.setDailyIntentions).toHaveBeenCalledWith(today, ['Ship GDI scope']);
+    expect(screen.queryByText("Today's intentions")).toBeNull();
+    expect(screen.getByRole('group', { name: "Today's intention: Ship GDI scope" })).toBeInTheDocument();
+    expect(key(/^edit$/i)).toBeInTheDocument();
   });
 
   it('paused with no intention: a compact SET INTENTION key sits in the row and opens the modal', async () => {

@@ -2,26 +2,46 @@ import { useState } from 'react';
 
 interface Props {
   intentions: string[];
-  onAdd: (text: string) => void;
+  onAdd: (text: string) => Promise<void> | void;
   onRemove: (index: number) => void;
   onClose: () => void;
 }
 
 export default function SetIntentionModal({ intentions, onAdd, onRemove, onClose }: Props) {
   const [draft, setDraft] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  /** Saves a typed draft; false when saving failed (the modal then stays open). */
+  const commitDraft = async (): Promise<boolean> => {
+    const text = draft.trim();
+    if (!text) return true;
+    try {
+      await onAdd(text);
+      setDraft('');
+      setError(null);
+      return true;
+    } catch {
+      setError('Could not save the intention. Try again.');
+      return false;
+    }
+  };
+
+  // Done and a backdrop click keep what was typed; Esc and × discard it.
+  const saveAndClose = async () => {
+    if (await commitDraft()) onClose();
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && draft.trim()) {
       e.preventDefault();
-      onAdd(draft.trim());
-      setDraft('');
+      void commitDraft();
     } else if (e.key === 'Escape') {
       onClose();
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={saveAndClose}>
       <div
         className="bg-drip-surface border border-focus/20 rounded-2xl shadow-glass max-w-sm w-full mx-4 animate-scale-in"
         onClick={e => e.stopPropagation()}
@@ -30,6 +50,7 @@ export default function SetIntentionModal({ intentions, onAdd, onRemove, onClose
           <h3 className="text-base font-display font-semibold text-txt-primary">Today's intentions</h3>
           <button
             onClick={onClose}
+            aria-label="Close without saving"
             className="text-txt-dim hover:text-txt-muted w-6 h-6 flex items-center justify-center rounded-md hover:bg-focus/5 transition-colors"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -63,6 +84,7 @@ export default function SetIntentionModal({ intentions, onAdd, onRemove, onClose
                          text-txt-primary placeholder-txt-dim focus:outline-none focus:ring-2 focus:ring-focus/30"
             />
           )}
+          {error && <p role="alert" className="text-xs text-alert px-1">{error}</p>}
           {intentions.length >= 3 && (
             <p className="text-xs text-txt-dim px-1">Max 3 intentions per day</p>
           )}
@@ -70,7 +92,7 @@ export default function SetIntentionModal({ intentions, onAdd, onRemove, onClose
 
         <div className="px-6 pb-5">
           <button
-            onClick={onClose}
+            onClick={saveAndClose}
             className="w-full h-10 rounded-xl bg-focus/10 border border-focus/20 text-txt-secondary text-sm
                        hover:bg-focus/15 transition-all duration-150"
           >
