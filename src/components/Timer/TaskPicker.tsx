@@ -1,11 +1,13 @@
 import { useRef, useId } from 'react';
-import { useTaskPickerNav } from '../../hooks/useTaskPickerNav';
+import { useTaskPickerNav, type PickerTask } from '../../hooks/useTaskPickerNav';
 import TaskResultList, { optionId } from './TaskResultList';
-import type { TaskCache, RankedTask } from '../../types';
+import type { RankedTask } from '../../types';
 
 interface Props {
   recentTasks: RankedTask[];
-  onSelect: (task: TaskCache) => void;
+  onSelect: (task: PickerTask) => void;
+  /** Plan's Today / This week rows for the Planned switch. */
+  plannedTasks?: PickerTask[];
   searchRef?: React.RefObject<HTMLInputElement>;
 }
 
@@ -22,12 +24,12 @@ function SearchIcon() {
  * Idle task picker: search input plus an always-visible, scrollable task list.
  * It fills whatever height its parent gives it; the list scrolls internally.
  */
-export default function TaskPicker({ recentTasks, onSelect, searchRef }: Props) {
+export default function TaskPicker({ recentTasks, plannedTasks, onSelect, searchRef }: Props) {
   const internalRef = useRef<HTMLInputElement>(null);
   const inputRef = searchRef || internalRef;
   const listId = `task-picker-${useId().replace(/:/g, '')}`;
 
-  const nav = useTaskPickerNav({ recentTasks, onSelect });
+  const nav = useTaskPickerNav({ recentTasks, plannedTasks, onSelect });
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (nav.handleNavKey(e)) return;
@@ -74,6 +76,8 @@ export default function TaskPicker({ recentTasks, onSelect, searchRef }: Props) 
         scrollTick={nav.scrollTick}
         onHover={nav.onHover}
         onSelect={nav.select}
+        source={nav.source}
+        onSourceChange={nav.setSource}
       />
     </div>
   );

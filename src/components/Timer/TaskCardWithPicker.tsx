@@ -1,6 +1,6 @@
 import { useRef, useEffect, useId, type ReactNode } from 'react';
 import { useTimerStore } from '../../stores/timerStore';
-import { useTaskPickerNav } from '../../hooks/useTaskPickerNav';
+import { useTaskPickerNav, type PickerTask } from '../../hooks/useTaskPickerNav';
 import TaskResultList, { optionId } from './TaskResultList';
 import type { TaskCache, RankedTask } from '../../types';
 
@@ -8,9 +8,11 @@ interface Props {
   task: TaskCache;
   note: string;
   recentTasks: RankedTask[];
+  /** Plan's Today / This week rows for the Planned switch. */
+  plannedTasks?: PickerTask[];
   pickerOpen: boolean;
   onToggle: () => void;
-  onSelectTask: (task: TaskCache) => void;
+  onSelectTask: (task: PickerTask) => void;
   onNoteChange: (note: string) => void;
   searchRef: React.RefObject<HTMLInputElement>;
   /** Rendered between the id row and the note input when collapsed (the duration strip). */
@@ -35,7 +37,7 @@ function SearchIcon() {
 }
 
 export default function TaskCardWithPicker({
-  task, note, recentTasks, pickerOpen, onToggle, onSelectTask, onNoteChange, searchRef, beforeNote,
+  task, note, recentTasks, plannedTasks, pickerOpen, onToggle, onSelectTask, onNoteChange, searchRef, beforeNote,
 }: Props) {
   const { sessionCount } = useTimerStore();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,7 +46,7 @@ export default function TaskCardWithPicker({
   const inputRef = searchRef || internalRef;
   const listId = `task-card-picker-${useId().replace(/:/g, '')}`;
 
-  const nav = useTaskPickerNav({ recentTasks, onSelect: onSelectTask });
+  const nav = useTaskPickerNav({ recentTasks, plannedTasks, onSelect: onSelectTask });
   const queryRef = useRef(nav.query);
   queryRef.current = nav.query;
 
@@ -143,6 +145,8 @@ export default function TaskCardWithPicker({
             onHover={nav.onHover}
             onSelect={nav.select}
             currentTaskId={task.task_id}
+            source={nav.source}
+            onSourceChange={nav.setSource}
           />
         </div>
       ) : (

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   COLUMNS, DATA_ORDER, effectiveTaskId, partition, groupBacklog, ageBadge, groupByList, resolveDrop,
   moveTargets, listSubtitle, provenance, capacityLine, formatMinutesPadded, weekLabel, weekRange,
-  isoWeek, getMonday, startCandidate,
+  isoWeek, getMonday, startCandidate, plannedRows,
 } from './boardLogic';
 import type { ListItem, TaskList } from '../../types';
 
@@ -274,5 +274,25 @@ describe('startCandidate', () => {
   it('returns null with nothing startable', () => {
     expect(startCandidate([item('a')], lists)).toBeNull();
     expect(startCandidate([], lists)).toBeNull();
+  });
+});
+
+describe('plannedRows', () => {
+  it('lists open Today then This week items in board order, list id winning, archived lists and done/backlog left out', () => {
+    const lists = [list('l1', { name: 'E8 Priorities', color: '#00f' }), list('l2', { name: 'GDI', task_id: '662962' })];
+    const items = [
+      item('w1', { column: 'this_week', order: 0, task_id: '689666' }),
+      item('t2', { column: 'today', order: 1 }),
+      item('t1', { column: 'today', order: 0, list_id: 'l2', task_id: '111' }),
+      item('td', { column: 'today', order: 2, completed: 1 }),
+      item('ta', { column: 'today', order: 3, archived: 1 }),
+      item('b1', { column: 'backlog' }),
+      item('gone', { column: 'today', list_id: 'archived-list' }),
+    ];
+    expect(plannedRows(items, lists)).toEqual([
+      { itemId: 't1', taskId: '662962', title: 't1', column: 'today', listName: 'GDI', listColor: '#fff' },
+      { itemId: 't2', taskId: null, title: 't2', column: 'today', listName: 'E8 Priorities', listColor: '#00f' },
+      { itemId: 'w1', taskId: '689666', title: 'w1', column: 'this_week', listName: 'E8 Priorities', listColor: '#00f' },
+    ]);
   });
 });

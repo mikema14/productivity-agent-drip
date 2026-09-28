@@ -2,12 +2,33 @@ import { useState, useMemo, useCallback, useRef } from 'react';
 import { useTaskSearch } from './useTaskSearch';
 import type { TaskCache, RankedTask } from '../types';
 
-/** A picker row: a cached task, with today's tracked minutes when known. */
-export type PickerTask = TaskCache & { todayMinutes?: number };
+/**
+ * A picker row: a cached task, with today's tracked minutes when known. Planned
+ * rows (a Plan item in Today / This week) carry `planned`; `task_id` is '' when
+ * the item has no task to log to.
+ */
+export type PickerTask = TaskCache & {
+  todayMinutes?: number;
+  planned?: { itemId: string; column: 'today' | 'this_week'; listName: string; listColor: string };
+};
+
+export type PickerSource = 'recent' | 'planned';
+const SOURCE_KEY = 'now_pickerSource';
+
+function readSource(): PickerSource | null {
+  try {
+    const v = localStorage.getItem(SOURCE_KEY);
+    return v === 'recent' || v === 'planned' ? v : null;
+  } catch {
+    return null;
+  }
+}
 
 interface Options {
   recentTasks: RankedTask[];
-  onSelect: (task: TaskCache) => void;
+  /** Plan's Today / This week rows; when given, the list can switch to them. */
+  plannedTasks?: PickerTask[];
+  onSelect: (task: PickerTask) => void;
 }
 
 /**
@@ -18,21 +39,31 @@ interface Options {
  * the empty gap while a search is in flight). Only arrow keys bump `scrollTick`,
  * which is what TaskResultList scrolls on - hover never scrolls.
  */
-export function useTaskPickerNav({ recentTasks, onSelect }: Options) {
+export function useTaskPickerNav({ recentTasks, plannedTasks, onSelect }: Options) {
   const [query, setQueryState] = useState('');
   const [rawHighlighted, setRawHighlighted] = useState(-1);
   const [scrollTick, setScrollTick] = useState(0);
   const [isFetching, setIsFetching] = useState(false);
   const fetchIdRef = useRef(0);
+  // No explicit choice yet: Planned when something is planned, else Recent.
+  const [chosenSource, setChosenSource] = useState<PickerSource | null>(readSource);
+  const source: PickerSource = !plannedTasks ? 'recent'
+    : chosenSource ?? (plannedTasks.length > 0 ? 'planned' : 'recent');
+
+  const setSource = useCallback((next: PickerSource) => {
+    setChosenSource(next);
+    setRawHighlighted(-1);
+    try { localStorage.setItem(SOURCE_KEY, next); } catch { /* per-viewer convenience only */ }
+  }, []);
 
   const { results: searchResults, isSearching } = useTaskSearch(query, recentTasks);
 
   // Search results come from task_cache without today's minutes; borrow them from the ranked list.
   const results: PickerTask[] = useMemo(() => {
-    if (!query.trim()) return recentTasks;
+    if (!query.trim()) return source === 'planned' ? plannedTasks ?? [] : recentTasks;
     const minutes = new Map(recentTasks.map(t => [t.task_id, t.todayMinutes]));
     return searchResults.map(t => ({ ...t, todayMinutes: minutes.get(t.task_id) ?? 0 }));
-  }, [query, recentTasks, searchResults]);
+  }, [query, recentTasks, searchResults, source, plannedTasks]);
 
   const highlighted = rawHighlighted < 0 || results.length === 0
     ? -1
@@ -43,7 +74,7 @@ export function useTaskPickerNav({ recentTasks, onSelect }: Options) {
     setRawHighlighted(0);
   }, []);
 
-  const select = useCallback((task: TaskCache) => {
+  const select = useCallback((task: PickerTask) => {
     setQueryState('');
     setRawHighlighted(-1);
     onSelect(task);
@@ -124,6 +155,8 @@ export function useTaskPickerNav({ recentTasks, onSelect }: Options) {
     isFetching,
     highlighted,
     scrollTick,
+    source,
+    setSource: plannedTasks ? setSource : undefined,
     onFocus,
     onBlur,
     onHover,

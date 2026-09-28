@@ -1,6 +1,9 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useTimerStore, KICKOFF_SECONDS } from '../../stores/timerStore';
 import { useIntentionsStore } from '../../stores/intentionsStore';
+import { useListsStore } from '../../stores/listsStore';
+import { plannedRows } from '../Plan/boardLogic';
+import type { PickerTask } from '../../hooks/useTaskPickerNav';
 import { useTaskName } from '../../hooks/useTaskName';
 import BoundaryConfirmDialog from './BoundaryConfirmDialog';
 import NowAside from './NowAside';
@@ -66,6 +69,21 @@ export default function Timer({ onNavigate }: TimerProps) {
   const { getIntentions, loadDay, addIntention, removeIntention } = useIntentionsStore();
   const intentions = getIntentions(today);
 
+  // Plan's Today / This week, for the picker's Planned switch (the store is shared with Plan).
+  const planLists = useListsStore(s => s.lists);
+  const planItems = useListsStore(s => s.items);
+  const plannedTasks: PickerTask[] = useMemo(
+    () => plannedRows(planItems, planLists).map(r => ({
+      task_id: r.taskId ?? '',
+      title: r.title,
+      project_id: 0,
+      project_name: null,
+      last_seen_at: '',
+      planned: { itemId: r.itemId, column: r.column, listName: r.listName, listColor: r.listColor },
+    })),
+    [planItems, planLists]
+  );
+
   // Local state
   const [selectedTask, setSelectedTask] = useState<TaskCache | null>(null);
   const nudgePause = useNudgePause();
@@ -112,22 +130,30 @@ export default function Timer({ onNavigate }: TimerProps) {
   useEffect(() => {
     loadDay(today);
     loadBoundarySettings();
+    const lists = useListsStore.getState();
+    if (lists.lists.length === 0) void lists.loadLists();
+    if (lists.items.length === 0) void lists.loadItems();
   }, []);
+
+  /**
+   * A planned task (Plan hand-off, the Day aside, the Planned picker): select its
+   * task (cached, else a stub) and take the item title as the session note.
+   */
+  const selectPlanned = useCallback((taskId: string | null, title: string) => {
+    if (taskId) {
+      window.logAPI.getCachedTask(taskId).then(task => {
+        setSelectedTask(task ?? { task_id: taskId, title, project_id: 0, project_name: null, last_seen_at: new Date().toISOString() });
+      });
+    }
+    setIntention(title);
+  }, [setIntention]);
 
   // Hand-off from Plan's "Start on": consume the pending selection once, exactly
   // as picking the task in the Now aside does. Left untouched while a session runs.
   useEffect(() => {
     const { pendingSelection, status: current, setPendingSelection } = useTimerStore.getState();
     if (!pendingSelection || current !== 'idle') return;
-    const { taskId, title } = pendingSelection;
-    window.logAPI.getCachedTask(taskId).then(task => {
-      if (task) {
-        setSelectedTask(task);
-      } else {
-        setSelectedTask({ task_id: taskId, title, project_id: 0, project_name: null, last_seen_at: new Date().toISOString() });
-      }
-    });
-    setIntention(title);
+    selectPlanned(pendingSelection.taskId, pendingSelection.title);
     setPendingSelection(null);
   }, []);
 
@@ -245,10 +271,16 @@ export default function Timer({ onNavigate }: TimerProps) {
     }
   }
 
-  const handleTaskSelect = useCallback((task: TaskCache) => {
+  const handleTaskSelect = useCallback((task: PickerTask) => {
+    if (task.planned) {
+      selectPlanned(task.task_id || null, task.title);
+      // No task to log to: keep the picker open so one can be chosen.
+      if (task.task_id) setPickerOpen(false);
+      return;
+    }
     setSelectedTask(task);
     setPickerOpen(false);
-  }, []);
+  }, [selectPlanned]);
 
   // Pre-fill the billable toggle from the selected task's default (list item > list > global).
   useEffect(() => {
@@ -461,7 +493,8 @@ export default function Timer({ onNavigate }: TimerProps) {
                     recentTasks={recentTasks}
                     pickerOpen={pickerOpen}
                     onToggle={() => setPickerOpen(p => !p)}
-                    onSelectTask={(t) => { setSelectedTask(t); setPickerOpen(false); }}
+                    plannedTasks={plannedTasks}
+                    onSelectTask={handleTaskSelect}
                     onNoteChange={setIntention}
                     searchRef={searchRef}
                     beforeNote={<DurationSegments value={durationMinutes} onChange={handleDurationChange} />}
@@ -483,6 +516,7 @@ export default function Timer({ onNavigate }: TimerProps) {
               <SectionHeader>02 Tasks</SectionHeader>
               <TaskPicker
                 recentTasks={recentTasks}
+                plannedTasks={plannedTasks}
                 onSelect={handleTaskSelect}
                 searchRef={searchRef}
               />
@@ -497,18 +531,7 @@ export default function Timer({ onNavigate }: TimerProps) {
           adhocEntries={adhocEntries}
           onRefresh={loadSessions}
           onNavigate={onNavigate}
-          onSelectTask={(taskId, itemTitle) => {
-            if (taskId) {
-              window.logAPI.getCachedTask(taskId).then(task => {
-                if (task) {
-                  setSelectedTask(task);
-                } else {
-                  setSelectedTask({ task_id: taskId, title: itemTitle, project_id: 0, project_name: null, last_seen_at: new Date().toISOString() });
-                }
-              });
-            }
-            setIntention(itemTitle);
-          }}
+          onSelectTask={selectPlanned}
         />
       </div>
 

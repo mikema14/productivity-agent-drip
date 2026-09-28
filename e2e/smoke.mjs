@@ -443,8 +443,9 @@ async function main() {
       await pill().filter({ hasText: 'Ready' }).waitFor();
       await shot('now-ready-empty');
 
-      // Ready-selected: click a recent row only (typing an id would hit the API and write task_cache).
-      const options = page.getByRole('option');
+      // Ready-selected: click a listed row only (typing an id would hit the API and write task_cache).
+      // The list may open on Planned; skip items with no task, which only set the note.
+      const options = page.getByRole('option').filter({ hasNot: page.getByText('No task ID') });
       // Selecting a task collapses the list, so remember whether one was picked
       const hasTask = (await options.count()) > 0;
       if (hasTask) {

@@ -205,6 +205,36 @@ export function moveTargets(column: ListItemColumn): { key: ListItemColumn; labe
   return COLUMNS.filter(c => c.key !== column);
 }
 
+/** One open Today / This week item, as Now's "Planned" picker lists it. */
+export interface PlannedRow {
+  itemId: string;
+  /** Effective id (list id wins); null for an item with no task to log to. */
+  taskId: string | null;
+  title: string;
+  column: 'today' | 'this_week';
+  listName: string;
+  listColor: string;
+}
+
+/** Today then This week, open and unarchived, in board order. */
+export function plannedRows(items: ListItem[], lists: TaskList[]): PlannedRow[] {
+  const byId = new Map(lists.map(l => [l.id, l]));
+  const { columns } = partition(items.filter(i => byId.has(i.list_id)), { scope: 'all', completedMode: 'hidden' });
+  return (['today', 'this_week'] as const).flatMap(column =>
+    columns[column].open.map(item => {
+      const list = byId.get(item.list_id)!;
+      return {
+        itemId: item.id,
+        taskId: effectiveTaskId(item, list),
+        title: item.title,
+        column,
+        listName: list.name,
+        listColor: list.color,
+      };
+    })
+  );
+}
+
 /** Lists panel subtitle (P21). */
 export function listSubtitle(list: TaskList): string {
   if (list.task_id) return `logs to ${list.task_id}`;

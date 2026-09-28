@@ -7,6 +7,7 @@ import { setTimer, resetTimer } from '../../test/timerState';
 import { useIntentionsStore } from '../../stores/intentionsStore';
 import { useLogStore } from '../../stores/logStore';
 import { useTimerStore } from '../../stores/timerStore';
+import { useListsStore } from '../../stores/listsStore';
 import type { PomodoroSession } from '../../types';
 import { getCurrentDate } from '../../utils/time';
 
@@ -516,5 +517,49 @@ describe('Timer — active states', () => {
     await waitFor(() => expect(screen.getByTestId('countdown-label')).toHaveTextContent('READY'));
     expect(screen.getByRole('region', { name: 'Focus' })).toHaveAttribute('data-layout', 'split');
     expect(screen.getByText(/^Session/)).toHaveTextContent('Session 3/8');
+  });
+});
+
+describe('Timer — Planned picker', () => {
+  const planList = { id: 'l1', name: 'GDI Corporation', color: '#22c55e', icon_path: null, task_id: null, order: 0, archived: 0, billable: 1, created_at: '' };
+  const planItem = (id: string, overrides: Record<string, unknown>) => ({
+    id, list_id: 'l1', title: `Item ${id}`, task_id: null, column: 'today', order: 0, completed: 0, archived: 0,
+    completed_at: null, description: null, subtasks: '[]', billable: 1, created_at: '', ...overrides,
+  });
+
+  beforeEach(() => {
+    localStorage.removeItem('now_pickerSource');
+    window.logAPI.getRankedRecentTasks = vi.fn(async () => makeTasks(3));
+    window.logAPI.getCachedTask = vi.fn(async () => null);
+    useIntentionsStore.setState({ intentions: new Map() });
+    useListsStore.setState({
+      lists: [planList] as never,
+      items: [planItem('p1', { task_id: '662962', title: 'Scope finalasing' }), planItem('p2', { title: 'Share skills', column: 'this_week' })] as never,
+    });
+  });
+  afterEach(() => {
+    resetTimer();
+    useListsStore.setState({ lists: [], items: [] });
+  });
+
+  it('break: picking a planned task selects it, takes its title as the note and enables Begin Focus', async () => {
+    setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(), totalDuration: 300, remainingSeconds: 200, intervalId: 1 });
+    const { user } = await renderTimer();
+    expect(screen.getByRole('button', { name: 'Planned' })).toHaveAttribute('aria-pressed', 'true');
+    const options = await screen.findAllByRole('option');
+    expect(options).toHaveLength(2);
+    await user.click(options[0]);
+    expect(await screen.findByDisplayValue('Scope finalasing')).toBeInTheDocument();
+    expect(useTimerStore.getState().intention).toBe('Scope finalasing');
+    expect(key(/begin focus/i)).toBeEnabled();
+  });
+
+  it('an item with no task only sets the note and keeps the picker open', async () => {
+    const { user } = await renderTimer();
+    const options = await screen.findAllByRole('option');
+    await user.click(options[1]);
+    expect(useTimerStore.getState().intention).toBe('Share skills');
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    expect(key(/begin focus/i)).toBeDisabled();
   });
 });

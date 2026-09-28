@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TaskPicker from './TaskPicker';
+import type { PickerTask } from '../../hooks/useTaskPickerNav';
 import { makeTask, makeTasks } from '../../test/fixtures';
 import type { RankedTask } from '../../types';
 
@@ -153,5 +154,55 @@ describe('TaskPicker', () => {
       project_id: 55,
       project_name: 'Remote project',
     });
+  });
+});
+
+function planned(itemId: string, taskId: string, column: 'today' | 'this_week', title = `Plan ${itemId}`): PickerTask {
+  return {
+    task_id: taskId, title, project_id: 0, project_name: null, last_seen_at: '',
+    planned: { itemId, column, listName: 'E8 Priorities', listColor: '#3b82f6' },
+  };
+}
+
+describe('TaskPicker — Planned', () => {
+  beforeEach(() => localStorage.removeItem('now_pickerSource'));
+
+  function setupPlanned(plannedTasks: PickerTask[]) {
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+    render(<TaskPicker recentTasks={makeTasks(3)} plannedTasks={plannedTasks} onSelect={onSelect} />);
+    const listbox = screen.getByRole('listbox');
+    return { user, onSelect, listbox, options: () => within(listbox).queryAllByRole('option') };
+  }
+
+  it('opens on Planned when something is planned: Today then This week groups, list name, No task ID for ad-hoc items', () => {
+    const { listbox, options } = setupPlanned([planned('t1', '689742', 'today'), planned('t2', '', 'today'), planned('w1', '689666', 'this_week')]);
+    expect(screen.getByRole('button', { name: 'Planned' })).toHaveAttribute('aria-pressed', 'true');
+    expect(options()).toHaveLength(3);
+    expect(within(listbox).getByText('Today')).toBeInTheDocument();
+    expect(within(listbox).getByText('This week')).toBeInTheDocument();
+    expect(within(options()[1]).getByText('No task ID')).toBeInTheDocument();
+    expect(within(options()[0]).getByText('E8 Priorities')).toBeInTheDocument();
+    expect(screen.getByText('from Plan')).toBeInTheDocument();
+  });
+
+  it('opens on Recent when nothing is planned, with an empty-state line on Planned', async () => {
+    const { user, options } = setupPlanned([]);
+    expect(screen.getByRole('button', { name: 'Recent tasks' })).toHaveAttribute('aria-pressed', 'true');
+    expect(options()).toHaveLength(3);
+    await user.click(screen.getByRole('button', { name: 'Planned' }));
+    expect(options()).toHaveLength(0);
+    expect(screen.getByText('Nothing planned for today or this week.')).toBeInTheDocument();
+  });
+
+  it('remembers the choice and hands the planned row to onSelect via Enter', async () => {
+    const { user, onSelect, options } = setupPlanned([planned('t1', '689742', 'today')]);
+    await user.click(screen.getByRole('button', { name: 'Recent tasks' }));
+    expect(localStorage.getItem('now_pickerSource')).toBe('recent');
+    expect(options()).toHaveLength(3);
+    await user.click(screen.getByRole('button', { name: 'Planned' }));
+    await user.click(screen.getByPlaceholderText('Search task ID or title…'));
+    await user.keyboard('{Enter}');
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ task_id: '689742', planned: expect.objectContaining({ itemId: 't1' }) }));
   });
 });
