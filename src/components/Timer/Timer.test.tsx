@@ -354,7 +354,7 @@ describe('Timer — active states', () => {
     expect(key(/skip break/i)).toBeInTheDocument();
     expect(key(/begin focus/i)).toBeDisabled();
     expect(key(/begin focus/i)).toHaveAttribute('title', 'Pick a task first');
-    expect(queryKey(/pause/i)).toBeNull();
+    expect(key(/^pause$/i)).toBeInTheDocument();
     expect(queryKey(/kickoff/i)).toBeNull();
     expect(screen.getByRole('listbox')).toBeInTheDocument();
     expect(key(/set intention/i)).toBeInTheDocument();
@@ -396,6 +396,35 @@ describe('Timer — active states', () => {
     expect([secs, type, taskId]).toEqual([50 * 60, 'focus', makeTasks(1)[0].task_id]);
     const saveOrder = vi.mocked(window.timerAPI.saveSession).mock.invocationCallOrder[0];
     expect(saveOrder).toBeLessThan(vi.mocked(window.timerAPI.startMainTimer).mock.invocationCallOrder[0]);
+  });
+
+  it('break: Pause / Resume drive the main timer and the label says paused', async () => {
+    window.timerAPI.pauseMainTimer = vi.fn(async () => undefined);
+    window.timerAPI.resumeMainTimer = vi.fn(async () => undefined);
+    setTimer({ status: 'break', isPaused: false, sessionStartTime: new Date(), totalDuration: 300, remainingSeconds: 200, intervalId: 1 });
+    const { user } = await renderTimer();
+    await user.click(key(/^pause$/i));
+    expect(window.timerAPI.pauseMainTimer).toHaveBeenCalled();
+    expect(await screen.findByText('BREAK · PAUSED')).toBeInTheDocument();
+    await user.click(key(/^resume$/i));
+    expect(window.timerAPI.resumeMainTimer).toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: /^pause$/i })).toBeInTheDocument();
+  });
+
+  it('ready after a finished focus: Start break Nm starts the earned break; without one there is no key', async () => {
+    window.timerAPI.startMainTimer = vi.fn(async () => ({ raycastFocus: false }));
+    setTimer({ status: 'idle', pendingBreakMinutes: 5, sessionCount: 1, durationMinutes: 25 });
+    const { user } = await renderTimer();
+    await user.click(key(/start break 5m/i));
+    await waitFor(() => expect(window.timerAPI.startMainTimer).toHaveBeenCalledWith(300, 'break'));
+    expect(useTimerStore.getState().status).toBe('break');
+    expect(useTimerStore.getState().pendingBreakMinutes).toBeNull();
+  });
+
+  it('ready with no finished focus: no Start break key', async () => {
+    setTimer({ status: 'idle', pendingBreakMinutes: null });
+    await renderTimer();
+    expect(queryKey(/start break/i)).toBeNull();
   });
 
   it('break under a minute: Enter starts the focus and saves no break row', async () => {

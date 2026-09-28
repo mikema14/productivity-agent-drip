@@ -175,6 +175,7 @@ export const useTimerStore = create<TimerStore>()(
       sessionStartTime: null,
       intention: '',
       overlayOpen: false,
+      pendingBreakMinutes: null,
       timerMode: 'pomodoro',
       sessionViewMode: 'flat',
       lastTaskId: null,
@@ -277,7 +278,8 @@ export const useTimerStore = create<TimerStore>()(
       kickoff: kickoffSecs ? 'warmup' : null,
       kickoffSource: kickoffSecs ? kickoffSource ?? 'now' : null,
       kickoffEscalateMinutes: kickoffSecs ? kickoffEscalateMinutes ?? null : null,
-      raycastFocus
+      raycastFocus,
+      pendingBreakMinutes: null
     });
   },
 
@@ -367,6 +369,7 @@ export const useTimerStore = create<TimerStore>()(
 
     set({
       status: 'break',
+      pendingBreakMinutes: null,
       remainingSeconds: duration,
       totalDuration: duration,
       isPaused: false,
@@ -482,6 +485,7 @@ export const useTimerStore = create<TimerStore>()(
       totalDuration: focusSecs,
       isPaused: false,
       overlayOpen: overlayShown,
+      pendingBreakMinutes: getBreakMinutes(state.durationMinutes, isLongBreak),
       lastTaskId: state.currentTaskId,
       lastTaskTitle: taskTitle,
       kickoff: null,
@@ -687,6 +691,7 @@ export const useTimerStore = create<TimerStore>()(
         intervalId: null,
         sessionStartTime: null,
         overlayOpen: earlyOverlayShown,
+        pendingBreakMinutes: getBreakMinutes(get().durationMinutes, isLongBreak),
         kickoff: null,
         kickoffSource: null,
         kickoffEscalateMinutes: null,
@@ -737,7 +742,8 @@ export const useTimerStore = create<TimerStore>()(
       kickoff: null,
       kickoffSource: null,
       kickoffEscalateMinutes: null,
-      raycastFocus: false
+      raycastFocus: false,
+      pendingBreakMinutes: null
     });
   },
 
@@ -752,6 +758,7 @@ export const useTimerStore = create<TimerStore>()(
     const focusSecs4 = get().durationMinutes * 60;
     set({
       overlayOpen: false,
+      pendingBreakMinutes: null,
       intention: '',
       status: 'idle',
       remainingSeconds: focusSecs4,

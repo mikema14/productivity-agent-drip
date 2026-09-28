@@ -62,6 +62,8 @@ export default function Timer({ onNavigate }: TimerProps) {
     kickoff,
     startKickoff,
     startFocusFromBreak,
+    startBreakFromModal,
+    pendingBreakMinutes,
     selectionResetToken,
   } = useTimerStore();
 
@@ -385,7 +387,7 @@ export default function Timer({ onNavigate }: TimerProps) {
   const sessionWindow = sessionStartTime && estimatedEnd
     ? `${formatTimeRange(sessionStartTime)} → ${formatTimeRange(estimatedEnd)}`
     : '';
-  const countdownLabel = isBreak ? `BREAK · ${sessionWindow}` : 'READY';
+  const countdownLabel = isBreak ? (isPaused ? 'BREAK · PAUSED' : `BREAK · ${sessionWindow}`) : 'READY';
   const endsAt = estimatedEnd ? formatTimeRange(estimatedEnd) : null;
 
   const tone = isBreak ? 'emerald' : 'amber';
@@ -400,9 +402,21 @@ export default function Timer({ onNavigate }: TimerProps) {
   const showIdlePicker = focusState === 'ready-empty';
 
   // Next to Begin Focus: Kickoff when ready, Skip Break during a break.
-  const secondaryKey = isBreak
-    ? <KeyButton variant="outline" onClick={() => skip()}>Skip Break</KeyButton>
-    : <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>;
+  // Next to Begin Focus. Break: Skip / Pause. Ready: Kickoff, plus the break a finished focus
+  // earned (mirrors the overlay card's Start break, for when that card is on another screen).
+  const secondaryKey = isBreak ? (
+    <>
+      <KeyButton variant="outline" onClick={() => skip()}>Skip Break</KeyButton>
+      <KeyButton variant="ghost" onClick={() => (isPaused ? resume() : pause())}>{isPaused ? 'Resume' : 'Pause'}</KeyButton>
+    </>
+  ) : (
+    <>
+      <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>
+      {pendingBreakMinutes !== null && (
+        <KeyButton variant="outline" onClick={() => startBreakFromModal()}>Start break {pendingBreakMinutes}m</KeyButton>
+      )}
+    </>
+  );
 
   const activeTask: { task_id: string; title: string } | null =
     isActive && currentTaskId
