@@ -157,8 +157,7 @@ export default function TaskCardWithPicker({
             aria-label="Session note"
             className="w-full h-9 px-3 bg-transparent border border-drip-border text-[13px] text-txt-primary placeholder:text-txt-muted focus:outline-none focus:border-focus/40"
           />
-          <div className="flex items-center justify-between font-mono text-[11px] text-txt-muted">
-            <span>{task.project_name || ''}</span>
+          <div className="flex items-center justify-end font-mono text-[11px] text-txt-muted">
             <span>
               Today<span className="text-txt-dim px-1.5">·</span>{sessionCount}/8 sessions
             </span>
