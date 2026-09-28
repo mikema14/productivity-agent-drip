@@ -12,7 +12,9 @@ export default defineConfig({
       {
         entry: 'electron/main.ts',
         onstart(options) {
-          options.startup()
+          // The e2e smoke launches Electron itself (Playwright); a second
+          // instance here would fight the single-instance lock.
+          if (process.env.DRIP_E2E !== '1') options.startup()
         },
         vite: {
           build: {

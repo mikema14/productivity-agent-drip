@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Drip — Now</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&amp;family=JetBrains+Mono:wght@300;400;500;600&amp;family=Barlow+Condensed:wght@600;700&amp;display=swap">
+<style>
+body{margin:0;background:#0a0a0c}
+a{color:#f59e0b;text-decoration:none}a:hover{color:#fbbf24}
+input::placeholder{color:#8585a0}
+</style>
+</helmet>
+<div style="width: 1200px; height: 800px; display: flex; background: #0a0a0c; color: #f0f0f2; font-family: 'Outfit', system-ui, sans-serif; overflow: hidden">
+
+<nav aria-label="Primary" style="width: 72px; height: 800px; box-sizing: border-box; padding: 52px 0 16px; display: flex; flex-direction: column; align-items: center; gap: 4px; border-right: 1px solid #1c1c22; flex-shrink: 0">
+<a href="Main.dc.html" aria-current="page" style="position: relative; width: 56px; height: 52px; border-radius: 2px; background: rgba(245,158,11,0.10); color: #f59e0b; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 10.5px">
+<span aria-hidden="true" style="position: absolute; top: 6px; right: 6px; width: 4px; height: 4px; background: #f59e0b; box-shadow: 0 0 5px rgba(245,158,11,0.8)"></span>
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="9" cy="9.5" r="6.5"></circle><path d="M9 9.5V6.5M9 9.5h2.5M9 2v1"></path></svg>
+<span>Now</span>
+</a>
+<a href="Plan.dc.html" style="width: 56px; height: 52px; border-radius: 2px; color: #8585a0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 10.5px">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="2" y="3" width="4" height="12" rx="1"></rect><rect x="7" y="3" width="4" height="8" rx="1"></rect><rect x="12" y="3" width="4" height="5" rx="1"></rect></svg>
+<span>Plan</span>
+</a>
+<a href="Review.dc.html" style="width: 56px; height: 52px; border-radius: 2px; color: #8585a0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 10.5px">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5l1.5 1.5L7 4M3 11l1.5 1.5L7 10M9.5 5.5H15M9.5 11.5H15"></path></svg>
+<span>Review</span>
+</a>
+<a href="Main.dc.html" style="width: 56px; height: 52px; border-radius: 2px; color: #8585a0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 10.5px">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="2.5" y="9" width="3" height="6.5" rx="0.5"></rect><rect x="7.5" y="5.5" width="3" height="10" rx="0.5"></rect><rect x="12.5" y="2.5" width="3" height="13" rx="0.5"></rect></svg>
+<span>Insights</span>
+</a>
+<div style="flex-grow: 1"></div>
+<a href="Main.dc.html" aria-label="Settings" style="width: 56px; height: 44px; border-radius: 2px; color: #8585a0; display: flex; align-items: center; justify-content: center">
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="9" cy="9" r="2.5"></circle><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4"></path></svg>
+</a>
+</nav>
+
+<main style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column">
+<header style="height: 52px; box-sizing: border-box; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1c1c22; flex-shrink: 0">
+<div style="display: flex; align-items: baseline; gap: 10px">
+<h1 style="margin: 0; font-size: 15px; font-weight: 500">Now</h1>
+<span style="font-size: 13px; color: #8585a0">Fri 25 Sep</span>
+<span aria-hidden="true" style="align-self: center; width: 84px; height: 14px; margin-left: 8px; background-image: radial-gradient(circle, #2a2a32 1.6px, transparent 2px); background-size: 7px 7px"></span>
+</div>
+<div style="display: flex; align-items: center; gap: 12px">
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #a0a0b0; padding: 4px 10px; border: 1px solid #2a2a32; border-radius: 0"><span style="width: 6px; height: 6px; border-radius: 0; background: #8585a0"></span>Ready</span>
+<button style="height: 32px; width: 260px; padding: 0 8px 0 12px; display: flex; align-items: center; gap: 10px; background: transparent; border: 1px solid #2a2a32; border-radius: 2px; color: #8585a0; font-family: 'Outfit', sans-serif; font-size: 13px; cursor: pointer">
+<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5L14 14"></path></svg>
+<span style="flex-grow: 1; text-align: left">Search or jump to…</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #a0a0b0; border: 1px solid #2a2a32; border-radius: 2px; padding: 1px 5px">⌘K</span>
+</button>
+</div>
+</header>
+
+<div style="flex-grow: 1; min-height: 0; display: flex">
+
+<div style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 24px 28px; display: flex; flex-direction: column; gap: 20px">
+
+<section aria-label="Focus" style="display: flex; gap: 28px; align-items: center; padding: 22px 24px; border: 1px solid #2a2a32; border-top: 2px solid #f59e0b; flex-shrink: 0">
+<div style="width: 330px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 500; letter-spacing: 1.5px; color: #8585a0">
+<span>READY</span>
+<span>SESSION <span style="color: #f0f0f2">3</span>/8</span>
+</div>
+<div style="position: relative; font-family: 'Barlow Condensed', 'JetBrains Mono', sans-serif; font-weight: 700; font-size: 160px; line-height: 0.8; letter-spacing: -3px; font-variant-numeric: tabular-nums; margin-left: -6px">
+<span aria-hidden="true" style="position: absolute; left: 0; top: 0; color: #16161b">88:88</span>
+<span style="position: relative; color: #f0f0f2">25:00</span>
+</div>
+<div aria-hidden="true" style="display: flex; align-items: flex-end; justify-content: space-between; height: 18px; margin-top: 6px">
+<span style="width: 2px; height: 18px; background: #f59e0b"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 2px; height: 18px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 2px; height: 18px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 2px; height: 18px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 2px; height: 18px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 1px; height: 9px; background: #45455a"></span>
+<span style="width: 2px; height: 18px; background: #45455a"></span>
+</div>
+<div style="display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #8585a0; margin-top: -6px">
+<span>00</span><span>05</span><span>10</span><span>15</span><span>20</span><span>25</span>
+</div>
+</div>
+<div style="width: 1px; align-self: stretch; background: #2a2a32; flex-shrink: 0"></div>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 500; letter-spacing: 1.5px; color: #8585a0"><span style="color: #f59e0b">689742</span> — EWOK OPS</span>
+<span style="font-size: 24px; font-weight: 500; letter-spacing: -0.3px; line-height: 1.15">Automatizovať dokumentáciu</span>
+</div>
+<div aria-hidden="true" style="display: flex; align-self: flex-start; width: 212px; margin-bottom: -10px"><span style="width: 53px; display: flex; justify-content: center"><span style="width: 5px; height: 5px; border-radius: 999px; background: #2a2a32"></span></span><span style="width: 53px; display: flex; justify-content: center"><span style="width: 5px; height: 5px; border-radius: 999px; background: #f59e0b; box-shadow: 0 0 6px rgba(245,158,11,0.8)"></span></span><span style="width: 53px; display: flex; justify-content: center"><span style="width: 5px; height: 5px; border-radius: 999px; background: #2a2a32"></span></span><span style="width: 53px; display: flex; justify-content: center"><span style="width: 5px; height: 5px; border-radius: 999px; background: #2a2a32"></span></span></div>
+<div role="group" aria-label="Duration in minutes" style="display: flex; align-self: flex-start; border: 1px solid #2a2a32">
+<button style="width: 52px; height: 34px; border: none; border-right: 1px solid #2a2a32; background: transparent; color: #a0a0b0; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; cursor: pointer">15</button>
+<button aria-pressed="true" style="width: 52px; height: 34px; border: none; border-right: 1px solid #2a2a32; background: #f59e0b; color: #0a0a0c; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; cursor: pointer">25</button>
+<button style="width: 52px; height: 34px; border: none; border-right: 1px solid #2a2a32; background: transparent; color: #a0a0b0; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; cursor: pointer">50</button>
+<button style="width: 52px; height: 34px; border: none; background: transparent; color: #a0a0b0; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; cursor: pointer">90</button>
+</div>
+<input aria-label="Session note" placeholder="Session note (optional)" style="padding: 8px 12px; font-size: 14px; background: transparent; border: 1px solid #2a2a32; border-radius: 0; color: #f0f0f2; font-family: 'Outfit', sans-serif; outline: none">
+<div style="display: flex; gap: 8px">
+<button style="height: 44px; padding: 0 18px; display: flex; align-items: center; gap: 14px; background: #f59e0b; color: #0a0a0c; border: none; border-radius: 3px; box-shadow: 0 3px 0 #92560a, inset 0 1px 0 rgba(255,255,255,0.35); font-family: 'JetBrains Mono', monospace; font-size: 12.5px; font-weight: 600; letter-spacing: 1.5px; cursor: pointer">BEGIN FOCUS<span style="font-size: 12px">↵</span></button>
+<button style="height: 44px; padding: 0 16px; background: transparent; color: #f0f0f2; border: 1px solid #45455a; border-radius: 3px; box-shadow: 0 3px 0 #000000; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; font-weight: 500; letter-spacing: 1.5px; cursor: pointer">KICKOFF 2M</button>
+</div>
+</div>
+</section>
+
+<section aria-label="Tasks" style="flex-grow: 1; min-height: 0; display: flex; flex-direction: column; border: 1px solid #1c1c22; border-radius: 0; padding: 8px; overflow: hidden">
+<div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 2px; background: #141418; color: #8585a0; flex-shrink: 0">
+<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5L14 14"></path></svg>
+<input aria-label="Search tasks" placeholder="Search task ID or title" style="flex-grow: 1; background: transparent; border: none; outline: none; color: #f0f0f2; font-family: 'Outfit', sans-serif; font-size: 14px">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #a0a0b0; border: 1px solid #2a2a32; border-radius: 2px; padding: 1px 6px">/</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px">
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 12px 12px 4px">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: #f59e0b">Today</span><span style="flex-grow: 1; border-top: 1px solid #2a2a32"></span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8585a0">2h 10m planned · 3h 40m free</span>
+</div>
+
+<button style="display: flex; align-items: center; gap: 12px; height: 46px; padding: 0 12px; border-radius: 2px; border: 1px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.06); text-align: left; cursor: pointer; font-family: 'Outfit', sans-serif; flex-shrink: 0">
+<span style="width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border: 1px solid #2a2a32; border-radius: 2px; background: #141418; box-shadow: 0 2px 0 #000000; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #a0a0b0; flex-shrink: 0">1</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f59e0b; background: rgba(245,158,11,0.12); padding: 2px 7px; border-radius: 2px; flex-shrink: 0">689742</span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 14px; color: #f0f0f2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Automatizovať dokumentáciu</span><span style="font-size: 12px; color: #8585a0">EWOK OPS</span></span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f0f0f2">1h 15m</span>
+</button>
+
+<button style="display: flex; align-items: center; gap: 12px; height: 46px; padding: 0 12px; border-radius: 2px; border: 1px solid transparent; background: transparent; text-align: left; cursor: pointer; font-family: 'Outfit', sans-serif; flex-shrink: 0">
+<span style="width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border: 1px solid #2a2a32; border-radius: 2px; background: #141418; box-shadow: 0 2px 0 #000000; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #a0a0b0; flex-shrink: 0">2</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f59e0b; background: rgba(245,158,11,0.12); padding: 2px 7px; border-radius: 2px; flex-shrink: 0">645001</span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 14px; color: #f0f0f2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Next level - Marek Mikesz</span><span style="font-size: 12px; color: #8585a0">Next level — personal development</span></span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f0f0f2">25m</span>
+</button>
+
+<button style="display: flex; align-items: center; gap: 12px; height: 46px; padding: 0 12px; border-radius: 2px; border: 1px solid transparent; background: transparent; text-align: left; cursor: pointer; font-family: 'Outfit', sans-serif; flex-shrink: 0">
+<span style="width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 2px; background: rgba(52,211,153,0.14); color: #34d399; flex-shrink: 0"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3 4.7-5"></path></svg></span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8585a0; background: rgba(255,255,255,0.05); padding: 2px 7px; border-radius: 2px; flex-shrink: 0">679834</span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 14px; color: #8585a0; text-decoration: line-through; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">EWOK Meetings</span><span style="font-size: 12px; color: #8585a0">EWOK OPS</span></span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8585a0">30m</span>
+</button>
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 14px 12px 4px">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: #8585a0">Recent</span><span style="flex-grow: 1; border-top: 1px solid #2a2a32"></span>
+<span style="font-size: 11px; color: #8585a0">by frequency</span>
+</div>
+
+<button style="display: flex; align-items: center; gap: 12px; height: 46px; padding: 0 12px; border-radius: 2px; border: 1px solid transparent; background: transparent; text-align: left; cursor: pointer; font-family: 'Outfit', sans-serif; flex-shrink: 0">
+<span style="width: 18px; flex-shrink: 0"></span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f59e0b; background: rgba(245,158,11,0.12); padding: 2px 7px; border-radius: 2px; flex-shrink: 0">692580</span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 14px; color: #f0f0f2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">KKS Kf.t- &lt;upsell/cross-sell&gt; n8n</span><span style="font-size: 12px; color: #8585a0">01 Client Success — Upsell</span></span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8585a0">2d</span>
+</button>
+
+<button style="display: flex; align-items: center; gap: 12px; height: 46px; padding: 0 12px; border-radius: 2px; border: 1px solid transparent; background: transparent; text-align: left; cursor: pointer; font-family: 'Outfit', sans-serif; flex-shrink: 0">
+<span style="width: 18px; flex-shrink: 0"></span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f59e0b; background: rgba(245,158,11,0.12); padding: 2px 7px; border-radius: 2px; flex-shrink: 0">694661</span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 14px; color: #f0f0f2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Hat-agro - &lt;upsell/cross-sell&gt; n8n</span><span style="font-size: 12px; color: #8585a0">01 Client Success — Upsell</span></span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8585a0">2d</span>
+</button>
+
+</div>
+</section>
+</div>
+
+<aside aria-label="Day timeline" style="width: 340px; flex-shrink: 0; box-sizing: border-box; padding: 24px 24px 20px; border-left: 1px solid #1c1c22; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: baseline; justify-content: space-between">
+<h2 style="margin: 0; font-size: 13px; font-weight: 500">Day</h2>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #a0a0b0">3h 05m <span style="color: #8585a0">/ 6h</span></span>
+</div>
+<div aria-label="3 hours 5 minutes of 6 hours" style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px">
+<span style="height: 6px; background: #f59e0b"></span>
+<span style="height: 6px; background: #f59e0b"></span>
+<span style="height: 6px; background: #f59e0b"></span>
+<span style="height: 6px; background: #f59e0b"></span>
+<span style="height: 6px; background: #f59e0b"></span>
+<span style="height: 6px; background: #f59e0b"></span>
+<span style="height: 6px; background: #2a2a32"></span>
+<span style="height: 6px; background: #2a2a32"></span>
+<span style="height: 6px; background: #2a2a32"></span>
+<span style="height: 6px; background: #2a2a32"></span>
+<span style="height: 6px; background: #2a2a32"></span>
+<span style="height: 6px; background: #2a2a32"></span>
+</div>
+
+<div style="position: relative; height: 540px; margin-top: 10px">
+<div style="position: absolute; left: 0; right: 0; top: -7px; display: flex; align-items: center; gap: 8px"><span style="width: 36px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #8585a0">08:00</span><span style="flex-grow: 1; border-top: 1px dashed rgba(245,158,11,0.10)"></span></div>
+<div style="position: absolute; left: 0; right: 0; top: 45px; display: flex; align-items: center; gap: 8px"><span style="width: 36px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #8585a0">09:00</span><span style="flex-grow: 1; border-top: 1px dashed rgba(245,158,11,0.10)"></span></div>
+<div style="position: absolute; left: 0; right: 0; top: 97px; display: flex; align-items: center; gap: 8px"><span style="width: 36px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #8585a0">10:00</span><span style="flex-grow: 1; border-top: 1px dashed rgba(245,158,11,0.10)"></span></div>
+<div style="position: absolute; left: 0; right: 0; top: 149px; display: flex; align-items: center; gap: 8px"><span style="width: 36px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #8585a0">11:00</span><span style="flex-grow: 1; border-top: 1px dashed rgba(245,158,11,0.10)"></span></div>
+<div style="position: absolute; left: 0; right: 0; top: 201px; display: flex; align-items: center; gap: 8px"><span style="width: 36px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #8585a0">12:00</span><span style="flex-grow: 1; border-top: 1px dashed rgba(245,158,11,0.10)"></span></div>
+<div style="position: absolute; left: 0; right: 0; top: 253px; display: flex; align-items: center; gap: 8px"><span style="width: 36px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #8585a0">13:00</span><span style="flex-grow: 1; border-top: 1px dashed rgba(245,158,11,0.10)"></span></div>
+<div style="position: absolute; left: 0; right: 0; top: 305px; display: flex; align-items: center; gap: 8px"><span style="width: 36px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #8585a0">14:00</span><span style="flex-grow: 1; border-top: 1px dashed rgba(245,158,11,0.10)"></span></div>
+<div style="position: absolute; left: 0; right: 0; top: 357px; display: flex; align-items: center; gap: 8px"><span style="width: 36px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #8585a0">15:00</span><span style="flex-grow: 1; border-top: 1px dashed rgba(245,158,11,0.10)"></span></div>
+<div style="position: absolute; left: 0; right: 0; top: 409px; display: flex; align-items: center; gap: 8px"><span style="width: 36px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #8585a0">16:00</span><span style="flex-grow: 1; border-top: 1px dashed rgba(245,158,11,0.10)"></span></div>
+<div style="position: absolute; left: 0; right: 0; top: 461px; display: flex; align-items: center; gap: 8px"><span style="width: 36px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #8585a0">17:00</span><span style="flex-grow: 1; border-top: 1px dashed rgba(245,158,11,0.10)"></span></div>
+<div style="position: absolute; left: 0; right: 0; top: 513px; display: flex; align-items: center; gap: 8px"><span style="width: 36px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #8585a0">18:00</span><span style="flex-grow: 1; border-top: 1px dashed rgba(245,158,11,0.10)"></span></div>
+
+<div style="position: absolute; left: 44px; right: 0; top: 53px; height: 24px; box-sizing: border-box; padding: 0 8px; display: flex; align-items: center; border-radius: 2px; background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.35); font-size: 11.5px; color: #93c5fd; overflow: hidden; white-space: nowrap">Daily standup</div>
+<div style="position: absolute; left: 44px; right: 0; top: 88px; height: 42px; box-sizing: border-box; padding: 5px 8px; display: flex; flex-direction: column; border-radius: 2px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.35); font-size: 11.5px; color: #fbbf24; overflow: hidden; white-space: nowrap"><span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px">689742 · 50m</span><span>Automatizovať dokumentáciu</span></div>
+<div style="position: absolute; left: 44px; right: 0; top: 132px; height: 4px; border-radius: 3px; background: rgba(52,211,153,0.5)"></div>
+<div style="position: absolute; left: 44px; right: 0; top: 140px; height: 22px; box-sizing: border-box; padding: 0 8px; display: flex; align-items: center; border-radius: 2px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.35); font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #fbbf24; overflow: hidden; white-space: nowrap">645001 · 25m</div>
+<div style="position: absolute; left: 36px; right: 0; top: 187px; display: flex; align-items: center; gap: 6px"><span style="width: 7px; height: 7px; border-radius: 0; background: #f59e0b"></span><span style="flex-grow: 1; border-top: 1px solid #f59e0b"></span><span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: #0a0a0c; background: #f59e0b; padding: 1px 5px">NOW 11:40</span></div>
+<div style="position: absolute; left: 44px; right: 0; top: 261px; height: 50px; box-sizing: border-box; padding: 5px 8px; display: flex; flex-direction: column; border-radius: 2px; border: 1px dashed rgba(59,130,246,0.45); font-size: 11.5px; color: #93c5fd; overflow: hidden; white-space: nowrap"><span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px">13:00 – 14:00</span><span>KKS Kf.t — upsell call</span></div>
+<div style="position: absolute; left: 44px; right: 0; top: 365px; height: 24px; box-sizing: border-box; padding: 0 8px; display: flex; align-items: center; border-radius: 2px; border: 1px dashed rgba(59,130,246,0.45); font-size: 11.5px; color: #93c5fd; overflow: hidden; white-space: nowrap">EWOK sync</div>
+</div>
+
+<div style="flex-grow: 1"></div>
+<div style="display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid #1c1c22">
+<span style="font-size: 12px; color: #8585a0">3 entries not logged</span>
+<a href="Review.dc.html" style="font-size: 13px">Review day →</a>
+</div>
+</aside>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

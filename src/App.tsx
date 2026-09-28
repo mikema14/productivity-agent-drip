@@ -1,20 +1,20 @@
 import { useState, useEffect } from 'react';
-import Sidebar from './components/Layout/Sidebar';
+import Rail from './components/Layout/Rail';
+import type { ViewId } from './components/Layout/views';
 import MainContent from './components/Layout/MainContent';
 import Timer from './components/Timer/Timer';
 import DailyLog from './components/DailyLog/DailyLog';
 import Settings from './components/Settings/Settings';
 import ProgressPage from './components/Progress/ProgressPage';
-import ListPlanningView from './components/Lists/ListPlanningView';
-import AllListsOverview from './components/Lists/AllListsOverview';
+import PlanView from './components/Plan/PlanView';
 import CreateListModal from './components/Lists/CreateListModal';
+import KickoffTakeover from './components/Kickoff/KickoffTakeover';
 import { useListsStore } from './stores/listsStore';
 import { loadSessionCount, checkTimerHydration, cleanupTimerIntervals, setupMainTimerListeners } from './stores/timerStore';
 import { useLogStore } from './stores/logStore';
 
 function App() {
-  const [currentView, setCurrentView] = useState('timer');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [currentView, setCurrentView] = useState<ViewId>('timer');
   const [showCreateList, setShowCreateList] = useState(false);
 
   // Load session count and check for stuck timer states on mount
@@ -63,26 +63,26 @@ function App() {
   const renderView = () => {
     switch (currentView) {
       case 'timer':
-        return <Timer />;
+        return <Timer onNavigate={setCurrentView} />;
       case 'daily-log':
-        return <DailyLog />;
+        return <DailyLog onNavigate={setCurrentView} />;
       case 'progress':
         return <ProgressPage />;
       case 'settings':
         return <Settings />;
       case 'lists':
-        return <ListPlanningView />;
       case 'all-lists':
-        return <AllListsOverview />;
+        return <PlanView view={currentView} onNavigate={setCurrentView} onCreateList={() => setShowCreateList(true)} />;
       default:
-        return <Timer />;
+        return <Timer onNavigate={setCurrentView} />;
     }
   };
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar onNavigate={setCurrentView} currentView={currentView} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(c => !c)} onCreateList={() => setShowCreateList(true)} />
+      <Rail view={currentView} onNavigate={setCurrentView} />
       <MainContent>{renderView()}</MainContent>
+      <KickoffTakeover />
       {showCreateList && (
         <CreateListModal onClose={() => { setShowCreateList(false); useListsStore.getState().loadLists(); }} />
       )}

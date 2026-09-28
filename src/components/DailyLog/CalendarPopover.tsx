@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLogStore } from '../../stores/logStore';
+import { todayString } from './reviewLogic';
 
 interface DayData {
   date: string;
@@ -83,7 +84,7 @@ export default function CalendarPopover({ selectedDate, onSelectDate, onClose }:
   const now = new Date();
   const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth() + 1;
   const canGoNext = !isCurrentMonth;
-  const todayStr = now.toISOString().split('T')[0];
+  const todayStr = todayString(now);
   const isOnToday = selectedDate === todayStr;
 
   const handlePrevMonth = () => {
@@ -129,14 +130,15 @@ export default function CalendarPopover({ selectedDate, onSelectDate, onClose }:
   return (
     <div
       ref={popoverRef}
-      className="absolute top-full right-0 mt-2 z-50 w-72 bg-drip-elevated border border-focus/30 rounded-xl shadow-glass p-4 animate-scale-in"
+      data-testid="calendar-popover"
+      className="absolute top-full right-0 mt-2 z-50 w-72 bg-drip-elevated border border-focus/30 rounded-[2px] shadow-glass p-4 animate-scale-in"
       onMouseDown={(e) => e.stopPropagation()}
     >
       {/* Header: month nav + today button */}
       <div className="flex items-center justify-between mb-3">
         <button
           onClick={handlePrevMonth}
-          className="w-7 h-7 flex items-center justify-center rounded-lg text-txt-muted hover:text-txt-primary hover:bg-focus/5 transition-all"
+          className="w-7 h-7 flex items-center justify-center rounded-[2px] text-txt-muted hover:text-txt-primary hover:bg-focus/5 transition-all"
         >
           <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M9 3L5 7L9 11" />
@@ -154,7 +156,7 @@ export default function CalendarPopover({ selectedDate, onSelectDate, onClose }:
           {!isOnToday && (
             <button
               onClick={() => onSelectDate(todayStr)}
-              className="px-2 py-0.5 text-[10px] text-txt-muted border border-focus/20 rounded-lg hover:bg-focus/5 hover:text-txt-secondary transition-all"
+              className="px-2 py-0.5 text-[10px] text-txt-muted border border-focus/20 rounded-[2px] hover:bg-focus/5 hover:text-txt-secondary transition-all"
             >
               Today
             </button>
@@ -162,7 +164,7 @@ export default function CalendarPopover({ selectedDate, onSelectDate, onClose }:
           <button
             onClick={handleNextMonth}
             disabled={!canGoNext}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-txt-muted hover:text-txt-primary hover:bg-focus/5 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
+            className="w-7 h-7 flex items-center justify-center rounded-[2px] text-txt-muted hover:text-txt-primary hover:bg-focus/5 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
           >
             <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M5 3L9 7L5 11" />
@@ -202,7 +204,7 @@ export default function CalendarPopover({ selectedDate, onSelectDate, onClose }:
               <button
                 key={cell.day}
                 onClick={() => handleDayClick(cell.day!)}
-                className={`cal-cell relative rounded-lg flex flex-col items-center justify-center aspect-square transition-colors
+                className={`cal-cell relative rounded-[2px] flex flex-col items-center justify-center aspect-square transition-colors
                   ${isSelected ? 'bg-focus/20 text-txt-primary' : 'hover:bg-focus/10 text-txt-secondary'}
                   ${isToday ? 'ring-1 ring-focus ring-offset-1 ring-offset-drip-elevated' : ''}
                 `}

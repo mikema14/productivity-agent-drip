@@ -18,15 +18,41 @@
     transition: color 0.3s ease;
   }
 
-  /* Focus panel large timer display */
-  .focus-timer-display {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
-    font-size: 86px;
-    font-weight: 300;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.04em;
-    line-height: 1;
-    color: #f0f0f2;
+  /* Now screen: the big countdown digits (condensed, tabular) */
+  .now-digits {
+    @apply font-condensed tabular-nums;
+    font-weight: 700;
+    font-size: 160px;
+    line-height: 0.8;
+    letter-spacing: -3px;
+  }
+  @media (max-width: 999px) {
+    .now-digits {
+      font-size: 120px;
+      letter-spacing: -2px;
+    }
+  }
+
+  /* Now screen: mono uppercase micro-label */
+  .now-label {
+    @apply font-mono uppercase tracking-label;
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+
+  /* Plan cards / Review rows: hover actions also appear on keyboard focus inside the row */
+  .plan-card-actions,
+  .row-actions {
+    /* Hidden actions must not swallow clicks meant for the title underneath */
+    @apply opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto;
+  }
+
+  /* Horizontal scroller without a visible scrollbar (Review toolbar below `wide:`) */
+  .scroll-x-quiet {
+    scrollbar-width: none;
+  }
+  .scroll-x-quiet::-webkit-scrollbar {
+    display: none;
   }
 
   /* Running LED indicator */

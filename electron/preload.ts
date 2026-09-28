@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PomodoroSession, TimerAPI, LogAPI, AdhocEntry, CalendarProposal, CalendarFeedResult, TaskCache, ApiTestResult, IssueData, TimeEntryPayload, OverlayActionType } from '../src/types';
+import type { PomodoroSession, TimerAPI, LogAPI, AdhocEntry, CalendarProposal, CalendarFeedResult, TaskCache, RankedTask, ApiTestResult, IssueData, TimeEntryPayload, OverlayActionType, IdleCommand } from '../src/types';
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object
@@ -106,11 +106,12 @@ const timerAPI: TimerAPI = {
   },
 
   // Main process timer control
-  startMainTimer: async (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string): Promise<void> => {
-    const result = await ipcRenderer.invoke('start-main-timer', duration, timerType, nextBreakDuration, taskId);
+  startMainTimer: async (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string, kickoffRolloverSeconds?: number): Promise<{ raycastFocus: boolean }> => {
+    const result = await ipcRenderer.invoke('start-main-timer', duration, timerType, nextBreakDuration, taskId, kickoffRolloverSeconds);
     if (!result.success) {
       throw new Error(result.error || 'Failed to start main timer');
     }
+    return { raycastFocus: result.raycastFocus === true };
   },
 
   pauseMainTimer: async (): Promise<void> => {
@@ -201,6 +202,28 @@ const timerAPI: TimerAPI = {
 
   onOverlayAction: (callback: (type: OverlayActionType) => void) => {
     ipcRenderer.on('overlay-action', (_event, type) => callback(type));
+  },
+
+  onIdleCommand: (callback: (command: IdleCommand) => void) => {
+    ipcRenderer.on('idle-command', (_event, command: IdleCommand) => callback(command));
+  },
+
+  // Idle nudge pause
+  getIdleNudgePause: async (): Promise<number | null> => {
+    const result = await ipcRenderer.invoke('idle-nudge:get-pause');
+    if (result?.success) return typeof result.pausedUntil === 'number' ? result.pausedUntil : null;
+    throw new Error(result?.error || 'Failed to read the nudge pause');
+  },
+
+  resumeIdleNudges: async (): Promise<void> => {
+    const result = await ipcRenderer.invoke('idle-nudge:resume');
+    if (!result?.success) throw new Error(result?.error || 'Failed to resume nudges');
+  },
+
+  onIdleNudgePauseChanged: (callback: (pausedUntil: number | null) => void) => {
+    const handler = (_event: unknown, pausedUntil: number | null) => callback(pausedUntil);
+    ipcRenderer.on('idle-nudge-paused', handler);
+    return () => ipcRenderer.removeListener('idle-nudge-paused', handler);
   }
 };
 
@@ -310,6 +333,22 @@ const logAPI: LogAPI = {
       return result.tasks;
     }
     throw new Error(result.error || 'Failed to get recent tasks');
+  },
+
+  getRankedRecentTasks: async (limit: number, today: string): Promise<RankedTask[]> => {
+    const result = await ipcRenderer.invoke('get-ranked-recent-tasks', limit, today);
+    if (result.success) {
+      return result.tasks;
+    }
+    throw new Error(result.error || 'Failed to get ranked recent tasks');
+  },
+
+  getTaskMinutesByRange: async (from: string, to: string): Promise<Record<string, number>> => {
+    const result = await ipcRenderer.invoke('get-task-minutes-by-range', from, to);
+    if (result.success) {
+      return result.minutes;
+    }
+    throw new Error(result.error || 'Failed to get task minutes');
   },
 
   searchTasks: async (query: string, limit?: number): Promise<TaskCache[]> => {

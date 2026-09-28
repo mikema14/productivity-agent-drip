@@ -12,6 +12,25 @@ interface TimerDayTimelineProps {
 
 const HOUR_HEIGHT = 80;
 
+/** Day bar denominator (plan Q5): 12 segments of 30 minutes against a 6h focus target. */
+export const DAY_TARGET_MINUTES = 360;
+export const DAY_BAR_SEGMENTS = 12;
+
+function formatHoursMinutes(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h > 0 ? `${h}h ${m.toString().padStart(2, '0')}m` : `${m}m`;
+}
+
+function describeDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const parts: string[] = [];
+  if (h > 0) parts.push(`${h} hour${h === 1 ? '' : 's'}`);
+  if (m > 0 || h === 0) parts.push(`${m} minute${m === 1 ? '' : 's'}`);
+  return parts.join(' ');
+}
+
 function getMonday(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();
@@ -145,6 +164,7 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
   const totalBreakMinutes = breakSessions.reduce((sum, s) => sum + s.duration_minutes, 0);
   const focusHours = Math.floor(totalFocusMinutes / 60);
   const focusMins = totalFocusMinutes % 60;
+  const filledSegments = Math.min(DAY_BAR_SEGMENTS, Math.round((totalFocusMinutes / DAY_TARGET_MINUTES) * DAY_BAR_SEGMENTS));
 
   const navigateDate = (delta: number) => {
     const d = new Date(selectedDate);
@@ -209,13 +229,31 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
   return (
     <div className="flex flex-col h-full">
       {/* WEEK HEADER */}
-      <div className="flex-none border-b border-focus/20 p-4">
+      <div className="flex-none border-b border-drip-elevated px-4 pb-3">
+        {/* Day bar: focus so far against the 6h target */}
+        <div className="flex items-baseline justify-between mb-1.5">
+          <span className="now-label text-txt-muted">Focus / 6h</span>
+          <span className="font-mono text-[12px] text-txt-secondary">{formatHoursMinutes(totalFocusMinutes)} <span className="text-txt-muted">/ 6h</span></span>
+        </div>
+        <div
+          role="img"
+          aria-label={`${describeDuration(totalFocusMinutes)} of 6 hours`}
+          data-testid="day-bar"
+          className="grid gap-[3px] mb-3"
+          style={{ gridTemplateColumns: `repeat(${DAY_BAR_SEGMENTS}, minmax(0, 1fr))` }}
+        >
+          {Array.from({ length: DAY_BAR_SEGMENTS }, (_, i) => (
+            <span key={i} data-filled={i < filledSegments || undefined} className={`h-1.5 ${i < filledSegments ? 'bg-focus' : 'bg-drip-border'}`} />
+          ))}
+        </div>
+
         {/* Date nav */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => navigateDate(-1)}
-              className="px-2 py-1 bg-transparent border border-focus/20 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary transition-all"
+              aria-label="Previous day"
+              className="w-7 h-7 flex items-center justify-center border border-drip-border text-txt-muted hover:bg-focus/5 hover:text-txt-primary transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -223,21 +261,22 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
             </button>
             <button
               onClick={goToToday}
-              className={`px-3 py-1 text-sm rounded-xl border transition-all ${isToday ? 'bg-focus/15 text-focus border-focus/30' : 'bg-transparent border-focus/20 text-txt-secondary hover:bg-focus/5'}`}
+              className={`px-3 h-7 now-label border transition-colors ${isToday ? 'bg-focus text-drip-bg border-focus' : 'bg-transparent border-drip-border text-txt-secondary hover:bg-focus/5 hover:text-txt-primary'}`}
             >
               Today
             </button>
             <button
               onClick={() => navigateDate(1)}
-              className="px-2 py-1 bg-transparent border border-focus/20 text-txt-muted text-sm rounded-xl hover:bg-focus/5 hover:text-txt-secondary transition-all"
+              aria-label="Next day"
+              className="w-7 h-7 flex items-center justify-center border border-drip-border text-txt-muted hover:bg-focus/5 hover:text-txt-primary transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
           </div>
-          <span className="text-sm text-txt-muted font-mono">
-            {formatDateShort(weekDates[0])} - {formatDateShort(weekDates[6])}
+          <span className="font-mono text-[11px] text-txt-muted">
+            {formatDateShort(weekDates[0])} – {formatDateShort(weekDates[6])}
           </span>
         </div>
 
@@ -250,17 +289,17 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
               <button
                 key={date.toISOString()}
                 onClick={() => setSelectedDate(date)}
-                className={`flex flex-col items-center py-1.5 rounded-lg transition-all text-xs
+                className={`flex flex-col items-center py-1 rounded-[2px] border transition-colors font-mono
                   ${isSelected
-                    ? 'bg-focus/10 border border-focus/30 text-focus'
+                    ? 'bg-focus/10 border-focus/30 text-focus'
                     : isDayToday
-                      ? 'text-focus hover:bg-focus/5'
-                      : 'text-txt-muted hover:bg-focus/5'
+                      ? 'border-transparent text-focus hover:bg-focus/5'
+                      : 'border-transparent text-txt-muted hover:bg-focus/5'
                   }`}
               >
-                <span className="font-medium">{formatDayName(date)}</span>
-                <span className={`text-lg font-mono ${isSelected ? 'text-focus font-semibold' : ''}`}>
-                  {date.getDate()}
+                <span className="text-[10px] tracking-label">{formatDayName(date)}</span>
+                <span className={`text-[13px] ${isSelected ? 'font-semibold' : ''}`}>
+                  {date.getDate().toString().padStart(2, '0')}
                 </span>
               </button>
             );
@@ -268,7 +307,7 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
         </div>
 
         {/* Stats row */}
-        <div className="mt-3 text-xs text-txt-muted text-center">
+        <div className="mt-2 font-mono text-[10.5px] text-txt-muted text-center">
           {focusSessions.length} session{focusSessions.length !== 1 ? 's' : ''}
           {totalFocusMinutes > 0 && (
             <span> &middot; {focusHours > 0 ? `${focusHours}h ` : ''}{focusMins}m focus</span>
@@ -292,7 +331,7 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
             return (
               <div key={hour} className="absolute left-0 right-0" style={{ top }}>
                 <div className="flex items-start">
-                  <span className="w-12 text-right pr-2 text-xs text-txt-dim font-mono -mt-2">
+                  <span className="w-12 text-right pr-2 font-mono text-[10.5px] text-txt-muted -mt-2">
                     {hour.toString().padStart(2, '0')}:00
                   </span>
                   <div className="flex-1 border-t border-dashed border-focus/10" />
@@ -369,24 +408,24 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
                 return (
                   <div
                     key={session.id}
-                    className={`absolute left-14 right-4 rounded-lg border transition-colors overflow-hidden
+                    className={`absolute left-14 right-4 rounded-[2px] border transition-colors overflow-hidden
                       ${isBreak
-                        ? 'bg-emerald-500/15 border-emerald-500/30'
+                        ? 'bg-break/15 border-break/40'
                         : isLogged
-                          ? 'bg-focus/15 border-focus/30'
-                          : 'bg-focus/10 border-focus/20'
+                          ? 'bg-focus/15 border-focus/40'
+                          : 'bg-focus/10 border-focus/30'
                       }`}
                     style={{ top, height }}
                   >
                     <div className="px-2 py-1 flex items-center gap-2 h-full">
-                      <span className={`text-xs font-mono font-medium truncate ${isBreak ? 'text-emerald-400' : 'text-focus'}`}>
+                      <span className={`font-mono text-[10.5px] font-medium truncate ${isBreak ? 'text-break' : 'text-focus-light'}`}>
                         {session.duration_minutes}m
                       </span>
                       {isBreak && (
-                        <span className="text-xs text-emerald-400/70">Break</span>
+                        <span className="text-xs text-break/70">Break</span>
                       )}
                       {!isBreak && session.task_id && (
-                        <span className="text-xs font-mono text-txt-muted">#{session.task_id}</span>
+                        <span className="font-mono text-[10.5px] text-txt-muted">{session.task_id}</span>
                       )}
                       {!isBreak && session.comment && height > 30 && (
                         <span className="text-xs text-txt-dim truncate">{session.comment}</span>
@@ -404,20 +443,20 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
                 return (
                   <div
                     key={proposal.id}
-                    className={`absolute left-14 right-4 rounded-lg border overflow-hidden
+                    className={`absolute left-14 right-4 rounded-[2px] border overflow-hidden
                       ${isAccepted
-                        ? 'bg-blue-500/15 border-blue-500/30'
-                        : 'bg-blue-500/5 border-blue-500/15 border-dashed'
+                        ? 'bg-blue-500/10 border-blue-500/40'
+                        : 'bg-transparent border-blue-500/40 border-dashed'
                       }`}
                     style={{ top, height }}
                   >
                     <div className="px-2 py-1 flex items-center gap-2 h-full">
-                      <span className="text-xs font-mono text-blue-400 font-medium truncate">
+                      <span className="font-mono text-[10.5px] text-blue-300 font-medium truncate">
                         {proposal.duration_minutes}m
                       </span>
-                      <span className="text-xs text-blue-400/70 truncate">{proposal.title}</span>
+                      <span className="text-xs text-blue-300/80 truncate">{proposal.title}</span>
                       {proposal.task_id && (
-                        <span className="text-xs font-mono text-txt-muted">#{proposal.task_id}</span>
+                        <span className="font-mono text-[10.5px] text-txt-muted">{proposal.task_id}</span>
                       )}
                     </div>
                   </div>
@@ -429,20 +468,20 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
                 return (
                   <div
                     key={entry.id}
-                    className={`absolute left-14 right-4 rounded-lg border overflow-hidden
+                    className={`absolute left-14 right-4 rounded-[2px] border overflow-hidden
                       ${isLogged
-                        ? 'bg-focus/10 border-focus/20'
-                        : 'bg-focus/5 border-focus/15 border-dashed'
+                        ? 'bg-focus/10 border-focus/30'
+                        : 'bg-transparent border-focus/30 border-dashed'
                       }`}
                     style={{ top, height }}
                   >
                     <div className="px-2 py-1 flex items-center gap-2 h-full">
-                      <span className="text-xs font-mono text-txt-secondary font-medium truncate">
+                      <span className="font-mono text-[10.5px] text-txt-secondary font-medium truncate">
                         {entry.duration_minutes}m
                       </span>
                       <span className="text-xs text-txt-muted truncate">{entry.title}</span>
                       {entry.task_id && (
-                        <span className="text-xs font-mono text-txt-dim">#{entry.task_id}</span>
+                        <span className="font-mono text-[10.5px] text-txt-dim">{entry.task_id}</span>
                       )}
                       {isLogged && (
                         <span className="text-xs text-txt-secondary ml-auto">&#10003;</span>
@@ -464,15 +503,15 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
 
             return (
               <div
-                className="absolute left-14 right-4 rounded-lg border border-focus/40 hatched-pattern bg-focus/5 overflow-hidden"
+                className="absolute left-14 right-4 rounded-[2px] border border-focus/40 hatched-pattern bg-focus/5 overflow-hidden"
                 style={{ top: Math.max(0, top), height }}
               >
                 <div className="px-2 py-1 flex items-center gap-2 h-full">
-                  <span className="text-xs font-mono text-focus font-medium">
+                  <span className="font-mono text-[10.5px] text-focus font-medium">
                     {elapsedMin}m
                   </span>
                   {currentTaskId && (
-                    <span className="text-xs font-mono text-txt-muted">#{currentTaskId}</span>
+                    <span className="font-mono text-[10.5px] text-txt-muted">{currentTaskId}</span>
                   )}
                   {intention && height > 30 && (
                     <span className="text-xs text-txt-dim truncate">{intention}</span>
@@ -495,13 +534,13 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
 
             return (
               <div
-                className="absolute left-14 right-4 rounded-lg border border-emerald-500/40 hatched-pattern-break bg-emerald-500/5 overflow-hidden"
+                className="absolute left-14 right-4 rounded-[2px] border border-break/40 hatched-pattern-break bg-break/5 overflow-hidden"
                 style={{ top: Math.max(0, top), height }}
               >
                 <div className="px-2 py-1 flex items-center gap-2 h-full">
-                  <span className="text-xs font-mono text-emerald-400 font-medium">{elapsedMin}m</span>
-                  <span className="text-xs text-emerald-400/70">Break</span>
-                  <span className="text-xs text-emerald-400/60 ml-auto font-mono animate-pulse-subtle">
+                  <span className="font-mono text-[10.5px] text-break font-medium">{elapsedMin}m</span>
+                  <span className="text-xs text-break/70">Break</span>
+                  <span className="text-xs text-break/60 ml-auto font-mono animate-pulse-subtle">
                     On break...
                   </span>
                 </div>
@@ -509,12 +548,15 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
             );
           })()}
 
-          {/* Current time red line */}
+          {/* Current time: amber NOW tag */}
           {isToday && currentTimeTop >= 0 && currentTimeTop <= totalHours * HOUR_HEIGHT && (
-            <div className="absolute left-12 right-0" style={{ top: currentTimeTop }}>
-              <div className="flex items-center">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500 -ml-1 shadow-[0_0_6px_rgba(239,68,68,0.5)]" />
-                <div className="flex-1 border-t-2 border-red-500/70" />
+            <div className="absolute left-12 right-4 pointer-events-none" style={{ top: currentTimeTop }}>
+              <div className="flex items-center gap-1.5 -translate-y-1/2">
+                <span className="w-[7px] h-[7px] bg-focus -ml-[3px]" />
+                <span className="flex-1 border-t border-focus" />
+                <span className="font-mono text-[10px] font-semibold tracking-[0.5px] text-drip-bg bg-focus px-1.5 leading-4">
+                  NOW {currentTime.getHours().toString().padStart(2, '0')}:{currentTime.getMinutes().toString().padStart(2, '0')}
+                </span>
               </div>
             </div>
           )}
@@ -523,15 +565,15 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
 
       {/* Unscheduled adhoc entries (no start_time) */}
       {dateAdhocEntries.filter(e => !e.start_time).length > 0 && (
-        <div className="flex-none border-t border-focus/20 px-4 py-2">
-          <p className="text-xs text-txt-dim mb-1">Unscheduled</p>
+        <div className="flex-none border-t border-drip-elevated px-4 py-2">
+          <p className="now-label text-txt-muted mb-1">Unscheduled</p>
           <div className="space-y-1">
             {dateAdhocEntries.filter(e => !e.start_time).map(entry => (
-              <div key={entry.id} className="flex items-center gap-2 px-2 py-1 rounded bg-focus/5 border border-focus/15 border-dashed">
-                <span className="text-xs font-mono text-txt-secondary">{entry.duration_minutes}m</span>
+              <div key={entry.id} className="flex items-center gap-2 px-2 py-1 rounded-[2px] border border-focus/30 border-dashed">
+                <span className="font-mono text-[10.5px] text-txt-secondary">{entry.duration_minutes}m</span>
                 <span className="text-xs text-txt-muted truncate">{entry.title}</span>
                 {entry.task_id && (
-                  <span className="text-xs font-mono text-txt-dim">#{entry.task_id}</span>
+                  <span className="font-mono text-[10.5px] text-txt-dim">{entry.task_id}</span>
                 )}
                 {entry.logged === 1 && (
                   <span className="text-xs text-txt-secondary ml-auto">&#10003;</span>
@@ -545,9 +587,10 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
       {/* FAB */}
       <button
         onClick={() => setShowAddModal(true)}
-        className="absolute bottom-6 right-6 w-14 h-14 bg-focus rounded-full shadow-glow-focus
+        aria-label="Add entry"
+        className="absolute bottom-4 right-4 w-11 h-11 bg-focus rounded-[2px] shadow-key-amber
                    flex items-center justify-center text-drip-bg text-2xl font-light
-                   hover:scale-105 active:scale-95 transition-transform z-10"
+                   active:translate-y-[2px] active:shadow-none transition-[transform,box-shadow] duration-100 z-10"
       >
         +
       </button>

@@ -53,6 +53,12 @@ export interface TaskCache {
   last_seen_at: string;
 }
 
+/** A cached task as shown in the Timer's recent list: frecency-ordered, with today's tracked time. */
+export interface RankedTask extends TaskCache {
+  /** Minutes tracked on this task today (sessions + adhoc entries + accepted calendar events). */
+  todayMinutes: number;
+}
+
 export interface AdhocEntry {
   id: string;
   created_at: string;
@@ -83,6 +89,8 @@ export interface CalendarProposal {
   task_id: string | null;
   comment: string | null;
   logged: 0 | 1;
+  /** R7: added by migration; undefined on rows read before it ran (treated as billable). */
+  billable?: 0 | 1;
 }
 
 export interface CalendarFeedResult {
@@ -204,17 +212,80 @@ export interface BreakRunningPayload {
   isLong: boolean;
 }
 
+/**
+ * Raycast Focus's built-in blocklist category ids, spelled out on the kickoff
+ * takeover. Shared by both processes so the deeplink and the pill never drift.
+ */
+export const RAYCAST_BLOCK_CATEGORIES = ['social', 'streaming', 'gaming'] as const;
+
+/** Where a kickoff was started from; drives the takeover's source line. */
+export type KickoffSource = 'auto' | 'nudge' | 'deeplink' | 'now';
+
+/** How long the idle nudge is paused for: the card's Snooze choices and the tray's "Pause nudges". */
+export type SnoozeChoice = '15m' | '1h' | 'day';
+
+/** Red nudge: the timer has been idle too long. Raised by the main-process idle watcher. */
+export interface IdleNudgePayload {
+  kind: 'idle';
+  /** ISO time the idle clock started. */
+  idleSince: string;
+  /** ISO time the kickoff takes over if the nudge is ignored. */
+  kickoffAt: string;
+  kickoffSeconds: number;
+  /** The card's two timed snooze choices (15m / 1h; 30s / 60s under DRIP_IDLE_FAST). */
+  snoozeSeconds: number;
+  snoozeLongSeconds: number;
+  /** Minutes between the nudge and the automatic kickoff. */
+  escalateMinutes: number;
+  /** Main's prediction of the kickoff's task (today's last session with a task); null when unknown. */
+  taskId: string | null;
+  taskTitle: string | null;
+  /** Whether Raycast Focus would be started with the kickoff (setting on, Raycast present, not test mode). */
+  raycastFocus: boolean;
+}
+
+/** A kickoff just rolled over into a full focus session. */
+export interface KickoffContinuePayload {
+  kind: 'kickoff-continue';
+  focusMinutes: number;
+  /** The prompt hides itself after this long; no answer = keep going. */
+  countdownSeconds: number;
+}
+
 export type SessionOverlayPayload =
   | FocusCompletePayload
   | BreakCompletePayload
-  | BreakRunningPayload;
+  | BreakRunningPayload
+  | IdleNudgePayload
+  | KickoffContinuePayload;
 
-export type OverlayActionType = 'start-break' | 'next-focus' | 'dismiss';
+export type OverlayActionType =
+  | 'start-break'
+  | 'next-focus'
+  | 'dismiss'
+  // Idle nudge
+  | 'idle-start-focus'
+  | 'idle-kickoff'
+  | 'idle-snooze'
+  // Kickoff roll-over prompt
+  | 'kickoff-keep'
+  | 'kickoff-stop';
+
+/** Extra data an overlay action may carry: the snooze choice for `idle-snooze`. */
+export interface OverlayActionData {
+  snooze?: SnoozeChoice;
+}
+
+/** Main → main-window renderer: the idle watcher asks the timer store to act. */
+export type IdleCommand =
+  | { type: 'start-focus' }
+  | { type: 'kickoff'; seconds: number; source: Exclude<KickoffSource, 'now'>; escalateMinutes: number }
+  | { type: 'stop-kickoff' };
 
 export interface OverlayAPI {
   onState: (callback: (payload: SessionOverlayPayload) => void) => void;
   onTick: (callback: (remainingSeconds: number) => void) => void;
-  action: (type: OverlayActionType) => void;
+  action: (type: OverlayActionType, data?: OverlayActionData) => void;
   saveNote: (sessionId: string, note: string) => Promise<void>;
   setInteractive: (interactive: boolean) => void;
   /** Escalation state — main owns the full-width top-edge attention strip. */
@@ -238,7 +309,8 @@ export interface TimerAPI {
   getDaysSinceLastLog?: () => Promise<number | null>;
   openExternal?: (url: string) => Promise<void>;
   // Main process timer control
-  startMainTimer: (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string) => Promise<void>;
+  /** Resolves with whether main asked Raycast Focus to start alongside the timer. */
+  startMainTimer: (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string, kickoffRolloverSeconds?: number) => Promise<{ raycastFocus: boolean }>;
   pauseMainTimer: () => Promise<void>;
   resumeMainTimer: () => Promise<void>;
   stopMainTimer: () => Promise<void>;
@@ -260,6 +332,13 @@ export interface TimerAPI {
   notifyBreakStarted: (totalSeconds: number, isLong: boolean) => Promise<void>;
   setOverlayEnabled: (enabled: boolean) => Promise<void>;
   onOverlayAction: (callback: (type: OverlayActionType) => void) => void;
+  onIdleCommand: (callback: (command: IdleCommand) => void) => void;
+  // Idle nudge pause (Snooze 15m / 1h / Rest of day, tray "Pause nudges")
+  /** Epoch ms the current pause ends, or null when nudges are not paused. */
+  getIdleNudgePause?: () => Promise<number | null>;
+  resumeIdleNudges?: () => Promise<void>;
+  /** Fires with the new end (or null) whenever the pause changes. Returns the unsubscribe. */
+  onIdleNudgePauseChanged?: (callback: (pausedUntil: number | null) => void) => () => void;
 }
 
 export interface LogAPI {
@@ -281,6 +360,10 @@ export interface LogAPI {
   getCachedTask: (taskId: string) => Promise<TaskCache | null>;
   cacheTask?: (taskId: string, title: string, projectId: number, projectName: string) => Promise<void>;
   getRecentTasks: () => Promise<TaskCache[]>;
+  /** Frecency-ranked recent tasks with today's tracked minutes. `today` is YYYY-MM-DD. */
+  getRankedRecentTasks?: (limit: number, today: string) => Promise<RankedTask[]>;
+  /** Tracked minutes per task id, inclusive YYYY-MM-DD range (Plan card annotations). */
+  getTaskMinutesByRange?: (from: string, to: string) => Promise<Record<string, number>>;
   searchTasks: (query: string, limit?: number) => Promise<TaskCache[]>;
   getTemplates: () => Promise<LogTemplate[]>;
   addTemplate: (template: Omit<LogTemplate, 'id' | 'created_at'>) => Promise<string>;
@@ -507,8 +590,4 @@ export interface TimerControlsProps {
   onResume: () => void;
   onSkip: () => void;
   onCancel: () => void;
-}
-
-export interface SessionHistoryProps {
-  sessions: PomodoroSession[];
 }

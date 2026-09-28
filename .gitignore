@@ -11,6 +11,7 @@ dist-electron/
 release/
 build/
 out/
+*.tsbuildinfo
 
 # Environment files
 .env
@@ -52,6 +53,7 @@ logs/
 # Testing
 coverage/
 .nyc_output/
+e2e/screenshots/
 
 # Temporary files
 tmp/
@@ -61,3 +63,7 @@ temp/
 # macOS
 .Spotlight-V100
 .Trashes
+
+# Tools
+.commander/
+.claude/worktrees/

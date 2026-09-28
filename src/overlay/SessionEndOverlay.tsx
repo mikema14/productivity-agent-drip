@@ -1,33 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties } from 'react';
 import type {
   BreakRunningPayload,
   FocusCompletePayload,
   BreakCompletePayload,
+  OverlayActionData,
   OverlayActionType,
   SessionOverlayPayload
 } from '../types';
 import { BREAK, CARD_W, FOCUS, GLASS, TXT, WINDOW } from './glass';
 import { playEscalationChime } from './chime';
 import { useOverlayHoverInteractivity } from './useOverlayHoverInteractivity';
+import { useWindowFocus } from '../hooks/useWindowFocus';
+import { ActionButton, CoffeeIcon, DismissButton, Dot, label, mmss, mono, pad } from './parts';
+import { IdleNudgeCard } from './IdleNudgeCard';
+import { KickoffPromptCard } from './KickoffPromptCard';
 
 const ESCALATE_AFTER_MS = 60_000;
 const NOTE_DEBOUNCE_MS = 400;
 
 type Shape = 'card' | 'break';
 
-function pad(n: number): string {
-  return n < 10 ? `0${n}` : String(n);
-}
-
 function clockTime(iso: string): string {
   const d = new Date(iso);
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function mmss(totalSeconds: number): string {
-  const s = Math.max(0, totalSeconds);
-  return `${Math.floor(s / 60)}:${pad(s % 60)}`;
+/** The idle nudge and the kickoff prompt run on main's clock, not the escalation one. */
+function escalates(payload: SessionOverlayPayload): boolean {
+  return payload.kind === 'focus-complete' || payload.kind === 'break-complete';
 }
 
 /** Dev affordance: `?state=card` renders a state without finishing a session. */
@@ -53,16 +54,39 @@ function devPayload(): SessionOverlayPayload | null {
   if (which === 'break') {
     return { kind: 'break-running', totalSeconds: 300, remainingSeconds: 222, isLong: false };
   }
+  if (which === 'idle') {
+    return {
+      kind: 'idle',
+      idleSince: new Date(Date.now() - 12 * 60_000).toISOString(),
+      kickoffAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+      kickoffSeconds: 120,
+      snoozeSeconds: 900,
+      snoozeLongSeconds: 3600,
+      escalateMinutes: 15,
+      taskId: '689742',
+      taskTitle: 'Automatizovať dokumentáciu',
+      raycastFocus: true
+    };
+  }
+  if (which === 'kickoff') {
+    return { kind: 'kickoff-continue', focusMinutes: 25, countdownSeconds: 10 };
+  }
   return null;
 }
 
 export function SessionEndOverlay() {
   const initial = useMemo(devPayload, []);
   const [payload, setPayload] = useState<SessionOverlayPayload | null>(initial);
+  // The window keydown handler is registered once; it reads the kind from here.
+  const kindRef = useRef<SessionOverlayPayload['kind'] | null>(initial?.kind ?? null);
+  const windowFocused = useWindowFocus();
 
   const [escalated, setEscalated] = useState(false);
   const [note, setNote] = useState('');
   const [remaining, setRemaining] = useState(0);
+  // Wall clock for the idle card's "· 12m" and the kickoff prompt's countdown
+  const [now, setNow] = useState(() => Date.now());
+  const [shownAt, setShownAt] = useState(() => Date.now());
 
   const shapeRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -76,6 +100,14 @@ export function SessionEndOverlay() {
   const isBreakRunning = payload?.kind === 'break-running';
   const shape: Shape = isBreakRunning ? 'break' : 'card';
   const accent = payload?.kind === 'focus-complete' ? FOCUS : BREAK;
+  const ticking = payload?.kind === 'idle' || payload?.kind === 'kickoff-continue';
+
+  useEffect(() => {
+    if (!ticking) return;
+    setNow(Date.now());
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [ticking, payload]);
 
   // ---------------------------------------------------------------- note save
   const flushNote = useCallback((immediate = false) => {
@@ -126,6 +158,21 @@ export function SessionEndOverlay() {
     playEscalationChime();
   }, []);
 
+  const act = useCallback(
+    (type: OverlayActionType, data?: OverlayActionData) => {
+      flushNote(true);
+      stopEscalation();
+      if (!window.overlayAPI) {
+        // Dev / e2e fixture window (no preload): nothing can leave the page.
+        console.log(`[Overlay] fixture action: ${type}${data ? ` ${JSON.stringify(data)}` : ''}`);
+        return;
+      }
+      if (data === undefined) window.overlayAPI.action(type);
+      else window.overlayAPI.action(type, data);
+    },
+    [flushNote, stopEscalation]
+  );
+
   // Hovering the card means the user has seen it, so stop nagging.
   const onHoverEnter = useCallback(() => {
     if (!isBreakRunning) stopEscalation();
@@ -143,6 +190,8 @@ export function SessionEndOverlay() {
       noteFocusedRef.current = false;
 
       setPayload(next);
+      kindRef.current = next.kind;
+      setShownAt(Date.now());
       stopEscalation();
 
       if (next.kind === 'break-running') {
@@ -161,7 +210,7 @@ export function SessionEndOverlay() {
         savedNoteRef.current = '';
         setNote('');
       }
-      escalateTimer.current = window.setTimeout(escalate, ESCALATE_AFTER_MS);
+      if (escalates(next)) escalateTimer.current = window.setTimeout(escalate, ESCALATE_AFTER_MS);
     });
 
     window.overlayAPI?.onTick((seconds) => setRemaining(seconds));
@@ -170,7 +219,16 @@ export function SessionEndOverlay() {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         flushNote(true);
-        window.overlayAPI?.action('dismiss');
+        if (window.overlayAPI) window.overlayAPI.action('dismiss');
+        else console.log('[Overlay] fixture action: dismiss');
+        return;
+      }
+      // The nudge's Start focus ↵ (N3). The note input's own Enter → start-break is untouched,
+      // and Enter on a focused key (Tab → Snooze → 1h) is that key's click, nothing more.
+      if (event.key === 'Enter' && kindRef.current === 'idle') {
+        const target = event.target as HTMLElement | null;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON' || target.isContentEditable)) return;
+        act('idle-start-focus');
       }
     };
     window.addEventListener('beforeunload', onBeforeUnload);
@@ -179,23 +237,13 @@ export function SessionEndOverlay() {
       window.removeEventListener('beforeunload', onBeforeUnload);
       window.removeEventListener('keydown', onKey);
     };
-  }, [escalate, flushNote, resetInteractive, stopEscalation]);
+  }, [act, escalate, flushNote, resetInteractive, stopEscalation]);
 
   // Focus the note as soon as a finished session appears, so typing works
   // without hunting for the field.
   useEffect(() => {
     if (payload && payload.kind === 'focus-complete') inputRef.current?.focus();
   }, [payload]);
-
-
-  const act = useCallback(
-    (type: OverlayActionType) => {
-      flushNote(true);
-      stopEscalation();
-      window.overlayAPI?.action(type);
-    },
-    [flushNote, stopEscalation]
-  );
 
   if (!payload) return null;
 
@@ -205,11 +253,6 @@ export function SessionEndOverlay() {
     top: WINDOW.inset,
     right: WINDOW.inset,
     fontFamily: "'Outfit', system-ui, sans-serif"
-  };
-
-  const mono: CSSProperties = {
-    fontFamily: "'JetBrains Mono', Menlo, monospace",
-    fontVariantNumeric: 'tabular-nums'
   };
 
   const sheen: CSSProperties = {
@@ -264,6 +307,27 @@ export function SessionEndOverlay() {
             </div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (payload.kind === 'idle') {
+    return (
+      <div style={anchor}>
+        <IdleNudgeCard payload={payload} now={now} windowFocused={windowFocused} shapeRef={shapeRef} act={act} />
+      </div>
+    );
+  }
+
+  if (payload.kind === 'kickoff-continue') {
+    return (
+      <div style={anchor}>
+        <KickoffPromptCard
+          payload={payload}
+          secondsLeft={payload.countdownSeconds - Math.floor((now - shownAt) / 1000)}
+          shapeRef={shapeRef}
+          act={act}
+        />
       </div>
     );
   }
@@ -332,30 +396,7 @@ export function SessionEndOverlay() {
                   {clockTime(focus.startedAt)} – {clockTime(focus.endedAt)}
                 </span>
               )}
-              <button
-                aria-label="Dismiss"
-                onClick={() => act('dismiss')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 22,
-                  height: 22,
-                  margin: '-2px -4px -2px 2px',
-                  padding: 0,
-                  border: 'none',
-                  background: 'transparent',
-                  color: TXT.dim,
-                  cursor: 'pointer',
-                  transition: 'color 150ms ease'
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = TXT.secondary)}
-                onMouseLeave={(e) => (e.currentTarget.style.color = TXT.dim)}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
+              <DismissButton onClick={() => act('dismiss')} />
             </div>
 
             {focus && (
@@ -439,106 +480,5 @@ export function SessionEndOverlay() {
         </div>
       </div>
     </div>
-  );
-}
-
-function label(color: string, weight: number = 500): CSSProperties {
-  return {
-    fontSize: 10.5,
-    fontWeight: weight,
-    letterSpacing: '0.14em',
-    textTransform: 'uppercase',
-    color
-  };
-}
-
-function Dot({ color, size, breathe }: { color: string; size: number; breathe?: boolean }) {
-  return (
-    <span
-      style={{
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        background: color,
-        boxShadow: `0 0 ${breathe ? 14 : 8}px ${color}cc`,
-        flexShrink: 0,
-        animation: breathe ? 'drip-dot 1.8s ease-in-out infinite' : undefined
-      }}
-    />
-  );
-}
-
-function ActionButton({
-  children,
-  onClick,
-  primary,
-  accent,
-  escalated
-}: {
-  children: ReactNode;
-  onClick: () => void;
-  primary?: boolean;
-  accent: { base: string; light: string; bright: string } | typeof BREAK;
-  escalated?: boolean;
-}) {
-  const light = 'light' in accent ? accent.light : FOCUS.light;
-  const bright = 'bright' in accent ? (accent as typeof FOCUS).bright : light;
-  const fillAlpha = escalated ? 0.26 : 0.16;
-  const borderAlpha = escalated ? 0.45 : 0.28;
-
-  const base: CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    flexGrow: primary ? 1 : 0,
-    height: 40,
-    padding: '0 14px',
-    borderRadius: 13,
-    fontFamily: "'Outfit', system-ui, sans-serif",
-    fontSize: 13.5,
-    fontWeight: primary ? 500 : 400,
-    cursor: 'pointer',
-    outline: 'none',
-    transition: 'background-color 160ms ease, border-color 160ms ease, color 160ms ease',
-    background: primary ? withAlpha(accent.base, fillAlpha) : 'transparent',
-    border: primary ? `0.5px solid ${withAlpha(accent.base, borderAlpha)}` : `0.5px solid rgba(255,255,255,0.10)`,
-    color: primary ? (escalated ? bright : light) : TXT.secondary
-  };
-
-  return (
-    <button
-      onClick={onClick}
-      style={base}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = primary
-          ? withAlpha(accent.base, fillAlpha + 0.08)
-          : withAlpha(accent.base, 0.06);
-        if (!primary) e.currentTarget.style.color = TXT.primary;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = primary ? withAlpha(accent.base, fillAlpha) : 'transparent';
-        if (!primary) e.currentTarget.style.color = TXT.secondary;
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function withAlpha(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function CoffeeIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8h1a4 4 0 010 8h-1" />
-      <path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z" />
-      <path d="M6 2v2M10 2v2M14 2v2" />
-    </svg>
   );
 }

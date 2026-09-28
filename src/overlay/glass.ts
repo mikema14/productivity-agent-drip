@@ -28,6 +28,8 @@ export const GLASS = {
     '0 16px 40px rgba(0, 0, 0, 0.34), 0 2px 8px rgba(0, 0, 0, 0.22), inset 0 0.5px 0 rgba(255, 255, 255, 0.14)',
   shadowPill:
     '0 8px 22px rgba(0, 0, 0, 0.30), 0 1px 4px rgba(0, 0, 0, 0.20), inset 0 0.5px 0 rgba(255, 255, 255, 0.14)',
+  // The idle nudge's red halo (mockups/Nudge.dc.html), added to shadowCard.
+  haloAlert: '0 0 0 4px rgba(239, 68, 68, 0.06), 0 0 48px rgba(239, 68, 68, 0.16)',
   sheen: 'linear-gradient(160deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 38%)',
   ease: 'cubic-bezier(0.32, 0.72, 0, 1)',
 } as const;
@@ -42,6 +44,12 @@ export const FOCUS = {
 export const BREAK = {
   base: COLOR.break.DEFAULT,
   light: COLOR.break.light,
+} as const;
+
+/** The idle nudge — semantic red, never decorative. */
+export const ALERT = {
+  base: COLOR.alert.DEFAULT,
+  light: COLOR.alert.light,
 } as const;
 
 export const TXT = COLOR.txt;

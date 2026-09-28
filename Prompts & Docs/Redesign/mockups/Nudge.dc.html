@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Drip — Idle nudge</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&amp;family=JetBrains+Mono:wght@300;400;500&amp;display=swap">
+<style>
+body{margin:0;background:#0a0a0c}
+</style>
+</helmet>
+<div style="width: 520px; height: 280px; box-sizing: border-box; padding: 20px; background: #0a0a0c; font-family: 'Outfit', system-ui, sans-serif; color: #f0f0f2">
+<div role="alertdialog" aria-label="Nothing running" style="width: 480px; height: 240px; box-sizing: border-box; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; background: #141418; border: 1px solid rgba(248,113,113,0.45); border-radius: 16px; box-shadow: 0 0 0 4px rgba(239,68,68,0.06), 0 0 48px rgba(239,68,68,0.16)">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 10.5px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase; color: #f87171"><span style="width: 7px; height: 7px; border-radius: 999px; background: #f87171"></span>Idle</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8585a0">takeover in <span style="color: #f87171">14:32</span></span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 22px; font-weight: 500; letter-spacing: -0.2px">Nothing running · <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400">12m</span></span>
+<span style="font-size: 13px; color: #a0a0b0">Then Raycast Focus turns on and a 2-minute kickoff starts on <span style="font-family: 'JetBrains Mono', monospace; color: #f59e0b">689742</span>.</span>
+</div>
+<div style="flex-grow: 1"></div>
+<div style="display: flex; gap: 8px">
+<button style="height: 40px; padding: 0 16px; display: flex; align-items: center; gap: 8px; background: #f59e0b; color: #0a0a0c; border: none; border-radius: 12px; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer">Start focus<span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; background: rgba(10,10,12,0.14); padding: 1px 6px; border-radius: 5px">↵</span></button>
+<button style="height: 40px; padding: 0 14px; background: rgba(245,158,11,0.10); color: #f59e0b; border: 1px solid rgba(245,158,11,0.2); border-radius: 12px; font-family: 'Outfit', sans-serif; font-size: 14px; cursor: pointer">Kickoff 2m</button>
+<div style="flex-grow: 1"></div>
+<button style="height: 40px; padding: 0 14px; background: transparent; color: #a0a0b0; border: 1px solid #2a2a32; border-radius: 12px; font-family: 'Outfit', sans-serif; font-size: 14px; cursor: pointer">Snooze 15m</button>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":520,"height":280}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

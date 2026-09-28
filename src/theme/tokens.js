@@ -11,17 +11,27 @@ export const COLOR = {
     surface: '#141418',
     elevated: '#1c1c22',
     border: '#2a2a32',
+    // Ghost digits behind the Now countdown (the unlit 88:88 segments).
+    ghost: '#16161b',
   },
   focus: {
     DEFAULT: '#f59e0b',
     light: '#fbbf24',
     bright: '#fde68a',
     dark: '#d97706',
+    // Drop edge of the amber keycap button (KeyButton).
+    shadow: '#92560a',
   },
   break: {
     DEFAULT: '#34d399',
     light: '#6ee7b7',
     dark: '#10b981',
+  },
+  // Semantic error red — Tailwind red-500 / red-400, as used across the app.
+  // Not an accent: only for errors and the idle nudge.
+  alert: {
+    DEFAULT: '#ef4444',
+    light: '#f87171',
   },
   txt: {
     primary: '#f0f0f2',

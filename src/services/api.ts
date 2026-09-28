@@ -123,6 +123,7 @@ class EasyProjectAPI {
     }
 
     // Fallback to fetch (won't work in production due to CORS, but kept for reference)
+    if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) throw new Error('Blocked: posting time entries is disabled in dev builds');
     const response = await fetch(`${this.baseUrl}/time_entries.json`, {
       method: 'POST',
       headers: {

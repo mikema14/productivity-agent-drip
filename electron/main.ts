@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, Notification, net, shell, screen } from 'electron';
 import { join } from 'path';
 import { readFileSync, statSync, writeFileSync } from 'fs';
-import type { FocusCompletePayload, BreakCompletePayload, OverlayActionType } from '../src/types';
+import type { FocusCompletePayload, BreakCompletePayload, OverlayActionData, OverlayActionType } from '../src/types';
 import {
   initDB,
   closeDB,
@@ -27,6 +27,8 @@ import {
   getCachedTask,
   cacheTask,
   getRecentTasks,
+  getRankedRecentTasks,
+  getTaskMinutesByRange,
   searchCachedTasks,
   getTemplates,
   addTemplate,
@@ -98,6 +100,7 @@ import {
   extendTimer,
   cleanupTimer
 } from './timer';
+import { initIdleNudge, stopIdleNudge, startKickoff, handleIdleOverlayAction, getNudgePausedUntil, resumeNudges } from './idleNudge';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -125,7 +128,8 @@ function createWindow() {
   // Load the app
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    // Docked devtools would shrink the viewport and corrupt e2e screenshots
+    if (process.env.DRIP_TEST_MODE !== '1') mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(join(__dirname, '../dist/index.html'));
   }
@@ -197,6 +201,10 @@ function handleDripUrl(url: string) {
         }
         break;
       }
+      case 'kickoff':
+        // 2 minutes of focus on the last task, rolling into a full session
+        startKickoff('deeplink');
+        break;
       case 'skip-break':
         stopTimer();
         if (mainWindow && !mainWindow.isDestroyed()) {
@@ -263,6 +271,9 @@ app.whenReady().then(() => {
   // Session-end overlay: read the enabled flag once, create the window lazily
   initOverlayEnabled();
 
+  // Red nudge when nothing runs for too long, kickoff when it's ignored
+  initIdleNudge(() => mainWindow);
+
   startCalendarBackgroundRefresh();
 
   // A disconnected or rearranged display would otherwise leave the overlay
@@ -293,6 +304,7 @@ app.on('window-all-closed', () => {
 // Cleanup on quit
 app.on('before-quit', () => {
   app.isQuitting = true;
+  stopIdleNudge();
   cleanupTimer();
   destroyOverlay();
   closeDB();
@@ -464,7 +476,10 @@ ipcMain.handle('overlay:save-note', async (_event, sessionId: string, note: stri
 
 // Overlay relays its actions to the main window renderer, which owns all timer
 // logic — the overlay never drives the timer itself.
-ipcMain.on('overlay:action', (_event, type: OverlayActionType) => {
+ipcMain.on('overlay:action', (_event, type: OverlayActionType, data?: OverlayActionData) => {
+  // Idle nudge and kickoff prompt buttons are handled by the idle watcher
+  if (handleIdleOverlayAction(type, data)) return;
+
   if (type === 'start-break') {
     // Collapse to the break pill immediately so there is no flash; the exact
     // totalSeconds arrives via overlay:break-started. Without a known break the
@@ -483,6 +498,25 @@ ipcMain.on('overlay:action', (_event, type: OverlayActionType) => {
 
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('overlay-action', type);
+  }
+});
+
+// Nudge pause (Snooze 15m / 1h / Rest of day, tray "Pause nudges"): the Now
+// header reads it and offers Resume; changes arrive as `idle-nudge-paused`.
+ipcMain.handle('idle-nudge:get-pause', async () => {
+  try {
+    return { success: true, pausedUntil: getNudgePausedUntil() };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('idle-nudge:resume', async () => {
+  try {
+    resumeNudges();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
   }
 });
 
@@ -654,6 +688,26 @@ ipcMain.handle('get-recent-tasks', async () => {
     return { success: true, tasks };
   } catch (error) {
     console.error('Failed to get recent tasks:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('get-ranked-recent-tasks', async (_event, limit: number, today: string) => {
+  try {
+    const tasks = getRankedRecentTasks(limit, today);
+    return { success: true, tasks };
+  } catch (error) {
+    console.error('Failed to get ranked recent tasks:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('get-task-minutes-by-range', async (_event, from: string, to: string) => {
+  try {
+    const minutes = getTaskMinutesByRange(from, to);
+    return { success: true, minutes };
+  } catch (error) {
+    console.error('Failed to get task minutes by range:', error);
     return { success: false, error: (error as Error).message };
   }
 });
@@ -844,6 +898,11 @@ ipcMain.handle('get-issue', async (_event, baseUrl: string, apiKey: string, issu
 
 // Post time entry
 ipcMain.handle('post-time-entry', async (_event, baseUrl: string, apiKey: string, payload: any) => {
+  // Dev builds share the real database and API key, so they must never log time to Easy8
+  if (!app.isPackaged && process.env.DRIP_ALLOW_API_WRITES !== '1') {
+    console.warn('[Safety] Blocked time-entry POST in dev build');
+    return { success: false, error: 'Blocked: posting time entries is disabled in dev builds' };
+  }
   try {
     const url = `${baseUrl}/time_entries.json`;
     console.log('Posting time entry to:', url);
@@ -1303,10 +1362,10 @@ ipcMain.handle('call-openrouter', async (_event, apiKey: string, model: string, 
 
 // ==================== MAIN PROCESS TIMER ====================
 
-ipcMain.handle('start-main-timer', async (_event, duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string) => {
+ipcMain.handle('start-main-timer', async (_event, duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string, kickoffRolloverSeconds?: number) => {
   try {
-    startTimer(duration, timerType, nextBreakDuration, taskId);
-    return { success: true };
+    const raycastFocus = startTimer(duration, timerType, nextBreakDuration, taskId, kickoffRolloverSeconds);
+    return { success: true, raycastFocus };
   } catch (error) {
     console.error('Failed to start main timer:', error);
     return { success: false, error: (error as Error).message };

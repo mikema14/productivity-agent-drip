@@ -2,7 +2,8 @@ import Database from 'better-sqlite3';
 import { app } from 'electron';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import type { PomodoroSession, Setting, TaskPreference, Milestone, Goal, DailyIntentions, ShutdownRitual, TaskList, ListItem } from '../types';
+import type { PomodoroSession, Setting, TaskPreference, Milestone, Goal, DailyIntentions, ShutdownRitual, TaskList, ListItem, TaskCache, RankedTask } from '../types';
+import { rankTasks, sumMinutesForRange, FRECENCY_WINDOW_DAYS, type TaskUsageRow } from '../utils/frecency';
 
 let db: Database.Database | null = null;
 
@@ -376,6 +377,14 @@ function runMigrations(database: Database.Database) {
       database.exec('ALTER TABLE calendar_proposals ADD COLUMN logged INTEGER DEFAULT 0');
       console.log('Migration complete: calendar_proposals.logged');
     }
+
+    // R7: billable flag per meeting (default 1 = today's effective behaviour when logging)
+    const hasBillableColumn = tableInfo.some((col: any) => col.name === 'billable');
+    if (!hasBillableColumn) {
+      console.log('Running migration: Adding billable column to calendar_proposals');
+      database.exec('ALTER TABLE calendar_proposals ADD COLUMN billable INTEGER DEFAULT 1');
+      console.log('Migration complete: calendar_proposals.billable');
+    }
   } catch (error) {
     console.error('Migration error:', error);
   }
@@ -586,7 +595,8 @@ function initializeDefaultSettings(database: Database.Database) {
     { key: 'sessionsUntilLongBreak', value: '3' },
     { key: 'defaultBillable', value: 'true' },
     { key: 'roundingMode', value: 'none' },
-    { key: 'sessionEndOverlay', value: 'true' }
+    { key: 'sessionEndOverlay', value: 'true' },
+    { key: 'raycastFocusEnabled', value: 'true' }
   ];
 
   const insertStmt = database.prepare(
@@ -839,6 +849,62 @@ export function getRecentTasks() {
 }
 
 /**
+ * Recent tasks for the Timer picker, ranked by frecency (see src/utils/frecency.ts)
+ * and carrying today's tracked minutes.
+ *
+ * SQL only fetches raw usage rows; scoring and the per-day sum are pure TS. A row's
+ * `day` follows the Daily Log's per-table rule (sessions: date(start_at); adhoc and
+ * calendar: their `date` column), so "today" here matches what the Daily Log shows
+ * for the same `today` string. getAllCachedTasks is untouched for its other callers.
+ */
+/**
+ * Raw usage rows (non-break sessions, adhoc entries, accepted calendar
+ * proposals) for tasks on or after `since` (YYYY-MM-DD). Shared by the
+ * frecency ranking and the per-range minute totals.
+ */
+function usageRowsSince(since: string): TaskUsageRow[] {
+  const database = getDB();
+  return database.prepare(`
+    SELECT task_id, start_at AS at, date(start_at) AS day, duration_minutes AS minutes
+      FROM pomodoro_sessions
+      WHERE task_id IS NOT NULL AND task_id != '' AND source != 'break'
+        AND date(start_at) >= @since
+    UNION ALL
+    SELECT task_id, COALESCE(start_time, date) AS at, date AS day, duration_minutes AS minutes
+      FROM adhoc_entries
+      WHERE task_id IS NOT NULL AND task_id != '' AND date >= @since
+    UNION ALL
+    SELECT task_id, start_at AS at, date AS day, duration_minutes AS minutes
+      FROM calendar_proposals
+      WHERE task_id IS NOT NULL AND task_id != '' AND accepted = 1 AND dismissed = 0
+        AND date >= @since
+  `).all({ since }) as TaskUsageRow[];
+}
+
+export function getRankedRecentTasks(limit = 20, today?: string): RankedTask[] {
+  const database = getDB();
+  const now = Date.now();
+  const day = today || new Date(now).toISOString().split('T')[0];
+  const since = new Date(now - FRECENCY_WINDOW_DAYS * 86_400_000).toISOString().split('T')[0];
+
+  const rows = usageRowsSince(since);
+
+  const tasks = database.prepare(`
+    SELECT task_id, title, project_id, project_name, last_seen_at FROM task_cache
+  `).all() as TaskCache[];
+
+  return rankTasks(tasks, rows, { now, today: day, limit });
+}
+
+/**
+ * Tracked minutes per task id for an inclusive YYYY-MM-DD range (Plan screen
+ * card annotations and the "tracked this week" line).
+ */
+export function getTaskMinutesByRange(from: string, to: string): Record<string, number> {
+  return Object.fromEntries(sumMinutesForRange(usageRowsSince(from), from, to));
+}
+
+/**
  * Search the full task cache by task ID, title or project name.
  *
  * Unlike getRecentTasks/getAllCachedTasks this is not capped to recent history -
@@ -1065,6 +1131,10 @@ export function updateCalendarProposal(id: string, updates: any): void {
   if (updates.logged !== undefined) {
     fields.push('logged = ?');
     values.push(updates.logged);
+  }
+  if (updates.billable !== undefined) {
+    fields.push('billable = ?');
+    values.push(updates.billable);
   }
 
   if (fields.length === 0) return;

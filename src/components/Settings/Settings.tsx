@@ -18,6 +18,8 @@ export default function Settings() {
     openRouterModel: 'anthropic/claude-4.5-sonnet-20250929',
     showTrayIcon: false,
     sessionEndOverlay: true,
+    raycastFocusEnabled: true,
+    idleNudgeEnabled: true,
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -45,6 +47,8 @@ export default function Settings() {
       const openRouterModel = await window.timerAPI.getSettings('openRouterModel') || 'anthropic/claude-4.5-sonnet-20250929';
       const showTrayIcon = (await window.timerAPI.getSettings('show_tray_icon') || 'false') === 'true';
       const sessionEndOverlay = (await window.timerAPI.getSettings('sessionEndOverlay') || 'true') === 'true';
+      const raycastFocusEnabled = (await window.timerAPI.getSettings('raycastFocusEnabled') || 'true') === 'true';
+      const idleNudgeEnabled = (await window.timerAPI.getSettings('idleNudgeEnabled') || 'true') === 'true';
 
       setSettings({
         apiBaseUrl,
@@ -62,6 +66,8 @@ export default function Settings() {
         openRouterModel,
         showTrayIcon,
         sessionEndOverlay,
+        raycastFocusEnabled,
+        idleNudgeEnabled,
       });
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -90,6 +96,8 @@ export default function Settings() {
       await window.timerAPI.toggleTray(settings.showTrayIcon);
       await window.timerAPI.saveSettings('sessionEndOverlay', settings.sessionEndOverlay.toString());
       await window.timerAPI.setOverlayEnabled(settings.sessionEndOverlay);
+      await window.timerAPI.saveSettings('raycastFocusEnabled', settings.raycastFocusEnabled.toString());
+      await window.timerAPI.saveSettings('idleNudgeEnabled', settings.idleNudgeEnabled.toString());
 
       setSaveMessage({ type: 'success', text: 'Settings saved successfully!' });
       setTimeout(() => setSaveMessage(null), 3000);
@@ -435,6 +443,53 @@ export default function Settings() {
               <p className="text-xs text-txt-dim">
                 A small always-on-top card appears when a focus session ends, even when Drip is hidden.
                 With this off, session end only fires a notification.
+              </p>
+            </div>
+          </section>
+
+          {/* Idle Nudge */}
+          <section>
+            <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Idle Nudge</h2>
+            <div className="space-y-4 bg-transparent border border-focus/30 rounded-xl p-6">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="idleNudgeEnabled"
+                  checked={settings.idleNudgeEnabled}
+                  onChange={(e) => setSettings({ ...settings, idleNudgeEnabled: e.target.checked })}
+                  className="w-4 h-4 text-focus border-focus/20 bg-transparent rounded focus:ring-focus/30"
+                />
+                <label htmlFor="idleNudgeEnabled" className="ml-2 text-sm font-medium text-txt-secondary">
+                  Nudge when nothing is running
+                </label>
+              </div>
+              <p className="text-xs text-txt-dim">
+                Mon–Fri 08:00–18:00, while you're at the Mac and not in a calendar event. After 10 idle minutes a
+                red card appears. Ignored for 15 more (or 15 minutes after a break ends), Drip starts a 2-minute
+                kickoff with Raycast Focus that rolls into a full session.
+              </p>
+            </div>
+          </section>
+
+          {/* Raycast Focus */}
+          <section>
+            <h2 className="text-lg font-display font-semibold text-txt-primary mb-4">Raycast Focus</h2>
+            <div className="space-y-4 bg-transparent border border-focus/30 rounded-xl p-6">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="raycastFocusEnabled"
+                  checked={settings.raycastFocusEnabled}
+                  onChange={(e) => setSettings({ ...settings, raycastFocusEnabled: e.target.checked })}
+                  className="w-4 h-4 text-focus border-focus/20 bg-transparent rounded focus:ring-focus/30"
+                />
+                <label htmlFor="raycastFocusEnabled" className="ml-2 text-sm font-medium text-txt-secondary">
+                  Start Raycast Focus with focus sessions
+                </label>
+              </div>
+              <p className="text-xs text-txt-dim">
+                Each focus session starts a matching Raycast Focus session, and pausing, stopping or finishing
+                in Drip ends it. Starting a session replaces any Focus session started in Raycast.
               </p>
             </div>
           </section>

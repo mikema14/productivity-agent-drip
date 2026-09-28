@@ -5,34 +5,36 @@ interface Props {
   onChange: (minutes: number) => void;
 }
 
+/** Joined strip of session lengths; the selected key is amber with an LED square above it. */
 export default function DurationSegments({ value, onChange }: Props) {
   return (
-    <div
-      className="inline-flex self-center items-center gap-0.5 p-[3px] rounded-[10px]"
-      style={{
-        background: 'oklch(1 0 0 / 0.04)',
-        border: '0.5px solid oklch(1 0 0 / 0.08)',
-      }}
-    >
-      {OPTIONS.map(opt => (
-        <button
-          key={opt}
-          onClick={() => onChange(opt)}
-          className={`h-7 text-[12px] font-medium rounded-lg transition-all duration-150 ${
-            value === opt
-              ? 'text-txt-primary'
-              : 'text-txt-muted hover:text-txt-secondary'
-          }`}
-          style={{
-            padding: '0 14px',
-            fontVariantNumeric: 'tabular-nums',
-            background: value === opt ? 'oklch(1 0 0 / 0.10)' : 'transparent',
-            boxShadow: value === opt ? 'inset 0 1px 0 oklch(1 0 0 / 0.06)' : 'none',
-          }}
-        >
-          {opt}m
-        </button>
-      ))}
+    <div className="inline-flex flex-col items-start">
+      <div aria-hidden className="flex mb-1">
+        {OPTIONS.map(opt => (
+          <span key={opt} className="w-[52px] flex justify-center">
+            <span className={`w-1 h-1 ${value === opt ? 'bg-focus shadow-led' : 'bg-transparent'}`} />
+          </span>
+        ))}
+      </div>
+      <div role="group" aria-label="Duration in minutes" className="flex border border-drip-border">
+        {OPTIONS.map((opt, i) => (
+          <button
+            key={opt}
+            type="button"
+            aria-pressed={value === opt}
+            onClick={() => onChange(opt)}
+            className={`w-[52px] h-[34px] font-mono text-[13px] tabular-nums transition-colors duration-150 ${
+              i < OPTIONS.length - 1 ? 'border-r border-drip-border' : ''
+            } ${
+              value === opt
+                ? 'bg-focus text-drip-bg font-semibold'
+                : 'bg-transparent text-txt-secondary font-medium hover:text-txt-primary hover:bg-focus/5'
+            }`}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

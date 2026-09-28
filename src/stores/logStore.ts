@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { PomodoroSession, AdhocEntry, CalendarProposal } from '../types';
 import { easyProjectAPI } from '../services/api';
 import { syncCalendarProposals } from '../services/calendar';
+import { getCurrentDate } from '../utils/time';
 
 // Combined entry type for the daily log view
 export interface LogEntry {
@@ -64,7 +65,8 @@ export const useLogStore = create<LogState>()(
   persist(
     (set, get) => ({
       entries: [],
-      selectedDate: new Date().toISOString().split('T')[0],
+      // Local calendar date: the UTC split opened yesterday between 00:00 and 02:00 CEST.
+      selectedDate: getCurrentDate(),
       isLoading: false,
       viewMode: 'list',
 
@@ -139,6 +141,7 @@ export const useLogStore = create<LogState>()(
           logged: p.logged === 1,
           markedToLog: p.accepted === 1 && p.logged === 0, // Only mark accepted, unlogged ones for logging
           isProposal: p.accepted === 0, // True if not yet accepted
+          billable: p.billable !== 0, // R7: rows from before the column read as billable
         }));
 
       // Combine and sort by start time
@@ -219,12 +222,14 @@ export const useLogStore = create<LogState>()(
         if ('billable' in changes) dbUpdates.billable = changes.billable ? 1 : 0;
         await window.logAPI.updateAdhocEntry(id, dbUpdates);
       } else if (entry.type === 'calendar') {
-        await window.logAPI.updateCalendarProposal?.(id, {
-          task_id: changes.taskId || null,
-          title: changes.title,
-          duration_minutes: changes.durationMinutes,
-          comment: changes.comment || null,
-        });
+        // Same field gating as the other branches (R7): only what the edit sent.
+        const dbUpdates: Partial<CalendarProposal> = {};
+        if ('taskId' in changes) dbUpdates.task_id = changes.taskId || null;
+        if ('title' in changes) dbUpdates.title = changes.title;
+        if ('durationMinutes' in changes) dbUpdates.duration_minutes = changes.durationMinutes;
+        if ('comment' in changes) dbUpdates.comment = changes.comment || null;
+        if ('billable' in changes) dbUpdates.billable = changes.billable ? 1 : 0;
+        await window.logAPI.updateCalendarProposal?.(id, dbUpdates);
       }
 
       // Reload the day to show updates (skip sync - local operation only)
@@ -936,10 +941,15 @@ export const useLogStore = create<LogState>()(
 }),
     {
       name: 'log-storage',
+      // R1: `selectedDate` is session state only, so Review always opens on today.
       partialize: (state) => ({
         viewMode: state.viewMode,
-        selectedDate: state.selectedDate,
       }),
+      // Storage written before R1 still holds a selectedDate; never rehydrate it.
+      merge: (persisted, current) => {
+        const { selectedDate: _stale, ...rest } = (persisted ?? {}) as Partial<LogState>;
+        return { ...current, ...rest };
+      },
     }
   )
 );
