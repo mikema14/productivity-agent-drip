@@ -35,11 +35,12 @@ vi.mock('../Lists/TaskDetailInline', () => ({
 }));
 
 vi.mock('../Lists/AddItemInline', () => ({
-  default: (props: { defaultBillable?: boolean; column: string; onAdd: (t: string, id: string | null, b: boolean) => Promise<void>; onCancel: () => void }) => (
+  default: (props: { listId: string; chooseList?: boolean; defaultBillable?: boolean; column: string; onAdd: (t: string, id: string | null, b: boolean, listId: string) => Promise<void>; onCancel: () => void }) => (
     <div data-testid="add-item">
-      add:{props.column}:{String(props.defaultBillable)}
-      <button onClick={() => props.onAdd('New task', '123', props.defaultBillable ?? true)}>submit add</button>
-      <button onClick={() => props.onAdd('Not billable task', null, false)}>submit add unbillable</button>
+      add:{props.column}:{String(props.defaultBillable)}:{props.listId}:{props.chooseList ? 'choose' : 'fixed'}
+      <button onClick={() => props.onAdd('New task', '123', props.defaultBillable ?? true, props.listId)}>submit add</button>
+      <button onClick={() => props.onAdd('Not billable task', null, false, props.listId)}>submit add unbillable</button>
+      <button onClick={() => props.onAdd('Other list task', null, false, 'l2')}>submit add to l2</button>
       <button onClick={props.onCancel}>cancel add</button>
     </div>
   ),
@@ -300,14 +301,20 @@ describe('PlanBoard — all scope', () => {
     expect(window.listsAPI.updateListItem).not.toHaveBeenCalled();
   });
 
-  it('dashed footer reads "Drop a task here" and switches to "Drop here" during a drag', () => {
+  it('dashed footer reads "Add a task" and switches to "Drop here" during a drag; none in Done', () => {
     renderBoard();
-    expect(section('Today').getByText('Drop a task here')).toBeInTheDocument();
-    expect(section('Done').queryByText('Drop a task here')).toBeNull();
+    expect(section('Today').getByRole('button', { name: 'Add a task' })).toBeInTheDocument();
+    expect(section('Done').queryByText('Add a task')).toBeNull();
     act(() => dnd().onDragStart!({ active: { id: 'b1' } }));
     expect(section('Today').getByText('Drop here')).toBeInTheDocument();
     act(() => dnd().onDragEnd!({ active: { id: 'b1' }, over: null }));
-    expect(section('Today').getByText('Drop a task here')).toBeInTheDocument();
+    expect(section('Today').getByRole('button', { name: 'Add a task' })).toBeInTheDocument();
+  });
+
+  it('no lists: the footer stays a drop zone', () => {
+    renderBoard('all', [], []);
+    expect(screen.queryByText('Add a task')).toBeNull();
+    expect(screen.getAllByText('Drop a task here').length).toBeGreaterThan(0);
   });
 
   it('backlog groups by age with labels and an Nd badge; Leexi provenance shows "from call · <date>"', () => {
@@ -328,10 +335,28 @@ describe('PlanBoard — all scope', () => {
     expect(within(card('Title b1')).queryByText(/\dd$/)).toBeNull();
   });
 
-  it('no "Add a task" footer in all scope', () => {
-    renderBoard();
-    expect(screen.queryByText('Add a task')).toBeNull();
-    expect(screen.queryByTestId('add-item')).toBeNull();
+  it('"Add a task" in all scope (P23): list chooser on the first list, the chosen list and its billable default on submit, remembered', async () => {
+    const { user } = renderBoard();
+    await user.click(section('This week').getByRole('button', { name: 'Add a task' }));
+    expect(section('This week').getByTestId('add-item')).toHaveTextContent('add:this_week:true:l1:choose');
+    await user.click(screen.getByText('submit add'));
+    expect(window.listsAPI.createListItem).toHaveBeenLastCalledWith(expect.objectContaining({
+      list_id: 'l1', title: 'New task', task_id: '123', column: 'this_week', order: 1, billable: 1,
+    }));
+    await user.click(screen.getByText('submit add to l2'));
+    expect(window.listsAPI.createListItem).toHaveBeenLastCalledWith(expect.objectContaining({ list_id: 'l2', column: 'this_week', billable: 0 }));
+    expect(localStorage.getItem('plan_addTaskList')).toBe('l2');
+  });
+
+  it('all scope add defaults to the one filtered list, else the last list added to', async () => {
+    localStorage.setItem('plan_addTaskList', 'l2');
+    const { user } = renderBoard();
+    await user.click(section('Today').getByRole('button', { name: 'Add a task' }));
+    expect(section('Today').getByTestId('add-item')).toHaveTextContent('add:today:false:l2:choose');
+    await user.click(screen.getByText('cancel add'));
+    await user.click(within(screen.getByTestId('plan-list-filters')).getByRole('button', { name: 'Ops' }));
+    await user.click(section('Today').getByRole('button', { name: 'Add a task' }));
+    expect(section('Today').getByTestId('add-item')).toHaveTextContent('add:today:true:l1:choose');
   });
 
   it('Done cards render struck-through and muted', () => {
