@@ -1,6 +1,6 @@
 # Archive
 
-Historical prompts, status snapshots and superseded specs moved here on 2026-09-26. Nothing in the repo references these files; they are kept for provenance, not for use. Current docs live one level up (`README.md`, `DEVELOPMENT_RULES.md`, `UI_DESIGN_SYSTEM.md`, `BILLABLE_FEATURE.md`, `OVERLAY_DRAGGABLE_NOTES.md`, `perf-rendering-ipc.md`) and in `Redesign/`.
+Historical prompts, status snapshots and superseded specs moved here on 2026-09-26. Nothing in the repo references these files; they are kept for provenance, not for use. Current docs: the agent guide `Drip/CLAUDE.md` (outside the repo), `UI_DESIGN_SYSTEM.md` and `Redesign/` one level up, and technical notes in the repo's `docs/`.
 
 | File | What it was | Why archived |
 |------|-------------|--------------|
@@ -29,3 +29,5 @@ Historical prompts, status snapshots and superseded specs moved here on 2026-09-
 | `Tailwind Structure .md` | `TaskIdInput` component snippet (was at repo root) | Stale; component since rewritten |
 | `llms-full.txt` | OpenRouter API reference dump | Unrelated to Drip |
 | `Gemini_Generated_Image_*.png`, `block.png`, `timeline.png` | Loose mockup images | Unreferenced |
+| `README-phase1.md` | Phase 1 setup README (moved 2026-09-28) | Describes the MVP, not the current app |
+| `DEVELOPMENT_RULES.md` | Early "everything deletable" rules (moved 2026-09-28) | Contradicts current rules (logged entries are not deletable); superseded by `Drip/CLAUDE.md` |

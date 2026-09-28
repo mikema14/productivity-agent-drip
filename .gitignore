@@ -63,3 +63,7 @@ temp/
 # macOS
 .Spotlight-V100
 .Trashes
+
+# Tools
+.commander/
+.claude/worktrees/
