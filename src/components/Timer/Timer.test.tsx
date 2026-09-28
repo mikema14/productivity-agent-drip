@@ -415,6 +415,12 @@ describe('Timer — active states', () => {
     window.timerAPI.startMainTimer = vi.fn(async () => ({ raycastFocus: false }));
     setTimer({ status: 'idle', pendingBreakMinutes: 5, sessionCount: 1, durationMinutes: 25 });
     const { user } = await renderTimer();
+    // The due break is the prompt: header pill, label and the primary key.
+    expect(screen.getByTestId('now-pill')).toHaveTextContent('Break due');
+    expect(screen.getByText('SESSION DONE')).toBeInTheDocument();
+    expect(screen.getByText(/Session done\. Take a 5-minute break/)).toBeInTheDocument();
+    expect(key(/start break 5m/i)).toHaveAttribute('data-variant', 'amber');
+    expect(key(/begin focus/i)).toHaveAttribute('data-variant', 'outline');
     await user.click(key(/start break 5m/i));
     await waitFor(() => expect(window.timerAPI.startMainTimer).toHaveBeenCalledWith(300, 'break'));
     expect(useTimerStore.getState().status).toBe('break');
@@ -425,6 +431,8 @@ describe('Timer — active states', () => {
     setTimer({ status: 'idle', pendingBreakMinutes: null });
     await renderTimer();
     expect(queryKey(/start break/i)).toBeNull();
+    expect(key(/begin focus/i)).toHaveAttribute('data-variant', 'amber');
+    expect(screen.getByTestId('now-pill')).toHaveTextContent('Ready');
   });
 
   it('break under a minute: Enter starts the focus and saves no break row', async () => {

@@ -380,6 +380,7 @@ export default function Timer({ onNavigate }: TimerProps) {
     : focusState === 'running' ? 'focusing'
     : focusState === 'paused' ? 'paused'
     : isBreak ? 'break'
+    : pendingBreakMinutes !== null ? 'break-due'
     : 'ready';
 
   // Split-layout label (ready / break). Running, paused and kickoff render the calm
@@ -387,7 +388,9 @@ export default function Timer({ onNavigate }: TimerProps) {
   const sessionWindow = sessionStartTime && estimatedEnd
     ? `${formatTimeRange(sessionStartTime)} → ${formatTimeRange(estimatedEnd)}`
     : '';
-  const countdownLabel = isBreak ? (isPaused ? 'BREAK · PAUSED' : `BREAK · ${sessionWindow}`) : 'READY';
+  // A focus just finished and no break has started: Now prompts for it (the card may be on another screen).
+  const breakDue = !isBreak && pendingBreakMinutes !== null;
+  const countdownLabel = isBreak ? (isPaused ? 'BREAK · PAUSED' : `BREAK · ${sessionWindow}`) : breakDue ? 'SESSION DONE' : 'READY';
   const endsAt = estimatedEnd ? formatTimeRange(estimatedEnd) : null;
 
   const tone = isBreak ? 'emerald' : 'amber';
@@ -404,19 +407,19 @@ export default function Timer({ onNavigate }: TimerProps) {
   // Next to Begin Focus: Kickoff when ready, Skip Break during a break.
   // Next to Begin Focus. Break: Skip / Pause. Ready: Kickoff, plus the break a finished focus
   // earned (mirrors the overlay card's Start break, for when that card is on another screen).
+  // Break: Skip / Pause next to Begin Focus. Break due: Start break is the primary key.
+  const breakKey = breakDue && (
+    <KeyButton variant="amber" onClick={() => startBreakFromModal()}>Start break {pendingBreakMinutes}m</KeyButton>
+  );
   const secondaryKey = isBreak ? (
     <>
       <KeyButton variant="outline" onClick={() => skip()}>Skip Break</KeyButton>
       <KeyButton variant="ghost" onClick={() => (isPaused ? resume() : pause())}>{isPaused ? 'Resume' : 'Pause'}</KeyButton>
     </>
   ) : (
-    <>
-      <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>
-      {pendingBreakMinutes !== null && (
-        <KeyButton variant="outline" onClick={() => startBreakFromModal()}>Start break {pendingBreakMinutes}m</KeyButton>
-      )}
-    </>
+    <KeyButton variant="outline" onClick={handleKickoff}>Kickoff 2m</KeyButton>
   );
+  const beginVariant = breakDue ? 'outline' : 'amber';
 
   const activeTask: { task_id: string; title: string } | null =
     isActive && currentTaskId
@@ -489,10 +492,15 @@ export default function Timer({ onNavigate }: TimerProps) {
               {/* ready-empty (break too: the next task can be picked and started mid-break) */}
               {focusState === 'ready-empty' && (
                 <>
-                  <p className="font-display text-[15px] text-txt-muted">{isBreak ? 'Take a breather, or pick the next task below' : 'Pick a task below'}</p>
+                  <p className="font-display text-[15px] text-txt-muted">
+                    {isBreak ? 'Take a breather, or pick the next task below'
+                      : breakDue ? `Session done. Take a ${pendingBreakMinutes}-minute break, or pick the next task below`
+                      : 'Pick a task below'}
+                  </p>
                   <DurationSegments value={durationMinutes} onChange={handleDurationChange} />
                   <div className="flex flex-wrap gap-2">
-                    <KeyButton variant="amber" kbd="↵" disabled title="Pick a task first" onClick={handleStart}>Begin Focus</KeyButton>
+                    {breakKey}
+                    <KeyButton variant={beginVariant} kbd="↵" disabled title="Pick a task first" onClick={handleStart}>Begin Focus</KeyButton>
                     {secondaryKey}
                   </div>
                 </>
@@ -514,7 +522,8 @@ export default function Timer({ onNavigate }: TimerProps) {
                     beforeNote={<DurationSegments value={durationMinutes} onChange={handleDurationChange} />}
                   />
                   <div className="flex flex-wrap items-center gap-2">
-                    <KeyButton variant="amber" kbd="↵" onClick={handleStart}>Begin Focus</KeyButton>
+                    {breakKey}
+                    <KeyButton variant={beginVariant} kbd="↵" onClick={handleStart}>Begin Focus</KeyButton>
                     {secondaryKey}
                     <BillableToggle checked={currentBillable} onChange={setCurrentBillable} size="sm" className="ml-auto" />
                   </div>

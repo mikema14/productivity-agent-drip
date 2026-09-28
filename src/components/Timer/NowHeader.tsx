@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 import { formatPausedUntil } from '../../utils/nudgePause';
 
-export type NowPillState = 'ready' | 'focusing' | 'paused' | 'break' | 'kickoff';
+export type NowPillState = 'ready' | 'break-due' | 'focusing' | 'paused' | 'break' | 'kickoff';
 
 interface Props {
   state: NowPillState;
@@ -14,6 +14,7 @@ interface Props {
 
 const PILL_LABEL: Record<NowPillState, string> = {
   ready: 'Ready',
+  'break-due': 'Break due',
   focusing: 'Focusing',
   paused: 'Paused',
   break: 'Break',
@@ -62,14 +63,14 @@ export default function NowHeader({ state, date = new Date(), nudgePausedUntil =
       <span
         data-testid="now-pill"
         className={`flex items-center gap-1.5 font-display text-[12px] px-2.5 py-1 border ${
-          isBreak ? 'border-break/40 text-break'
+          isBreak || state === 'break-due' ? 'border-break/40 text-break'
           : active ? 'border-focus/40 text-focus'
           : 'border-drip-border text-txt-secondary'
         }`}
       >
         <span
           className={`w-1.5 h-1.5 ${
-            isBreak ? 'bg-break'
+            isBreak || state === 'break-due' ? 'bg-break'
             : state === 'focusing' ? 'bg-focus led-running'
             : active ? 'bg-focus'
             : 'bg-txt-muted'
