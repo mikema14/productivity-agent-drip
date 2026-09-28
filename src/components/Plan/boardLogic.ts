@@ -15,7 +15,7 @@ export const COLUMNS: { key: ListItemColumn; label: string }[] = [
   { key: 'backlog', label: 'Backlog' },
 ];
 
-/** Data order: "Move right" still means "closer to Today" (unchanged semantics). */
+/** Data order: backlog → this week → today (the order the store and drag logic use). */
 export const DATA_ORDER: ListItemColumn[] = ['backlog', 'this_week', 'today'];
 
 export type BoardColumnKey = ListItemColumn | 'done';
@@ -200,13 +200,9 @@ export function resolveDrop({ activeId, overId, items, partition }: ResolveDropA
   return { kind: 'move', column: target, order: overIndex >= 0 ? overIndex : targetItems.length };
 }
 
-/** Hover arrows on the data order: ← towards Backlog, → towards Today. */
-export function arrowTargets(column: ListItemColumn): { left: ListItemColumn | null; right: ListItemColumn | null } {
-  const i = DATA_ORDER.indexOf(column);
-  return {
-    left: i > 0 ? DATA_ORDER[i - 1] : null,
-    right: i >= 0 && i < DATA_ORDER.length - 1 ? DATA_ORDER[i + 1] : null,
-  };
+/** Hover move actions: the other two columns, named, in display order (P22). */
+export function moveTargets(column: ListItemColumn): { key: ListItemColumn; label: string }[] {
+  return COLUMNS.filter(c => c.key !== column);
 }
 
 /** Lists panel subtitle (P21). */

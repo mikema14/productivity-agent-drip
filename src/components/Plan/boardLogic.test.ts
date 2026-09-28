@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   COLUMNS, DATA_ORDER, effectiveTaskId, partition, groupBacklog, ageBadge, groupByList, resolveDrop,
-  arrowTargets, listSubtitle, provenance, capacityLine, formatMinutesPadded, weekLabel, weekRange,
+  moveTargets, listSubtitle, provenance, capacityLine, formatMinutesPadded, weekLabel, weekRange,
   isoWeek, getMonday, startCandidate,
 } from './boardLogic';
 import type { ListItem, TaskList } from '../../types';
@@ -199,11 +199,11 @@ describe('resolveDrop', () => {
   });
 });
 
-describe('arrowTargets', () => {
-  it('follows the data order', () => {
-    expect(arrowTargets('backlog')).toEqual({ left: null, right: 'this_week' });
-    expect(arrowTargets('this_week')).toEqual({ left: 'backlog', right: 'today' });
-    expect(arrowTargets('today')).toEqual({ left: 'this_week', right: null });
+describe('moveTargets', () => {
+  it('names the other two columns in display order', () => {
+    expect(moveTargets('today').map(t => t.label)).toEqual(['This week', 'Backlog']);
+    expect(moveTargets('this_week').map(t => t.label)).toEqual(['Today', 'Backlog']);
+    expect(moveTargets('backlog').map(t => t.label)).toEqual(['Today', 'This week']);
   });
 });
 

@@ -163,7 +163,7 @@ async function assertPlanColumns(page) {
 /**
  * Plan walk (PHASE2_PLAN.md §7.1), read-only by construction: toggles are
  * restored, cards are only expanded/hovered. Never drags; never clicks Start
- * on, Restore, Move left/right, Move to list, Delete, Mark done, Add a task,
+ * on, Restore, Move to Today/This week/Backlog, Move to list, Delete, Mark done, Add a task,
  * Archive, or anything inside TaskDetailInline.
  */
 async function planWalk(page, shot) {

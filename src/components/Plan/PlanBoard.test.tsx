@@ -235,18 +235,20 @@ describe('PlanBoard — all scope', () => {
     expect(screen.queryByTestId('plan-card-checklist')).toBeNull();
   });
 
-  it('Move right from backlog appends to this_week; no Move right on today; no Move left on backlog; none on done cards', async () => {
+  it('moves name their destination: backlog → Today / This week append; today has no Move to Today; none on done cards', async () => {
     const { user } = renderBoard();
     const b1 = within(card('Title b1'));
-    expect(b1.queryByTitle('Move left')).toBeNull();
-    await user.click(b1.getByTitle('Move right'));
+    expect(b1.queryByTitle('Move to Backlog')).toBeNull();
+    await user.click(b1.getByRole('button', { name: 'Move to This week' }));
     expect(window.listsAPI.updateListItem).toHaveBeenCalledWith('b1', { column: 'this_week', order: 1 });
+    await user.click(within(card('Title b2')).getByRole('button', { name: 'Move to Today' }));
+    expect(window.listsAPI.updateListItem).toHaveBeenCalledWith('b2', { column: 'today', order: 2 });
     const t1 = within(card('Title t1'));
-    expect(t1.queryByTitle('Move right')).toBeNull();
-    expect(t1.getByTitle('Move left')).toBeInTheDocument();
+    expect(t1.queryByTitle('Move to Today')).toBeNull();
+    expect(t1.getByRole('button', { name: 'Move to This week' })).toHaveTextContent('This week');
+    expect(t1.getByRole('button', { name: 'Move to Backlog' })).toBeInTheDocument();
     const td = within(card('Title td'));
-    expect(td.queryByTitle('Move left')).toBeNull();
-    expect(td.queryByTitle('Move right')).toBeNull();
+    expect(td.queryByTitle(/^Move to (Today|This week|Backlog)$/)).toBeNull();
     expect(td.getByTitle('Delete')).toBeInTheDocument();
   });
 
