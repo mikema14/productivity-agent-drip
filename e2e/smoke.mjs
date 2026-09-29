@@ -195,11 +195,13 @@ async function planWalk(page, shot) {
   // 4. Card detail: title toggles TaskDetailInline open and closed (no writes: saves only fire on changed values)
   const titles = page.getByTestId('plan-card-title');
   if (await titles.count()) {
-    // Click the title's start: the hover actions overlay its right end
-    await titles.first().click({ position: { x: 8, y: 8 } });
+    // Dispatch the click on the title itself: at 800px a short title sits entirely under the hover
+    // actions (`.plan-card-actions` covers the card's right end), which would take a pointer click
+    await titles.first().dispatchEvent('click');
     await page.getByPlaceholder('Add a description...').waitFor();
     await shot('plan-card-detail');
-    await titles.first().click({ position: { x: 8, y: 8 } });
+    await titles.first().dispatchEvent('click');
+    await page.getByPlaceholder('Add a description...').waitFor({ state: 'hidden' });
   } else {
     console.warn('[smoke] no Plan cards; skipping plan-card-detail');
   }
