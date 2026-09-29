@@ -4,6 +4,8 @@ import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import type { PomodoroSession, Setting, TaskPreference, Milestone, Goal, DailyIntentions, ShutdownRitual, TaskList, ListItem, TaskCache, RankedTask } from '../types';
 import { rankTasks, sumMinutesForRange, FRECENCY_WINDOW_DAYS, type TaskUsageRow } from '../utils/frecency';
+import { getCurrentDate } from '../utils/time';
+import { todaySinceFor } from '../utils/todaySince';
 
 let db: Database.Database | null = null;
 
@@ -567,6 +569,11 @@ function runMigrations(database: Database.Database) {
         database.exec("ALTER TABLE list_items ADD COLUMN subtasks TEXT DEFAULT '[]'");
       if (!listItemsInfo.some((c: any) => c.name === 'billable'))
         database.exec('ALTER TABLE list_items ADD COLUMN billable INTEGER NOT NULL DEFAULT 1');
+      // R29: the local date an item entered Today; what is in Today at rollout starts from now
+      if (!listItemsInfo.some((c: any) => c.name === 'today_since')) {
+        database.exec('ALTER TABLE list_items ADD COLUMN today_since TEXT');
+        database.prepare('UPDATE list_items SET today_since = ? WHERE "column" = \'today\'').run(getCurrentDate());
+      }
     }
   } catch (error) {
     console.error('Migration error (list_items extensions):', error);
@@ -1675,8 +1682,9 @@ export function createListItem(item: Omit<ListItem, 'id' | 'created_at'>): strin
   const database = getDB();
   const id = uuidv4();
   database.prepare(
-    'INSERT INTO list_items (id, list_id, title, task_id, "column", "order", completed, billable) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(id, item.list_id, item.title, item.task_id, item.column, item.order, item.completed, item.billable ?? 1);
+    'INSERT INTO list_items (id, list_id, title, task_id, "column", "order", completed, billable, today_since) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(id, item.list_id, item.title, item.task_id, item.column, item.order, item.completed, item.billable ?? 1,
+    todaySinceFor(null, item.column, null, getCurrentDate()));
   return id;
 }
 
@@ -1691,7 +1699,13 @@ export function updateListItem(id: string, updates: Partial<ListItem>): void {
       updates.archived = 0;
     }
   }
-  const allowed = ['list_id', 'title', 'task_id', 'column', 'order', 'completed', 'archived', 'completed_at', 'description', 'subtasks', 'billable'] as const;
+  // R29: a column write keeps `today_since` in step (set on entering Today, cleared on leaving)
+  if (updates.column && !('today_since' in updates)) {
+    const current = database.prepare('SELECT "column", today_since FROM list_items WHERE id = ?').get(id) as
+      { column: ListItem['column']; today_since: string | null } | undefined;
+    if (current) updates.today_since = todaySinceFor(current.column, updates.column, current.today_since, getCurrentDate());
+  }
+  const allowed = ['list_id', 'title', 'task_id', 'column', 'order', 'completed', 'archived', 'completed_at', 'description', 'subtasks', 'billable', 'today_since'] as const;
   const sets: string[] = [];
   const values: any[] = [];
   for (const key of allowed) {

@@ -3,6 +3,7 @@ import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TodaysThree from './TodaysThree';
 import { useListsStore } from '../../stores/listsStore';
+import { carriedDays, shiftDate, todayString } from './reviewLogic';
 import type { ListItem, TaskList } from '../../types';
 
 function list(overrides: Partial<TaskList> = {}): TaskList {
@@ -53,22 +54,54 @@ describe('TodaysThree', () => {
     expect(rows[1]).toHaveTextContent('222');
     expect(rows[2]).toHaveTextContent('No task ID');
     expect(screen.getByRole('region', { name: 'Today' }).textContent).not.toContain('#');
-    expect(screen.getByText('Carry-overs stay in Today')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Today · 7' })).toBeInTheDocument();
   });
 
-  it('Done is pressed for completed items and clicking it reopens; open items have Carry pressed', async () => {
-    seed([item({ id: 'done', completed: 1, title: 'Shipped' }), item({ id: 'open', order: 1 })]);
+  it('open items: joined Done / Carry / Week / Drop with Carry pressed; Done completes', async () => {
+    seed([item({ id: 'open' })]);
     const user = userEvent.setup();
     render(<TodaysThree />);
-    const [doneRow, openRow] = screen.getAllByTestId('today-item');
-    expect(outcome(doneRow).getByRole('button', { name: 'Done' })).toHaveAttribute('aria-pressed', 'true');
-    expect(outcome(doneRow).getByRole('button', { name: 'Carry' })).toHaveAttribute('aria-pressed', 'false');
-    expect(within(doneRow).getByText('Shipped')).toHaveClass('line-through');
-    expect(outcome(openRow).getByRole('button', { name: 'Carry' })).toHaveAttribute('aria-pressed', 'true');
-    await user.click(outcome(doneRow).getByRole('button', { name: 'Done' }));
-    expect(window.listsAPI.updateListItem).toHaveBeenCalledWith('done', { completed: 0 });
-    await user.click(outcome(openRow).getByRole('button', { name: 'Done' }));
+    const row = screen.getByTestId('today-item');
+    const group = outcome(row);
+    expect(group.getAllByRole('button').map(b => b.textContent)).toEqual(['Done', 'Carry', 'Week', 'Drop']);
+    expect(group.getByRole('button', { name: 'Carry' })).toHaveAttribute('aria-pressed', 'true');
+    expect(group.getByRole('button', { name: 'Done' })).toHaveAttribute('aria-pressed', 'false');
+    await user.click(group.getByRole('button', { name: 'Done' }));
     expect(window.listsAPI.updateListItem).toHaveBeenCalledWith('open', { completed: 1 });
+  });
+
+  it('done items collapse to one line after the open ones: check · id · title · Done, which reopens', async () => {
+    seed([item({ id: 'done', completed: 1, title: 'Shipped', task_id: '645001', order: 0 }), item({ id: 'open', order: 1 })]);
+    const user = userEvent.setup();
+    render(<TodaysThree />);
+    const [openRow, doneRow] = screen.getAllByTestId('today-item');
+    expect(openRow).toHaveTextContent('Write proposal');
+    expect(doneRow).toHaveAttribute('data-done');
+    expect(doneRow).toHaveTextContent('645001');
+    expect(doneRow).toHaveTextContent('Shipped');
+    expect(within(doneRow).queryByRole('group', { name: 'Outcome' })).toBeNull();
+    const key = within(doneRow).getByRole('button', { name: 'Done' });
+    expect(key).toHaveAttribute('aria-pressed', 'true');
+    expect(key).toHaveAttribute('title', 'Reopen');
+    await user.click(key);
+    expect(window.listsAPI.updateListItem).toHaveBeenCalledWith('done', { completed: 0 });
+  });
+
+  it('Carried n× from two workdays in Today on (R29), not before, not without a date', () => {
+    const today = todayString();
+    // The latest date that reads 2 on any weekday or weekend (carriedDays itself is tested in reviewLogic)
+    let twoWorkdaysAgo = shiftDate(today, -1);
+    while (carriedDays(twoWorkdaysAgo, today) < 2) twoWorkdaysAgo = shiftDate(twoWorkdaysAgo, -1);
+    seed([
+      item({ id: 'old', today_since: twoWorkdaysAgo }),
+      item({ id: 'new', order: 1, today_since: today }),
+      item({ id: 'none', order: 2, today_since: null }),
+    ]);
+    render(<TodaysThree />);
+    const [old, fresh, none] = screen.getAllByTestId('today-item');
+    expect(within(old).getByTestId('carried')).toHaveTextContent('Carried 2×');
+    expect(within(fresh).queryByTestId('carried')).toBeNull();
+    expect(within(none).queryByTestId('carried')).toBeNull();
   });
 
   it('Carry writes nothing', async () => {
@@ -84,7 +117,7 @@ describe('TodaysThree', () => {
     seed([item(), item({ id: 'w1', column: 'this_week', order: 4 })]);
     const user = userEvent.setup();
     render(<TodaysThree />);
-    await user.click(screen.getByRole('button', { name: 'To week' }));
+    await user.click(screen.getByRole('button', { name: 'Week' }));
     expect(window.listsAPI.updateListItem).toHaveBeenCalledWith('i1', { column: 'this_week', order: 5 });
     expect(useListsStore.getState().items.find(i => i.id === 'i1')?.column).toBe('this_week');
   });
@@ -100,15 +133,6 @@ describe('TodaysThree', () => {
     expect(window.listsAPI.updateListItem).toHaveBeenCalledWith('i1', { column: 'backlog', order: 0 });
     expect(useListsStore.getState().items.find(i => i.id === 'i1')?.column).toBe('backlog');
     expect(screen.queryByTestId('today-item')).toBeNull();
-  });
-
-  it('below wide the row wraps and the outcome group takes its own line under the title', () => {
-    seed([item()]);
-    render(<TodaysThree />);
-    const row = screen.getByTestId('today-item');
-    expect(row).toHaveClass('flex-wrap', 'wide:flex-nowrap');
-    expect(screen.getByRole('group', { name: 'Outcome' })).toHaveClass('w-full', 'wide:w-auto');
-    expect(screen.getByText('Write proposal')).toHaveClass('flex-1', 'min-w-0', 'truncate');
   });
 
   it('archived today items are not shown', () => {

@@ -3,18 +3,20 @@ import { useLogStore } from '../../stores/logStore';
 import { useShutdownStore } from '../../stores/shutdownStore';
 import EntryRow from './EntryRow';
 import EntriesTable from './EntriesTable';
+import EntriesFilterRow from './EntriesFilterRow';
+import LogSummaryBar from './LogSummaryBar';
 import AddEntryModal from './AddEntryModal';
 import TemplateManagerModal from './TemplateManagerModal';
 import TimelineView from './TimelineView';
 import EndDayModal from './EndDayModal';
 import ReviewHeader from './ReviewHeader';
-import TodaysThree from './TodaysThree';
-import TomorrowAside from './TomorrowAside';
-import { dayStats, selectionSummary, shiftDate, todayString, buildEPLink, errorHint, nextWorkday } from './reviewLogic';
+import CloseDayAside from './CloseDayAside';
+import { filterEntries, logSummary, shiftDate, todayString, buildEPLink, errorHint, nextWorkday, type EntryFilter } from './reviewLogic';
 import type { CalendarProposal } from '../../types';
+import type { LogEntry } from '../../stores/logStore';
 import { useListsStore } from '../../stores/listsStore';
 import type { ViewId } from '../Layout/views';
-import { mergeEntriesByTaskId } from '../../utils/mergeEntries';
+import { mergeEntriesByTaskId, type MergedEntry } from '../../utils/mergeEntries';
 import { forceSyncCalendar, invalidateCalendarCache, syncCalendarProposals } from '../../services/calendar';
 
 interface DailyLogProps {
@@ -22,7 +24,13 @@ interface DailyLogProps {
   onNavigate?: (view: ViewId) => void;
 }
 
-/** The Review screen: header, entries table, modals and the success toast. */
+const asRow = (e: LogEntry): MergedEntry => ({ ...e, isMerged: false, sourceCount: 1, sourceEntries: [e] });
+
+/**
+ * The Review screen (mockup Review.dc.html, R22–R33): logging is the main
+ * column — summary bar, filter row, inline-editable table — and closing the
+ * day is the optional aside. Enter logs the selection, N adds an entry.
+ */
 export default function DailyLog({ onNavigate }: DailyLogProps) {
   const {
     entries,
@@ -53,6 +61,8 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [successCount, setSuccessCount] = useState(0);
   const [isGrouped, setIsGrouped] = useState(false);
+  // R31: session state; TO LOG by default, logged rows one `show` away
+  const [filter, setFilter] = useState<EntryFilter>('to-log');
   const [dayLocked, setDayLocked] = useState(false);
   const [showMoveCalendar, setShowMoveCalendar] = useState(false);
   const [moveSingleId, setMoveSingleId] = useState<string | null>(null);
@@ -73,16 +83,11 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     }
   }, [showSuccessToast]);
 
-  // Merge entries by task ID for display (toggleable)
-  const mergedEntries = useMemo(
-    () => isGrouped ? mergeEntriesByTaskId(entries) : entries.map(e => ({
-      ...e,
-      isMerged: false,
-      sourceCount: 1,
-      sourceEntries: [e]
-    })),
-    [entries, isGrouped]
-  );
+  // Rows on screen: the filter first (so a group never mixes logged and unlogged), then the optional merge
+  const mergedEntries = useMemo(() => {
+    const filtered = filterEntries(entries, filter);
+    return isGrouped ? mergeEntriesByTaskId(filtered) : filtered.map(asRow);
+  }, [entries, filter, isGrouped]);
 
   useEffect(() => {
     loadDay(selectedDate);
@@ -149,11 +154,6 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     await loadDay(selectedDate, true); // Skip sync - local operation only
   };
 
-  const handleDismissProposal = async (id: string) => {
-    await window.logAPI.dismissCalendarProposal?.(id);
-    await loadDay(selectedDate, true); // Skip sync - local operation only
-  };
-
   // Handle merged entry interactions
   const handleToggleLogMerged = (entryId: string) => {
     const mergedEntry = mergedEntries.find(e => e.id === entryId);
@@ -178,7 +178,7 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     });
   };
 
-  const handleUpdateMerged = async (entryId: string, changes: any) => {
+  const handleUpdateMerged = async (entryId: string, changes: Partial<LogEntry>) => {
     const mergedEntry = mergedEntries.find(e => e.id === entryId);
     clearLogError(mergedEntry?.isMerged ? mergedEntry.sourceEntries.map(e => e.id) : [entryId]);
 
@@ -192,7 +192,7 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     }
 
     // Regular entry
-    updateEntry(entryId, changes);
+    await updateEntry(entryId, changes);
   };
 
   const handleDeleteMerged = async (entryId: string) => {
@@ -230,9 +230,20 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     deleteEntry(entryId);
   };
 
-  // R7: the live Billable pill writes through the same merged update path
+  // R7: the live Billable key writes through the same merged update path
   const handleToggleBillable = (entryId: string, billable: boolean) => {
     void handleUpdateMerged(entryId, { billable });
+  };
+
+  // R26: a task picked in the row; a proposal is accepted with it (R8), any other row is marked to log
+  const handleAssignTask = async (entryId: string, taskId: string) => {
+    const row = mergedEntries.find(e => e.id === entryId);
+    if (row?.isProposal) {
+      clearLogError([entryId]);
+      await handleAcceptProposal(entryId, taskId);
+      return;
+    }
+    await handleUpdateMerged(entryId, { taskId, markedToLog: true });
   };
 
   // Stable refs — always point to the latest handler without changing identity
@@ -240,21 +251,20 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
   const handleDeleteMergedRef    = useRef(handleDeleteMerged);
   const handleToggleLogMergedRef = useRef(handleToggleLogMerged);
   const handleAcceptProposalRef  = useRef(handleAcceptProposal);
-  const handleDismissProposalRef = useRef(handleDismissProposal);
+  const handleAssignTaskRef      = useRef(handleAssignTask);
   const handleToggleBillableRef  = useRef(handleToggleBillable);
   handleUpdateMergedRef.current    = handleUpdateMerged;
   handleDeleteMergedRef.current    = handleDeleteMerged;
   handleToggleLogMergedRef.current = handleToggleLogMerged;
   handleAcceptProposalRef.current  = handleAcceptProposal;
-  handleDismissProposalRef.current = handleDismissProposal;
+  handleAssignTaskRef.current      = handleAssignTask;
   handleToggleBillableRef.current  = handleToggleBillable;
 
-  const stableUpdate   = useCallback((id: string, changes: any)      => handleUpdateMergedRef.current(id, changes), []);
+  const stableUpdate   = useCallback((id: string, changes: Partial<LogEntry>) => handleUpdateMergedRef.current(id, changes), []);
   const stableDelete   = useCallback((id: string)                    => handleDeleteMergedRef.current(id),          []);
   const stableToggle   = useCallback((id: string)                    => handleToggleLogMergedRef.current(id),       []);
   const stableAccept   = useCallback((id: string)                    => handleAcceptProposalRef.current(id),        []);
-  const stableDismiss  = useCallback((id: string)                    => handleDismissProposalRef.current(id),       []);
-  const stableAssign   = useCallback((id: string, taskId: string)    => handleAcceptProposalRef.current(id, taskId), []);
+  const stableAssign   = useCallback((id: string, taskId: string)    => handleAssignTaskRef.current(id, taskId),    []);
   const stableBillable = useCallback((id: string, billable: boolean) => handleToggleBillableRef.current(id, billable), []);
 
   // Move entries handlers
@@ -344,12 +354,9 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     window.timerAPI.showNotification('Day Complete', 'Your shutdown ritual has been saved!');
   };
 
-  const stats = useMemo(() => dayStats(mergedEntries), [mergedEntries]);
-  const summary = useMemo(() => selectionSummary(mergedEntries), [mergedEntries]);
-  const { workEntries, breakEntries } = useMemo(() => ({
-    workEntries: mergedEntries.filter(e => e.source !== 'break'),
-    breakEntries: mergedEntries.filter(e => e.source === 'break'),
-  }), [mergedEntries]);
+  // R24: every count over the flat day, never the merged rows
+  const summary = useMemo(() => logSummary(entries), [entries]);
+  const isToday = selectedDate === todayString();
 
   const openSettings = onNavigate ? () => onNavigate('settings') : undefined;
   const authError = Object.values(logErrors).find(e => errorHint(e).action === 'settings');
@@ -364,7 +371,6 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
       onDelete={stableDelete}
       onToggleLog={stableToggle}
       onAccept={stableAccept}
-      onDismiss={stableDismiss}
       onMove={stableMove}
       onAssignTask={stableAssign}
       onToggleBillable={stableBillable}
@@ -397,13 +403,20 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     );
   } else if (viewMode === 'timeline') {
     body = <TimelineView entries={entries} />;
-  } else {
+  } else if (mergedEntries.length === 0) {
+    const allLogged = filter === 'to-log' && summary.logged.count > 0;
     body = (
-      <div>
-        {workEntries.map(renderRow)}
-        {breakEntries.map(renderRow)}
+      <div data-testid="entries-empty" className="flex-1 flex flex-col items-center justify-center gap-2 py-10 text-txt-muted">
+        <p className="font-display text-[14px]">{allLogged ? 'Everything is logged' : filter === 'logged' ? 'Nothing logged yet' : 'No work entries'}</p>
+        {allLogged && (
+          <button type="button" onClick={() => setFilter('all')} className="h-8 px-3 rounded-[2px] font-display text-[13px] text-focus hover:bg-focus/10 transition-colors">
+            Show logged
+          </button>
+        )}
       </div>
     );
+  } else {
+    body = <div>{mergedEntries.map(renderRow)}</div>;
   }
   if (rowsStale) {
     body = (
@@ -418,6 +431,39 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
     );
   }
 
+  // Enter = Log, N = + Add entry (R32): only with no field, key or link focused and nothing open over Review
+  const canLog = summary.selected.count > 0 && !isLogging && !rowsStale;
+  const anyOverlay = showAddModal || showTemplateModal || showEndDayModal || showMoveCalendar;
+  const keyState = useRef({ canLog, anyOverlay, busy: rowsStale });
+  keyState.current = { canLog, anyOverlay, busy: rowsStale };
+  const handleLogSelectedRef = useRef(handleLogSelected);
+  handleLogSelectedRef.current = handleLogSelected;
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      const isEnter = e.key === 'Enter' && !e.shiftKey;
+      const isN = e.key === 'n' || e.key === 'N';
+      if (!isEnter && !isN) return;
+      const { canLog: can, anyOverlay: covered, busy } = keyState.current;
+      if (covered || document.querySelector('[role="dialog"]')) return;
+      // The target too: an input's own Enter may blur it before the event reaches the window
+      const interactive = (el: EventTarget | Element | null) =>
+        el instanceof HTMLElement && (/^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(el.tagName) || el.isContentEditable);
+      if (interactive(e.target) || interactive(document.activeElement)) return;
+      if (isEnter) {
+        if (!can) return;
+        e.preventDefault();
+        void handleLogSelectedRef.current();
+      } else {
+        if (busy) return;
+        e.preventDefault();
+        setShowAddModal(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   return (
     <div className="flex flex-col h-full">
       <ReviewHeader
@@ -428,13 +474,13 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
         onSelectDate={setSelectedDate}
         onSync={handleSyncCalendar}
         isSyncing={isSyncing}
-        stats={stats}
+        trackedMinutes={summary.trackedMinutes}
+        billableMinutes={summary.billableMinutes}
       />
 
       <div className="flex flex-1 min-h-0">
-        {/* The main column scrolls as a whole: Today at its natural height, then the
-            entries at theirs; the entries footer sticks to the bottom of this viewport. */}
-        <div data-testid="review-main" className="flex-1 min-w-0 min-h-0 overflow-y-auto p-7 gap-5 flex flex-col">
+        {/* Logging is the main job: summary, filter, then the table takes the remaining height and scrolls its rows. */}
+        <div data-testid="review-main" className="flex-1 min-w-0 min-h-0 overflow-y-auto px-5 wide:px-7 py-6 gap-4 flex flex-col">
           {authError && (
             <div role="alert" data-testid="auth-banner" className="shrink-0 h-9 px-3 flex items-center justify-between gap-3 border border-alert/40 rounded-[2px] font-display text-[12.5px] text-alert">
               <span className="truncate">Easy8 rejected the request: {authError}</span>
@@ -443,22 +489,19 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
               )}
             </div>
           )}
-          {/* Plan's Today column is not date-specific: only today's review triages it */}
-          {selectedDate === todayString() && <TodaysThree />}
-          <EntriesTable
+          <LogSummaryBar summary={summary} onLog={handleLogSelected} isLogging={isLogging} busy={rowsStale} />
+          <EntriesFilterRow
+            filter={filter}
+            onFilterChange={setFilter}
+            counts={{ all: summary.toLog.count + summary.logged.count, 'to-log': summary.toLog.count, logged: summary.logged.count }}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             groupByTask={isGrouped}
             onGroupByTaskToggle={() => setIsGrouped(!isGrouped)}
             showGroupToggle={viewMode === 'list' && entries.length > 0}
-            stats={stats}
-            summary={summary}
-            onSelectToggle={toggleSelectAll}
+            markedCount={summary.selected.count}
             onMoveEntries={() => { setMoveSingleId(null); setShowMoveCalendar(true); }}
             onManageTemplates={() => setShowTemplateModal(true)}
-            onAddEntry={() => setShowAddModal(true)}
-            onLogSelected={handleLogSelected}
-            isLogging={isLogging}
             busy={rowsStale}
             moveCalendar={{
               open: showMoveCalendar,
@@ -466,13 +509,23 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
               onSelect: handleMoveConfirm,
               onClose: () => { setShowMoveCalendar(false); setMoveSingleId(null); },
             }}
+          />
+          <EntriesTable
+            viewMode={viewMode}
+            summary={summary}
+            onSelectToggle={toggleSelectAll}
+            onAddEntry={() => setShowAddModal(true)}
+            showingLogged={filter !== 'to-log'}
+            onToggleLogged={() => setFilter(f => (f === 'to-log' ? 'all' : 'to-log'))}
+            isToday={isToday}
+            busy={rowsStale}
           >
             {body}
           </EntriesTable>
         </div>
-        <TomorrowAside
+        <CloseDayAside
           date={selectedDate}
-          isToday={selectedDate === todayString()}
+          isToday={isToday}
           todayItems={listItems.filter(i => i.column === 'today')}
           lists={lists}
           proposals={tomorrowProposals}

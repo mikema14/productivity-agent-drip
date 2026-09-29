@@ -195,11 +195,13 @@ async function planWalk(page, shot) {
   // 4. Card detail: title toggles TaskDetailInline open and closed (no writes: saves only fire on changed values)
   const titles = page.getByTestId('plan-card-title');
   if (await titles.count()) {
-    // Click the title's start: the hover actions overlay its right end
-    await titles.first().click({ position: { x: 8, y: 8 } });
+    // Dispatch the click on the title itself: at 800px a short title sits entirely under the hover
+    // actions (`.plan-card-actions` covers the card's right end), which would take a pointer click
+    await titles.first().dispatchEvent('click');
     await page.getByPlaceholder('Add a description...').waitFor();
     await shot('plan-card-detail');
-    await titles.first().click({ position: { x: 8, y: 8 } });
+    await titles.first().dispatchEvent('click');
+    await page.getByPlaceholder('Add a description...').waitFor({ state: 'hidden' });
   } else {
     console.warn('[smoke] no Plan cards; skipping plan-card-detail');
   }
@@ -249,18 +251,21 @@ async function assertReviewInvariants(page) {
 }
 
 /**
- * Review walk (PHASE3_PLAN.md §7.1), read-only by construction. Never clicks:
- * any `Log this entry` checkbox, the Billable pill, Assign task, Accept,
- * Dismiss, Edit → Save, Move (row or bulk confirm), Delete, Select all, any
- * outcome pill in Today, Sync calendar, `Log N to Easy8`, End Day inside the
- * modal, Add Entry inside the modal, or anything inside the Templates manager
- * except its close. The reflection textarea is never typed into.
+ * Review walk (PHASE3_PLAN.md §7.1, R22–R33), read-only by construction. Never
+ * presses Enter on Review (= Log) and never clicks: any row or header checkbox,
+ * the Billable key, an option in the task picker, Move (row or bulk confirm),
+ * Delete / Dismiss, any outcome in Today, Sync calendar, `Log N to Easy8`, End
+ * Day inside the modal, Add Entry inside the modal, or anything inside the
+ * Templates manager except its close. It never types into a Dur, Comment or
+ * reflection field: a Dur editor and the task picker are opened and closed
+ * with Escape only.
  */
 async function reviewWalk(page, shot) {
   const table = page.locator('section[aria-label="Time entries"]');
   const toolbar = page.getByTestId('entries-toolbar');
-  const footer = page.getByTestId('entries-footer');
-  const aside = page.locator('aside[aria-label="Tomorrow"]');
+  const summaryBar = page.getByTestId('log-summary');
+  const aside = page.locator('aside[aria-label="Close the day"]');
+  const filter = toolbar.getByRole('group', { name: 'Filter entries' });
 
   // 1. Landing (writes: calendar_proposals sync inserts for today + next workday; safe rows)
   await page.getByRole('heading', { name: 'Review', exact: true }).waitFor();
@@ -271,12 +276,19 @@ async function reviewWalk(page, shot) {
 
   // 2. R1 proof + rule 6; the log key is asserted, never clicked
   await assertReviewInvariants(page);
-  const logKey = footer.getByRole('button', { name: /^Log( \d+)? to Easy8$/ });
+  const logKey = summaryBar.getByRole('button', { name: /^Log( \d+)? to Easy8( ↵)?$/ });
   if (!(await logKey.count())) throw new Error('Log to Easy8 key missing');
   console.log('[smoke] Log to Easy8 key present (not clicked)');
 
-  // 3. Today section (nothing clicked)
-  if (await page.locator('section[aria-label="Today"]').count()) await shot('review-today-section');
+  // 3. Today triage in the aside (nothing clicked)
+  if (await aside.locator('section[aria-label="Today"]').count()) await shot('review-today-section');
+
+  // 3b. Filter: All / Logged / back to To log (session state only)
+  await filter.getByRole('button', { name: /^All \d+$/ }).click();
+  await shot('review-filter-all');
+  await filter.getByRole('button', { name: /^Logged \d+$/ }).click();
+  await shot('review-filter-logged');
+  await filter.getByRole('button', { name: /^To log \d+$/ }).click();
 
   // 4. Timeline → List (localStorage viewMode; restored)
   await toolbar.getByRole('button', { name: 'Timeline', exact: true }).click();
@@ -294,21 +306,29 @@ async function reviewWalk(page, shot) {
     await group.click();
   }
 
-  // 6. Hover the first open row; Edit → Cancel restores the buffer (no writes)
+  // 6. Hover the first open row; open its Dur editor and its task picker, each closed with Escape (no writes)
   const openRow = page.locator('[data-testid="entry-row"][data-kind="open"]').first();
   if (await openRow.count()) {
     await openRow.hover();
     await shot('review-row-hover');
-    const edit = openRow.getByRole('button', { name: 'Edit', exact: true });
-    if (await edit.count()) {
-      await edit.click();
-      await page.getByTestId('entry-editor').waitFor();
-      await shot('review-row-edit');
-      await openRow.getByRole('button', { name: 'Cancel', exact: true }).click();
-      await page.getByTestId('entry-editor').waitFor({ state: 'hidden' });
+    const dur = openRow.getByRole('button', { name: /^Duration / });
+    if (await dur.count()) {
+      await dur.click();
+      await openRow.getByLabel('Duration', { exact: true }).waitFor();
+      await shot('review-row-duration');
+      await page.keyboard.press('Escape');
+      await openRow.getByLabel('Duration', { exact: true }).waitFor({ state: 'hidden' });
+    }
+    const taskKey = openRow.getByTestId('entry-task-id').or(openRow.getByRole('button', { name: '+ Assign task' })).first();
+    if (await taskKey.count()) {
+      await taskKey.click();
+      await page.getByTestId('task-picker').waitFor();
+      await shot('review-row-picker');
+      await page.keyboard.press('Escape');
+      await page.getByTestId('task-picker').waitFor({ state: 'hidden' });
     }
   } else {
-    console.warn('[smoke] no open entries today; skipping review-row-hover / review-row-edit');
+    console.warn('[smoke] no open entries today; skipping review-row-hover / duration / picker');
   }
 
   // 7. Date popover → Esc (no writes)
@@ -328,11 +348,17 @@ async function reviewWalk(page, shot) {
   await waitFor(async () => (await page.getByTestId('review-date').textContent()) === todayLabel, 10_000, 'today label');
   await assertReviewInvariants(page);
 
-  // 9. + Entry → Cancel (no writes)
-  await footer.getByRole('button', { name: '+ Entry', exact: true }).click();
+  // 9. + Add entry → Cancel, then the N key → Cancel (no writes; focus leaves every field first)
+  await table.getByRole('button', { name: /^\+ Add entry/ }).click();
   await page.getByRole('button', { name: 'Cancel', exact: true }).waitFor();
   await shot('review-add-entry');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).waitFor({ state: 'hidden' });
+  await page.evaluate(() => (document.activeElement instanceof HTMLElement) && document.activeElement.blur());
+  await page.keyboard.press('n');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).waitFor({ state: 'hidden' });
 
   // 10. Templates → close (getTemplates is a read)
   await toolbar.getByRole('button', { name: 'Templates', exact: true }).click();
@@ -343,7 +369,9 @@ async function reviewWalk(page, shot) {
 
   // 10b. Weekends have no entries: walk back to the latest day with rows, look, return (reads + safe proposal syncs)
   // Proposal-only days (synced from the calendar) don't count: we want real rows
+  // Past days are usually all logged, so list All while looking back (To log again after)
   const realRows = () => page.locator('[data-testid="entry-row"]:not([data-kind="proposal"])');
+  await filter.getByRole('button', { name: /^All \d+$/ }).click();
   if (!(await realRows().count())) {
     let back = 0;
     while (back < 7 && !(await realRows().count())) {
@@ -366,6 +394,7 @@ async function reviewWalk(page, shot) {
     }
     await waitFor(async () => (await page.getByTestId('review-date').textContent()) === todayLabel, 10_000, 'back to today');
   }
+  await filter.getByRole('button', { name: /^To log \d+$/ }).click();
 
   // 11. End day → modal → Cancel (saveRitual only fires from the modal's End Day key, never clicked)
   const endDay = aside.getByRole('button', { name: 'End day', exact: true });

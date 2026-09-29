@@ -74,6 +74,8 @@ async function renderLog(entries: LogEntry[] = [], date = FIXTURE_DATE, viewMode
 
 const table = () => screen.getByRole('region', { name: 'Time entries' });
 const footer = () => screen.getByTestId('entries-footer');
+const summaryBar = () => screen.getByTestId('log-summary');
+const addEntry = () => within(table()).getByRole('button', { name: /add entry/i });
 const toolbar = () => screen.getByTestId('entries-toolbar');
 
 describe('DailyLog (Review)', () => {
@@ -90,9 +92,24 @@ describe('DailyLog (Review)', () => {
     expect(screen.getByTestId('review-date')).toHaveTextContent('· Today');
     expect(loadDay).toHaveBeenCalledWith(today);
     const stats = screen.getByTestId('review-stats');
-    expect(stats).toHaveTextContent('25m tracked');
-    expect(stats).toHaveTextContent('1 to log');
-    expect(stats).toHaveTextContent('5m break');
+    expect(stats).toHaveTextContent('25m tracked · 25m billable');
+    expect(stats).not.toHaveTextContent('break');
+    expect(screen.getByTestId('summary-to-log')).toHaveTextContent('1 · 25m');
+    expect(screen.getByTestId('summary-needs-task')).toHaveTextContent('0');
+    expect(screen.getByTestId('summary-logged')).toHaveTextContent('0 · 0m');
+  });
+
+  it('tracked in the header is always to log + logged, proposals and logged rows included (R24)', async () => {
+    await renderLog([
+      makeEntry('pomodoro', { durationMinutes: 30 }),
+      makeEntry('proposal', { id: 'p1', durationMinutes: 60 }),
+      makeEntry('logged', { id: 'l1', durationMinutes: 25 }),
+      makeEntry('break', { id: 'b1', durationMinutes: 5 }),
+    ]);
+    expect(screen.getByTestId('review-stats')).toHaveTextContent('1h 55m tracked');
+    expect(screen.getByTestId('summary-to-log')).toHaveTextContent('2 · 1h 30m');
+    expect(screen.getByTestId('summary-needs-task')).toHaveTextContent('1');
+    expect(screen.getByTestId('summary-logged')).toHaveTextContent('1 · 25m');
   });
 
   it('prev / next shift selectedDate by one day; the date button opens the month grid', async () => {
@@ -148,11 +165,11 @@ describe('DailyLog (Review)', () => {
     expect(stale).toContainElement(screen.getAllByTestId('entry-row')[0]);
     const log = screen.getByRole('button', { name: /log 2 to easy8/i });
     expect(log).toBeDisabled();
-    expect(within(toolbar()).getByRole('button', { name: 'Unselect all' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Select all loggable entries' })).toBeDisabled();
     expect(within(toolbar()).getByRole('button', { name: 'Move to…' })).toBeDisabled();
-    expect(within(footer()).getByRole('button', { name: '+ Entry' })).toBeDisabled();
+    expect(addEntry()).toBeDisabled();
     fireEvent.click(log);
-    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Unselect all' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all loggable entries' }));
     expect(logSelected).not.toHaveBeenCalled();
     expect(toggleSelectAll).not.toHaveBeenCalled();
     expect(toggleLogMark).not.toHaveBeenCalled();
@@ -160,14 +177,40 @@ describe('DailyLog (Review)', () => {
     act(() => { useLogStore.setState({ isLoading: false }); });
     expect(screen.queryByTestId('entries-stale')).toBeNull();
     expect(screen.getByRole('button', { name: /log 2 to easy8/i })).toBeEnabled();
-    expect(within(footer()).getByRole('button', { name: '+ Entry' })).toBeEnabled();
+    expect(addEntry()).toBeEnabled();
   });
 
-  it('renders work rows before break rows with the column header', async () => {
+  it('lists work rows only under the column header; breaks stay in Timeline (R23)', async () => {
     await renderLog([makeEntry('break', { id: 'b1', startTime: `${FIXTURE_DATE}T08:00:00.000` }), makeEntry('pomodoro')]);
     expect(screen.getByTestId('entries-columns')).toHaveTextContent('Time');
+    expect(screen.getByTestId('entries-columns')).toHaveTextContent('Comment → Easy8');
     const rows = screen.getAllByTestId('entry-row');
-    expect(rows.map(r => r.getAttribute('data-kind'))).toEqual(['open', 'break']);
+    expect(rows.map(r => r.getAttribute('data-kind'))).toEqual(['open']);
+  });
+
+  it('the filter defaults to To log, hides logged rows, and the footer show / hide flips to All (R31)', async () => {
+    const { user } = await renderLog([makeEntry('pomodoro'), makeEntry('logged', { id: 'l1' })], today);
+    const filter = within(screen.getByRole('group', { name: 'Filter entries' }));
+    expect(filter.getByRole('button', { name: 'To log 1' })).toHaveAttribute('aria-pressed', 'true');
+    expect(filter.getByRole('button', { name: 'All 2' })).toBeInTheDocument();
+    expect(filter.getByRole('button', { name: 'Logged 1' })).toBeInTheDocument();
+    expect(screen.getAllByTestId('entry-row').map(r => r.getAttribute('data-kind'))).toEqual(['open']);
+    expect(footer()).toHaveTextContent('1 logged today · show');
+    await user.click(within(footer()).getByRole('button', { name: 'show' }));
+    expect(filter.getByRole('button', { name: 'All 2' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByTestId('entry-row')).toHaveLength(2);
+    await user.click(within(footer()).getByRole('button', { name: 'hide' }));
+    expect(screen.getAllByTestId('entry-row')).toHaveLength(1);
+    await user.click(filter.getByRole('button', { name: 'Logged 1' }));
+    expect(screen.getAllByTestId('entry-row').map(r => r.getAttribute('data-kind'))).toEqual(['logged']);
+  });
+
+  it('with everything logged, To log shows `Everything is logged` and a way to see them', async () => {
+    const { user } = await renderLog([makeEntry('logged', { id: 'l1' })], '2020-01-02');
+    expect(screen.getByText('Everything is logged')).toBeInTheDocument();
+    expect(footer()).toHaveTextContent('1 logged · show');
+    await user.click(screen.getByRole('button', { name: 'Show logged' }));
+    expect(screen.getAllByTestId('entry-row')).toHaveLength(1);
   });
 
   it('Timeline renders TimelineView (mocked), hides the column header and Group by task, persists viewMode', async () => {
@@ -202,20 +245,55 @@ describe('DailyLog (Review)', () => {
 
   it('Log button is disabled at 0 selected and labelled Log N to Easy8 when marked', async () => {
     const { user, logSelected } = await renderLog([makeEntry('pomodoro', { markedToLog: false })]);
-    const idle = within(footer()).getByRole('button', { name: 'Log to Easy8' });
+    const idle = within(summaryBar()).getByRole('button', { name: 'Log to Easy8' });
     expect(idle).toBeDisabled();
     expect(idle).toHaveAttribute('title', 'Mark entries to log');
     useLogStore.setState({ entries: [makeEntry('pomodoro'), makeEntry('adhoc', { id: 'a1' })] });
-    const key = await within(footer()).findByRole('button', { name: 'Log 2 to Easy8' });
+    const key = await within(summaryBar()).findByRole('button', { name: /^Log 2 to Easy8/ });
     expect(footer()).toHaveTextContent('2 selected · 55m');
     await user.click(key);
     expect(logSelected).toHaveBeenCalledTimes(1);
   });
 
+  it('N counts only loggable rows: a marked row without a task is blocked, not counted (R22)', async () => {
+    await renderLog([makeEntry('pomodoro'), makeEntry('adhoc', { id: 'a1', taskId: null })]);
+    expect(within(summaryBar()).getByRole('button', { name: /^Log 1 to Easy8/ })).toBeEnabled();
+    expect(footer()).toHaveTextContent('1 selected · 25m · 1 blocked: needs a task');
+  });
+
+  it('Enter logs the selection when no field or key has focus; N opens + Add entry (R32)', async () => {
+    const { user, logSelected } = await renderLog([makeEntry('pomodoro')]);
+    (document.activeElement as HTMLElement | null)?.blur();
+    await user.keyboard('{Enter}');
+    expect(logSelected).toHaveBeenCalledTimes(1);
+    await user.keyboard('n');
+    expect(screen.getByTestId('add-entry-modal')).toBeInTheDocument();
+  });
+
+  it('Enter never logs from a focused input, with modifiers, with nothing selected or under a dialog', async () => {
+    const { user, logSelected } = await renderLog([makeEntry('pomodoro')]);
+    await user.click(screen.getByLabelText('Comment'));
+    await user.keyboard('{Enter}');
+    expect(logSelected).not.toHaveBeenCalled();
+    (document.activeElement as HTMLElement | null)?.blur();
+    await user.keyboard('{Meta>}{Enter}{/Meta}');
+    expect(logSelected).not.toHaveBeenCalled();
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    document.body.appendChild(dialog);
+    await user.keyboard('{Enter}n');
+    expect(logSelected).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('add-entry-modal')).toBeNull();
+    dialog.remove();
+    useLogStore.setState({ entries: [makeEntry('pomodoro', { markedToLog: false })] });
+    await user.keyboard('{Enter}');
+    expect(logSelected).not.toHaveBeenCalled();
+  });
+
   it('shows the success toast with the count; the link opens the EP URL', async () => {
     const { user, logSelected } = await renderLog([makeEntry('pomodoro')]);
     vi.mocked(logSelected).mockResolvedValue({ success: 1, failed: 0, errors: [] });
-    await user.click(within(footer()).getByRole('button', { name: 'Log 1 to Easy8' }));
+    await user.click(within(summaryBar()).getByRole('button', { name: /^Log 1 to Easy8/ }));
     expect(await screen.findByText('✓ 1 entry logged')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'View in Easy Project →' }));
     expect(window.timerAPI.openExternal).toHaveBeenCalledWith(expect.stringContaining('/easy_time_entries?'));
@@ -228,7 +306,7 @@ describe('DailyLog (Review)', () => {
       success: 0, failed: 2,
       errors: [{ entryId: 'pomodoro-1', error: 'Issue not found (404)' }, { entryId: 'a1', error: 'Invalid API key (401)' }],
     });
-    await user.click(within(footer()).getByRole('button', { name: 'Log 2 to Easy8' }));
+    await user.click(within(summaryBar()).getByRole('button', { name: /^Log 2 to Easy8/ }));
     const rows = await screen.findAllByTestId('entry-row');
     expect(within(rows[0]).getByRole('alert')).toHaveTextContent('Issue not found (404)');
     expect(within(rows[1]).getByRole('alert')).toHaveTextContent('Invalid API key (401)');
@@ -242,36 +320,45 @@ describe('DailyLog (Review)', () => {
   it('a row error clears on the next log attempt and on edit', async () => {
     const { user, logSelected } = await renderLog([makeEntry('pomodoro')]);
     vi.mocked(logSelected).mockResolvedValueOnce({ success: 0, failed: 1, errors: [{ entryId: 'pomodoro-1', error: 'API error: 500' }] });
-    await user.click(within(footer()).getByRole('button', { name: 'Log 1 to Easy8' }));
+    await user.click(within(summaryBar()).getByRole('button', { name: /^Log 1 to Easy8/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('API error: 500');
     vi.mocked(logSelected).mockResolvedValueOnce({ success: 1, failed: 0, errors: [] });
-    await user.click(within(footer()).getByRole('button', { name: 'Log 1 to Easy8' }));
+    await user.click(within(summaryBar()).getByRole('button', { name: /^Log 1 to Easy8/ }));
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
     vi.mocked(logSelected).mockResolvedValueOnce({ success: 0, failed: 1, errors: [{ entryId: 'pomodoro-1', error: 'API error: 500' }] });
-    await user.click(within(footer()).getByRole('button', { name: 'Log 1 to Easy8' }));
+    await user.click(within(summaryBar()).getByRole('button', { name: /^Log 1 to Easy8/ }));
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Billable' }));
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
   });
 
-  it('footer counts marked rows without a task as needing one', async () => {
+  it('footer counts rows without a task as blocked', async () => {
     await renderLog([makeEntry('adhoc', { taskId: null })]);
-    expect(footer()).toHaveTextContent('1 needs a task');
+    expect(footer()).toHaveTextContent('0 selected · 1 blocked: needs a task');
   });
 
-  it('Select all / Unselect all calls toggleSelectAll', async () => {
-    const { user, toggleSelectAll } = await renderLog([makeEntry('pomodoro', { markedToLog: false })]);
-    await user.click(screen.getByRole('button', { name: 'Select all' }));
+  it('the header checkbox selects all loggable rows: indeterminate when some, checked when all', async () => {
+    const { user, toggleSelectAll } = await renderLog([makeEntry('pomodoro', { markedToLog: false }), makeEntry('adhoc', { id: 'a1' })]);
+    const box = screen.getByRole('checkbox', { name: 'Select all loggable entries' }) as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    expect(box.indeterminate).toBe(true);
+    await user.click(box);
     expect(toggleSelectAll).toHaveBeenCalledTimes(1);
-    useLogStore.setState({ entries: [makeEntry('pomodoro')] });
-    expect(await screen.findByRole('button', { name: 'Unselect all' })).toBeInTheDocument();
+    act(() => { useLogStore.setState({ entries: [makeEntry('pomodoro'), makeEntry('adhoc', { id: 'a1' })] }); });
+    expect(box.checked).toBe(true);
+    expect(box.indeterminate).toBe(false);
   });
 
-  it('Templates opens the manager and + Entry opens AddEntryModal', async () => {
+  it('the header checkbox is disabled when nothing can be logged', async () => {
+    await renderLog([makeEntry('adhoc', { taskId: null })]);
+    expect(screen.getByRole('checkbox', { name: 'Select all loggable entries' })).toBeDisabled();
+  });
+
+  it('Templates opens the manager and + Add entry opens AddEntryModal', async () => {
     const { user } = await renderLog([makeEntry('pomodoro')]);
     await user.click(screen.getByRole('button', { name: 'Templates' }));
     expect(screen.getByTestId('template-modal')).toBeInTheDocument();
-    await user.click(within(footer()).getByRole('button', { name: '+ Entry' }));
+    await user.click(addEntry());
     expect(screen.getByTestId('add-entry-modal')).toBeInTheDocument();
   });
 
@@ -300,23 +387,43 @@ describe('DailyLog (Review)', () => {
     expect(deleteEntry).not.toHaveBeenCalled();
   });
 
-  it('Assign task save on a proposal → acceptCalendarProposal(id, "123") then loadDay(date, true)', async () => {
+  it('assigning a task to a proposal accepts it with that id (R8), then reloads locally', async () => {
+    window.logAPI.getCachedTask = vi.fn(async (id: string) => ({ task_id: id, title: 'T', project_id: 1, project_name: 'P', last_seen_at: '' }));
     const { user, loadDay, updateEntry } = await renderLog([makeEntry('proposal')]);
-    await user.click(screen.getByRole('button', { name: 'Assign task' }));
-    await user.type(screen.getByPlaceholderText('Task ID'), '123');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(updateEntry).toHaveBeenCalledWith('proposal-1', expect.objectContaining({ title: 'KKS upsell call' }));
+    await user.click(screen.getByRole('button', { name: '+ Assign task' }));
+    await user.type(screen.getByLabelText('Find a task'), '123{Enter}');
     await waitFor(() => expect(window.logAPI.acceptCalendarProposal).toHaveBeenCalledWith('proposal-1', '123'));
     await waitFor(() => expect(loadDay).toHaveBeenCalledWith(FIXTURE_DATE, true));
+    expect(updateEntry).not.toHaveBeenCalled();
   });
 
-  it('Accept / Dismiss on a proposal row go through the bridge and reload locally', async () => {
-    const { user, loadDay } = await renderLog([makeEntry('proposal')]);
-    await user.click(screen.getByRole('button', { name: 'Accept' }));
+  it('assigning a task to any other row writes the task and marks it to log', async () => {
+    window.logAPI.getCachedTask = vi.fn(async (id: string) => ({ task_id: id, title: 'T', project_id: 1, project_name: 'P', last_seen_at: '' }));
+    const { user, updateEntry } = await renderLog([makeEntry('adhoc', { id: 'a1', taskId: null, markedToLog: false })]);
+    await user.click(screen.getByRole('button', { name: '+ Assign task' }));
+    await user.type(screen.getByLabelText('Find a task'), '456{Enter}');
+    await waitFor(() => expect(updateEntry).toHaveBeenCalledWith('a1', { taskId: '456', markedToLog: true }));
+  });
+
+  it('checking a proposal that has a task accepts it; Dismiss goes through deleteEntry (R30)', async () => {
+    const { user, loadDay, deleteEntry } = await renderLog([makeEntry('proposal', { taskId: '643749' })]);
+    await user.click(screen.getByRole('checkbox', { name: 'Accept and log this entry' }));
     expect(window.logAPI.acceptCalendarProposal).toHaveBeenCalledWith('proposal-1', undefined);
-    await user.click(screen.getByRole('button', { name: 'Dismiss' }));
-    expect(window.logAPI.dismissCalendarProposal).toHaveBeenCalledWith('proposal-1');
     await waitFor(() => expect(loadDay).toHaveBeenCalledWith(FIXTURE_DATE, true));
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(deleteEntry).toHaveBeenCalledWith('proposal-1');
+  });
+
+  it('inline edits write through updateEntry: duration and comment', async () => {
+    const { user, updateEntry } = await renderLog([makeEntry('pomodoro')]);
+    await user.click(screen.getByRole('button', { name: 'Duration 25m' }));
+    await user.clear(screen.getByLabelText('Duration'));
+    await user.type(screen.getByLabelText('Duration'), '1h{Enter}');
+    expect(updateEntry).toHaveBeenCalledWith('pomodoro-1', { durationMinutes: 60 });
+    const comment = screen.getByLabelText('Comment');
+    await user.clear(comment);
+    await user.type(comment, 'Review notes{Enter}');
+    expect(updateEntry).toHaveBeenCalledWith('pomodoro-1', { comment: 'Review notes' });
   });
 
   it('billable pill writes updateEntry(id, { billable: false })', async () => {
@@ -344,6 +451,7 @@ describe('DailyLog (Review)', () => {
     expect(window.logAPI.getCalendarProposals).toHaveBeenCalledWith('2026-09-28');
     expect(screen.getByTestId('tomorrow-date')).toHaveTextContent('Mon 28 Sep');
     expect(await screen.findByText(/4h 30m/)).toBeInTheDocument();
+    expect(screen.getByTestId('tomorrow-calendar')).toHaveTextContent('1 meeting · 4h 30m free');
   });
 
   it('shows Calendar unavailable when the tomorrow feed fails', async () => {
@@ -372,18 +480,16 @@ describe('DailyLog (Review)', () => {
     expect(screen.queryByRole('button', { name: 'End day' })).toBeNull();
   });
 
-  it('aside lists open today items from the lists store only when the selected date is today', async () => {
+  it('the aside starts tomorrow with the first open today item only when the selected date is today', async () => {
     useListsStore.setState({
       lists: [],
       items: [{ id: 'i1', list_id: 'l1', title: 'Carry me', task_id: '77', column: 'today', order: 0, completed: 0, archived: 0, completed_at: null, description: null, subtasks: '[]', billable: 1, created_at: '' }],
     });
     await renderLog([], '2020-01-02');
-    const aside = () => within(screen.getByRole('complementary', { name: 'Tomorrow' }));
-    expect(aside().queryByText('Starts in Today')).toBeNull();
-    expect(aside().queryByText('Carry me')).toBeNull();
+    const aside = () => within(screen.getByRole('complementary', { name: 'Close the day' }));
+    expect(aside().queryByTestId('tomorrow-start')).toBeNull();
     await act(async () => { useLogStore.setState({ selectedDate: today }); });
-    expect(aside().getByText('Starts in Today')).toBeInTheDocument();
-    expect(aside().getByText('Carry me')).toBeInTheDocument();
+    expect(aside().getByTestId('tomorrow-start')).toHaveTextContent('Starts with 77');
     useListsStore.setState({ lists: [], items: [] });
   });
 
@@ -395,20 +501,23 @@ describe('DailyLog (Review)', () => {
     expect(table()).toBeInTheDocument();
   });
 
-  it('the Today section renders only when the selected date is today', async () => {
+  it('the Today triage lives in the aside and renders only when the selected date is today', async () => {
     await renderLog([], '2020-01-02');
     expect(screen.queryByRole('region', { name: 'Today' })).toBeNull();
     await act(async () => { useLogStore.setState({ selectedDate: today }); });
-    expect(screen.getByRole('region', { name: 'Today' })).toBeInTheDocument();
+    const aside = screen.getByRole('complementary', { name: 'Close the day' });
+    expect(within(aside).getByRole('region', { name: 'Today' })).toBeInTheDocument();
+    expect(within(screen.getByTestId('review-main')).queryByRole('region', { name: 'Today' })).toBeNull();
   });
 
-  it('the main column scrolls as a whole; the entries section is unconstrained and its footer sticky', async () => {
+  it('the summary bar and filter sit above the table, which takes the remaining height and scrolls its rows', async () => {
     await renderLog([makeEntry('pomodoro')]);
     const main = screen.getByTestId('review-main');
-    expect(main).toHaveClass('overflow-y-auto');
-    expect(main).not.toHaveClass('overflow-hidden');
-    expect(table()).not.toHaveClass('overflow-hidden', 'flex-1');
-    expect(screen.getByTestId('entries-body')).not.toHaveClass('overflow-auto', 'overflow-y-auto');
-    expect(footer()).toHaveClass('sticky', 'bottom-0');
+    const order = Array.from(main.children).map(el => el.getAttribute('data-testid') ?? el.getAttribute('aria-label'));
+    expect(order.indexOf('log-summary')).toBeLessThan(order.indexOf('entries-toolbar'));
+    expect(order.indexOf('entries-toolbar')).toBeLessThan(order.indexOf('Time entries'));
+    expect(table()).toHaveClass('flex-1');
+    expect(screen.getByTestId('entries-scroll')).toHaveClass('overflow-y-auto');
+    expect(screen.getByTestId('entries-body')).toHaveClass('overflow-x-auto');
   });
 });

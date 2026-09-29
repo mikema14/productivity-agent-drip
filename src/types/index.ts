@@ -555,6 +555,8 @@ export interface ListItem {
   subtasks: string; // JSON: Subtask[]
   billable: 0 | 1;
   created_at: string;
+  /** Local `YYYY-MM-DD` the item entered Today; null outside Today (R29). */
+  today_since?: string | null;
 }
 
 export interface Subtask {

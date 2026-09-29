@@ -23,17 +23,23 @@ Go straight to **Now**, or to Plan first if Today needs adjusting.
 - **Drifting (new):** after **10 min** with nothing running, and you're not in a meeting and the screen isn't locked, a **red nudge** appears. You can Start focus, Kickoff, or Snooze for 15 min, 1 h or the rest of the day. In a call or on a coffee break, pause nudges ahead of time from the menu-bar icon (Pause nudges; turn the icon on in Settings) or resume them from the "Nudges paused until…" line on Now; starting a focus or break clears the pause. Ignore it for **15 more minutes** and Drip takes over: Raycast Focus turns on and a 2-minute kickoff fills the Drip window. **Esc** stops it without saving anything. At 2:00 it asks "keep going?"; if you don't answer, it continues into a full session. The same thing happens if you don't get going after a break ends.
 
 ## End of day: close it in Review
-Press **Review day →** at the bottom of Now; it shows how many entries aren't logged yet. Review always opens on today.
-1. **Today's tasks.** Decide on each Plan Today item:
+Press **Review day →** at the bottom of Now; it shows how many entries aren't logged yet. Review always opens on today. The main job here is logging, and closing the day is optional.
+1. **Log time.** The bar at the top shows what is still **to log**, how many entries **need a task**, and what is already **logged**.
+   - The list starts on **To log**. Logged entries are one **show** away, in the footer or the **All** / **Logged** filter.
+   - Edit in place:
+     - Click a duration and type `45m`, `1h10` or `1:10`.
+     - The comment field is exactly what Easy8 receives.
+     - **Yes / No** sets billable.
+   - An entry without a task is highlighted, and its checkbox stays off until you **+ Assign task**. The picker searches your recent tasks; a task ID + Enter fetches it.
+   - A calendar event with a task is accepted when you tick it.
+   - Press **Log N to Easy8**, or just Enter. N counts only the ticked entries that have a task. Any failure shows on the row that failed. An invalid API key shows a banner that opens Settings.
+   - **N** or **+ Add entry** adds a manual entry. Hover a row to move it to another day or delete it.
+2. **Close the day (optional).** The right-hand panel works through Plan's Today items:
    - **Done** marks it complete.
-   - **Carry** leaves it in Today.
-   - **To week** moves it back to This week.
+   - **Carry** leaves it in Today; after two workdays it shows **Carried 2×**.
+   - **Week** moves it back to This week.
    - **Drop** moves it to Backlog; nothing is deleted.
-2. **Entries.** Sessions, manual entries and calendar events are listed for the day.
-   - Give calendar events a task with **Assign task**.
-   - Check Billable on each entry.
-   - Tick what to log, then press **Log N to Easy8**. Any failure shows on the row that failed. An invalid API key shows a banner that opens Settings.
-3. **Tomorrow panel.** It shows the next workday's meetings and how much of your 6h is free. Write one line about today, then press **End day**. That saves the reflection and tomorrow's intentions, and the day is locked.
+   One line shows what tomorrow starts with, its meetings and how much of your 6h is free. Write one line about today, then press **End day**. That saves the reflection and tomorrow's intentions, and the day is locked. Logging never needs End day.
 
 ## Friday
 Same close, but **End day plans Monday**, not Saturday. Monday then starts with that plan in place.

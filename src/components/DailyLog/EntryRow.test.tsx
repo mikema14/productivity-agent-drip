@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EntryRow, { type EntryRowProps } from './EntryRow';
 import { makeEntry, asMerged } from '../../test/logFixtures';
@@ -9,7 +9,7 @@ import type { MergedEntry } from '../../utils/mergeEntries';
 function renderRow(entry: MergedEntry, overrides: Partial<EntryRowProps> = {}) {
   const props: EntryRowProps = {
     entry,
-    onUpdate: vi.fn(), onDelete: vi.fn(), onToggleLog: vi.fn(), onAccept: vi.fn(), onDismiss: vi.fn(),
+    onUpdate: vi.fn(), onDelete: vi.fn(), onToggleLog: vi.fn(), onAccept: vi.fn(),
     onMove: vi.fn(), onAssignTask: vi.fn(), onToggleBillable: vi.fn(), onOpenSettings: vi.fn(),
     ...overrides,
   };
@@ -19,82 +19,204 @@ function renderRow(entry: MergedEntry, overrides: Partial<EntryRowProps> = {}) {
 
 const openRow = (o: Partial<LogEntry> = {}) => asMerged(makeEntry('pomodoro', o));
 
-describe('EntryRow', () => {
-  it('open pomodoro row: checkbox reflects markedToLog and toggling calls onToggleLog', async () => {
+beforeEach(() => {
+  window.logAPI.getCachedTask = vi.fn(async () => ({ task_id: '643749', title: 'Feature X', project_id: 1, project_name: 'P', last_seen_at: '' }));
+  window.logAPI.getRecentTasks = vi.fn(async () => [
+    { task_id: '555', title: 'Sales task', project_id: 1, project_name: 'P', last_seen_at: '' },
+    { task_id: '689742', title: 'Doc automation', project_id: 1, project_name: 'P', last_seen_at: '' },
+  ]);
+});
+
+describe('EntryRow — select', () => {
+  it('open row: checkbox reflects markedToLog and toggling calls onToggleLog', async () => {
     const { user, onToggleLog, row } = renderRow(openRow({ markedToLog: false }));
     expect(row).toHaveAttribute('data-kind', 'open');
     const box = screen.getByRole('checkbox', { name: 'Log this entry' });
     expect(box).not.toBeChecked();
     await user.click(box);
     expect(onToggleLog).toHaveBeenCalledWith('pomodoro-1');
-    expect(screen.getByTestId('entry-dot')).toHaveClass('bg-focus');
   });
 
-  it('id pill has no # and takes the cached title as tooltip', async () => {
-    window.logAPI.getCachedTask = vi.fn(async () => ({ task_id: '643749', title: 'Feature X', project_id: 1, project_name: 'P', last_seen_at: '' }));
+  it('a row without a task: amber tint, disabled checkbox, dashed + Assign task (R22)', () => {
+    const { row } = renderRow(asMerged(makeEntry('adhoc', { taskId: null })));
+    expect(row.className).toContain('bg-focus/[0.05]');
+    const box = screen.getByRole('checkbox', { name: 'Log this entry (needs a task)' });
+    expect(box).toBeDisabled();
+    expect(box).toHaveAttribute('title', 'Needs a task');
+    expect(screen.getByRole('button', { name: '+ Assign task' })).toHaveClass('border-dashed');
+  });
+
+  it('a proposal with a task: checking it accepts it (R30)', async () => {
+    const { user, onAccept, onToggleLog, row } = renderRow(asMerged(makeEntry('proposal', { taskId: '643749' })));
+    expect(row).toHaveAttribute('data-kind', 'proposal');
+    const box = screen.getByRole('checkbox', { name: 'Accept and log this entry' });
+    expect(box).not.toBeChecked();
+    await user.click(box);
+    expect(onAccept).toHaveBeenCalledWith('proposal-1');
+    expect(onToggleLog).not.toHaveBeenCalled();
+  });
+
+  it('logged row: green check, dimmed, read-only text, no inputs and no actions', () => {
+    const { row } = renderRow(asMerged(makeEntry('logged', { billable: false })));
+    expect(row).toHaveAttribute('data-kind', 'logged');
+    expect(row).toHaveClass('opacity-70');
+    expect(screen.getByRole('img', { name: 'Logged' })).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(row).toHaveTextContent('Proposal draft');
+    expect(row).toHaveTextContent('No');
+  });
+});
+
+describe('EntryRow — Dur', () => {
+  it('click → type 1h10 → Enter commits 70 minutes', async () => {
+    const { user, onUpdate } = renderRow(openRow({ durationMinutes: 25 }));
+    await user.click(screen.getByRole('button', { name: 'Duration 25m' }));
+    const input = screen.getByLabelText('Duration');
+    expect(input).toHaveFocus();
+    await user.clear(input);
+    await user.type(input, '1h10{Enter}');
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith('pomodoro-1', { durationMinutes: 70 });
+    expect(screen.queryByLabelText('Duration')).toBeNull();
+  });
+
+  it('an unreadable value keeps the editor open marked invalid; Esc cancels without a write', async () => {
+    const { user, onUpdate } = renderRow(openRow());
+    await user.click(screen.getByRole('button', { name: 'Duration 25m' }));
+    const input = screen.getByLabelText('Duration');
+    await user.clear(input);
+    await user.type(input, 'soon{Enter}');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveClass('border-alert');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByLabelText('Duration')).toBeNull();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('blur commits a valid change, reverts an invalid one, and an unchanged value writes nothing', async () => {
+    const { user, onUpdate } = renderRow(openRow());
+    await user.click(screen.getByRole('button', { name: 'Duration 25m' }));
+    await user.tab();
+    expect(onUpdate).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Duration 25m' }));
+    await user.clear(screen.getByLabelText('Duration'));
+    await user.type(screen.getByLabelText('Duration'), 'x');
+    await user.tab();
+    expect(onUpdate).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Duration 25m' }));
+    await user.clear(screen.getByLabelText('Duration'));
+    await user.type(screen.getByLabelText('Duration'), '45m');
+    await user.tab();
+    expect(onUpdate).toHaveBeenCalledWith('pomodoro-1', { durationMinutes: 45 });
+  });
+
+  it('merged rows keep the duration read-only', () => {
+    const a = makeEntry('pomodoro', { id: 'p1' });
+    const b = makeEntry('pomodoro', { id: 'p2' });
+    renderRow(asMerged({ ...a, durationMinutes: 50 }, [a, b]));
+    expect(screen.queryByRole('button', { name: /Duration/ })).toBeNull();
+    expect(screen.getByTitle('Ungroup to edit')).toHaveTextContent('50m');
+  });
+});
+
+describe('EntryRow — Task', () => {
+  it('shows the id without # and the task name under it', async () => {
     renderRow(openRow());
-    const pill = screen.getByTestId('entry-task-id');
-    expect(pill).toHaveTextContent('643749');
-    expect(pill.textContent).not.toContain('#');
-    await waitFor(() => expect(pill).toHaveAttribute('title', 'Feature X'));
-    expect(window.logAPI.getCachedTask).toHaveBeenCalledWith('643749');
+    const id = screen.getByTestId('entry-task-id');
+    expect(id).toHaveTextContent('643749');
+    expect(id.textContent).not.toContain('#');
+    expect(await screen.findByText('Feature X')).toBeInTheDocument();
   });
 
-  it('Assign task on an id-less row opens the editor with the task field focused', async () => {
-    const { user } = renderRow(asMerged(makeEntry('adhoc', { taskId: null })));
-    await user.click(screen.getByRole('button', { name: 'Assign task' }));
-    const editor = screen.getByTestId('entry-editor');
-    expect(within(editor).getByPlaceholderText('Task ID')).toHaveFocus();
+  it('+ Assign task opens the picker; picking a recent task calls onAssignTask', async () => {
+    const { user, onAssignTask } = renderRow(asMerged(makeEntry('adhoc', { taskId: null })));
+    await user.click(screen.getByRole('button', { name: '+ Assign task' }));
+    expect(screen.getByLabelText('Find a task')).toHaveFocus();
+    const option = await screen.findByRole('option', { name: /555/ });
+    await user.pointer({ keys: '[MouseLeft>]', target: option });
+    expect(onAssignTask).toHaveBeenCalledWith('adhoc-1', '555');
+    expect(screen.queryByTestId('task-picker')).toBeNull();
   });
 
-  it('billable pill is pressed and toggles through onToggleBillable(id, false)', async () => {
+  it('a numeric id + Enter resolves through the cache', async () => {
+    window.logAPI.getCachedTask = vi.fn(async (id: string) => ({ task_id: id, title: 'Cached', project_id: 1, project_name: 'P', last_seen_at: '' }));
+    const { user, onAssignTask } = renderRow(asMerged(makeEntry('proposal')));
+    await user.click(screen.getByRole('button', { name: '+ Assign task' }));
+    await user.type(screen.getByLabelText('Find a task'), '777{Enter}');
+    await waitFor(() => expect(onAssignTask).toHaveBeenCalledWith('proposal-1', '777'));
+  });
+
+  it('Esc closes the picker without a write; the assigned task is a key that reopens it', async () => {
+    const { user, onAssignTask } = renderRow(openRow());
+    await user.click(screen.getByTestId('entry-task-id'));
+    expect(screen.getByTestId('task-picker')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByTestId('task-picker')).toBeNull();
+    expect(onAssignTask).not.toHaveBeenCalled();
+  });
+
+  it('the picker never prints # before an id', async () => {
+    const { user } = renderRow(openRow());
+    await user.click(screen.getByTestId('entry-task-id'));
+    await screen.findByRole('option', { name: /555/ });
+    expect(screen.getByTestId('task-picker').textContent).not.toContain('#');
+  });
+});
+
+describe('EntryRow — Comment and Billable', () => {
+  it('the comment input shows what Easy8 receives: the comment, else the title (R25)', () => {
+    renderRow(asMerged(makeEntry('calendar', { comment: null })));
+    expect(screen.getByLabelText('Comment')).toHaveValue('Daily standup');
+  });
+
+  it('Enter commits the edited comment; Esc reverts without a write', async () => {
+    const { user, onUpdate } = renderRow(openRow({ comment: 'Dev work', title: 'Dev work' }));
+    const input = screen.getByLabelText('Comment');
+    await user.clear(input);
+    await user.type(input, 'Refactor{Enter}');
+    expect(onUpdate).toHaveBeenCalledWith('pomodoro-1', { comment: 'Refactor' });
+    vi.mocked(onUpdate).mockClear();
+    await user.click(input);
+    await user.type(input, ' more');
+    await user.keyboard('{Escape}');
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(input).toHaveValue('Dev work');
+  });
+
+  it('Billable is a Yes / No key that toggles through onToggleBillable', async () => {
     const { user, onToggleBillable } = renderRow(openRow());
-    const pill = screen.getByRole('button', { name: 'Billable' });
-    expect(pill).toHaveAttribute('aria-pressed', 'true');
-    await user.click(pill);
+    const key = screen.getByRole('button', { name: 'Billable' });
+    expect(key).toHaveAttribute('aria-pressed', 'true');
+    expect(key).toHaveTextContent('Yes');
+    await user.click(key);
     expect(onToggleBillable).toHaveBeenCalledWith('pomodoro-1', false);
   });
 
-  it('logged row: Logged check, static billable label, no checkbox, no actions', () => {
-    const { row } = renderRow(asMerged(makeEntry('logged')));
-    expect(row).toHaveAttribute('data-kind', 'logged');
-    expect(screen.getByRole('img', { name: 'Logged' })).toBeInTheDocument();
-    expect(screen.queryByRole('checkbox')).toBeNull();
-    expect(screen.getByText('Billable')).not.toHaveAttribute('aria-pressed');
-    expect(screen.queryByRole('button', { name: /Edit|Move|Delete/ })).toBeNull();
+  it('a non-billable row reads No', () => {
+    renderRow(openRow({ billable: false }));
+    const key = screen.getByRole('button', { name: 'Billable' });
+    expect(key).toHaveAttribute('aria-pressed', 'false');
+    expect(key).toHaveTextContent('No');
+  });
+});
+
+describe('EntryRow — actions and errors', () => {
+  it('hover actions live in .row-actions: Move and Delete call back with the id', async () => {
+    const { user, onMove, onDelete, row } = renderRow(openRow());
+    expect(row.querySelector('.row-actions')).not.toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Move' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(onMove).toHaveBeenCalledWith('pomodoro-1');
+    expect(onDelete).toHaveBeenCalledWith('pomodoro-1');
   });
 
-  it('proposal row: tint, disabled checkbox, Accept / Dismiss callbacks, blue dot', async () => {
-    const { user, onAccept, onDismiss, row } = renderRow(asMerged(makeEntry('proposal')));
-    expect(row).toHaveAttribute('data-kind', 'proposal');
-    expect(row.className).toContain('bg-focus/[0.04]');
-    expect(screen.getByRole('checkbox', { name: 'Log this entry (needs accepting)' })).toBeDisabled();
-    expect(screen.getByTestId('entry-dot')).toHaveClass('bg-blue-400');
-    await user.click(screen.getByRole('button', { name: 'Accept' }));
+  it('a proposal offers Dismiss only (no Move)', async () => {
+    const { user, onDelete } = renderRow(asMerged(makeEntry('proposal')));
+    expect(screen.queryByRole('button', { name: 'Move' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Dismiss' }));
-    expect(onAccept).toHaveBeenCalledWith('proposal-1');
-    expect(onDismiss).toHaveBeenCalledWith('proposal-1');
-  });
-
-  it('proposal Assign task + Save calls onUpdate then onAssignTask(id, "123")', async () => {
-    const { user, onUpdate, onAssignTask } = renderRow(asMerged(makeEntry('proposal')));
-    await user.click(screen.getByRole('button', { name: 'Assign task' }));
-    await user.type(screen.getByPlaceholderText('Task ID'), '123');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(onUpdate).toHaveBeenCalledWith('proposal-1', expect.objectContaining({ title: 'KKS upsell call', durationMinutes: 60 }));
-    expect(vi.mocked(onUpdate).mock.calls[0][1]).not.toHaveProperty('taskId');
-    expect(onAssignTask).toHaveBeenCalledWith('proposal-1', '123');
-    expect(screen.queryByTestId('entry-editor')).toBeNull();
-  });
-
-  it('break row: emerald dot, muted, no checkbox, no billable, no actions', () => {
-    const { row } = renderRow(asMerged(makeEntry('break')));
-    expect(row).toHaveAttribute('data-kind', 'break');
-    expect(row).toHaveClass('text-txt-muted');
-    expect(screen.getByTestId('entry-dot')).toHaveClass('bg-break');
-    expect(screen.queryByRole('checkbox')).toBeNull();
-    expect(screen.queryByText(/billable/i)).toBeNull();
-    expect(screen.queryByRole('button')).toBeNull();
+    expect(onDelete).toHaveBeenCalledWith('proposal-1');
   });
 
   it('merged row shows the sessions badge and Delete carries the count', () => {
@@ -103,48 +225,6 @@ describe('EntryRow', () => {
     renderRow(asMerged(a, [a, b]));
     expect(screen.getByText('2 sessions')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete' })).toHaveAttribute('title', 'Delete all 2 sessions');
-  });
-
-  it('Edit → Save calls onUpdate with the five fields; hover actions live in .row-actions', async () => {
-    const { user, onUpdate, row } = renderRow(openRow());
-    expect(row.querySelector('.row-actions')).not.toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    const comment = screen.getByLabelText('Comment');
-    await user.clear(comment);
-    await user.type(comment, 'Refactor');
-    const duration = screen.getByLabelText('Duration');
-    await user.clear(duration);
-    await user.type(duration, '40');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(onUpdate).toHaveBeenCalledWith('pomodoro-1', {
-      taskId: '643749', title: 'Focus session', comment: 'Refactor', durationMinutes: 40, billable: true,
-    });
-  });
-
-  it('Cancel restores the entry and closes the editor', async () => {
-    const { user, onUpdate } = renderRow(openRow());
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    await user.type(screen.getByLabelText('Title'), ' extra');
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(onUpdate).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('entry-editor')).toBeNull();
-    expect(screen.getByText('Focus session')).toBeInTheDocument();
-  });
-
-  it('calendar row: selecting a task keeps the event title and copies it into an empty comment', async () => {
-    window.logAPI.getRecentTasks = vi.fn(async () => [
-      { task_id: '555', title: 'Sales task', project_id: 1, project_name: 'P', last_seen_at: '' },
-    ]);
-    const { user, onUpdate } = renderRow(asMerged(makeEntry('calendar', { comment: null })));
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    const taskInput = screen.getByPlaceholderText('Task ID');
-    await user.clear(taskInput);
-    await user.type(taskInput, '555');
-    await user.tab(); // blur resolves the id against the recents list
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(onUpdate).toHaveBeenCalledWith('calendar-1', expect.objectContaining({
-      taskId: '555', title: 'Daily standup', comment: 'Daily standup',
-    }));
   });
 
   it('renders the log error as an alert; 401 offers Open Settings', async () => {
@@ -160,10 +240,8 @@ describe('EntryRow', () => {
     expect(screen.queryByRole('button', { name: 'Open Settings' })).toBeNull();
   });
 
-  it('comment cell shows title · comment when the comment differs from the title', () => {
-    renderRow(openRow({ title: 'Feature X', comment: 'Dev work' }));
-    const row = screen.getByTestId('entry-row');
-    expect(row).toHaveTextContent('Feature X · Dev work');
-    expect(row.querySelector('[title="Feature X · Dev work"]')).not.toBeNull();
+  it('calendar rows keep the blue dot, focus rows the amber one', () => {
+    renderRow(asMerged(makeEntry('calendar')));
+    expect(screen.getByTestId('entry-dot')).toHaveClass('bg-blue-400');
   });
 });
