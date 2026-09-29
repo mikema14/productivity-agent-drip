@@ -11,7 +11,11 @@ import { useListsStore } from '../../stores/listsStore';
 import type { PomodoroSession } from '../../types';
 import { getCurrentDate } from '../../utils/time';
 
-vi.mock('./TimerDayTimeline', () => ({ default: () => <div>TimelineStub</div> }));
+// Keep the real exports (DAY_TARGET_MINUTES / DAY_BAR_SEGMENTS feed the running card's readouts).
+vi.mock('./TimerDayTimeline', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./TimerDayTimeline')>()),
+  default: () => <div>TimelineStub</div>,
+}));
 vi.mock('../Lists/TimerTaskList', () => ({ default: () => <div>TaskListStub</div> }));
 
 const today = getCurrentDate();
@@ -245,17 +249,66 @@ describe('Timer — active states', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 
-  it('running: calm single-column block — no start time, no session counter or squares, title from the cache', async () => {
+  it('running: calm block — no start time, no intention row or 01 Focus header, title from the cache', async () => {
     window.logAPI.getCachedTask = vi.fn(async () => makeTasks(1)[0]);
     setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(2026, 8, 25, 22, 22, 0), totalDuration: 900, remainingSeconds: 800, currentTaskId: '600001', intervalId: 1, sessionCount: 0 });
     await renderTimer();
     expect(screen.getByRole('region', { name: 'Focus' })).toHaveAttribute('data-layout', 'calm');
     expect(screen.queryByTestId('countdown-label')).toBeNull();
     expect(screen.queryByText(/22:22/)).toBeNull();
-    expect(screen.queryByText(/Session/)).toBeNull();
-    expect(screen.queryAllByTestId('session-square')).toHaveLength(0);
+    expect(screen.queryByText('01 Focus')).toBeNull();
+    expect(queryKey(/set intention/i)).toBeNull();
+    expect(screen.queryByTestId('continue-slot')).toBeNull();
     expect(screen.getByTestId('focus-header')).toHaveTextContent('Ends 22:37');
     expect(await screen.findByTestId('active-task-title')).toHaveTextContent('Task number 1');
+  });
+
+  it('running: readouts count today with the running session — focus / 6h bar, session number + squares, this task', async () => {
+    window.timerAPI.getSessions = vi.fn(async () => [
+      makeSession(0, { duration_minutes: 25 }),
+      makeSession(1, { duration_minutes: 50 }),
+      makeSession(2, { duration_minutes: 11, task_id: '662962' }),
+      makeSession(3, { duration_minutes: 5, source: 'break', task_id: null }),
+    ]);
+    // 10 minutes into the running session on 600001
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(Date.now() - 600_000), totalDuration: 1500, remainingSeconds: 900, currentTaskId: '600001', intervalId: 1 });
+    await renderTimer();
+    const readouts = await screen.findByTestId('focus-readouts');
+    await waitFor(() => expect(within(readouts).getByText(/^1h 36m/)).toBeInTheDocument());
+    const bar = within(readouts).getByTestId('day-bar');
+    expect(bar).toHaveAttribute('aria-label', '1 hour 36 minutes of 6 hours');
+    expect(bar.querySelectorAll('[data-filled]')).toHaveLength(3);
+    expect(within(readouts).getByTestId('session-number')).toHaveTextContent('04');
+    const squares = within(readouts).getAllByTestId('session-square');
+    expect(squares).toHaveLength(4);
+    expect(squares[3]).toHaveAttribute('data-current');
+    expect(squares.filter(q => q.hasAttribute('data-current'))).toHaveLength(1);
+    expect(within(readouts).getByTestId('task-readout')).toHaveTextContent('1h 25m · 3 sessions');
+  });
+
+  it('running with no task: no ON THIS TASK readout', async () => {
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1500, currentTaskId: null, intervalId: 1 });
+    await renderTimer();
+    expect(screen.getByTestId('session-number')).toHaveTextContent('01');
+    expect(screen.queryByTestId('task-readout')).toBeNull();
+  });
+
+  it('running: the INTENT line edits the session note in place — Enter saves, Escape reverts, empty shows the placeholder', async () => {
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, currentTaskId: '600001', intention: '', intervalId: 1 });
+    const { user } = await renderTimer();
+    const line = screen.getByTestId('intent-line');
+    expect(line).toHaveTextContent('Add an intent for this session');
+    await user.click(line);
+    await user.type(screen.getByRole('textbox', { name: 'Session intent' }), 'error preview{Enter}');
+    expect(useTimerStore.getState().intention).toBe('error preview');
+    expect(screen.getByTestId('intent-line')).toHaveTextContent('error preview');
+
+    await user.click(screen.getByTestId('intent-line'));
+    const input = screen.getByRole('textbox', { name: 'Session intent' });
+    await user.clear(input);
+    await user.type(input, 'something else{Escape}');
+    expect(useTimerStore.getState().intention).toBe('error preview');
+    expect(screen.queryByRole('textbox', { name: 'Session intent' })).toBeNull();
   });
 
   it('running: key set and variants — Pause light, Finish outline, +5 min text, Cancel text-danger', async () => {
@@ -491,26 +544,25 @@ describe('Timer — active states', () => {
     expect(key(/^pause$/i)).toHaveAttribute('data-variant', 'light');
   });
 
-  it('kickoff: calm layout with a 2-minute ruler and no session counter', async () => {
+  it('kickoff: calm layout with a 2-minute ruler, the running readouts and no /8 counter', async () => {
     setTimer({ status: 'focus', isPaused: false, kickoff: 'warmup', sessionStartTime: new Date(), totalDuration: 120, remainingSeconds: 100, intervalId: 1, durationMinutes: 25, sessionCount: 0 });
     await renderTimer();
     expect(screen.getByRole('region', { name: 'Focus' })).toHaveAttribute('data-layout', 'calm');
     expect(screen.queryByTestId('countdown-label')).toBeNull();
-    expect(screen.queryByText(/Session/)).toBeNull();
     expect(screen.queryByText('/8', { exact: false })).toBeNull();
-    expect(screen.queryAllByTestId('session-square')).toHaveLength(0);
+    expect(screen.getByTestId('session-number')).toHaveTextContent('01');
+    expect(screen.getAllByTestId('session-square')).toHaveLength(1);
     const labels = Array.from(screen.getByTestId('tick-ruler').querySelectorAll('[data-label]')).map(l => l.textContent);
     expect(labels).toEqual(['00', '01', '02']);
   });
 
-  it('running with an intention: EDIT stays available and opens SetIntentionModal (parity)', async () => {
+  it('running with an intention: the daily intention row is hidden while the card runs (Q16)', async () => {
     useIntentionsStore.setState({ intentions: new Map([[today, ['Ship the rail']]]) });
     window.dashboardAPI.getDailyIntentions = vi.fn(async () => ({ date: today, intentions: ['Ship the rail'] }));
     setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, intervalId: 1 });
-    const { user } = await renderTimer();
-    expect(screen.getByRole('group', { name: "Today's intention: Ship the rail" })).toBeInTheDocument();
-    await user.click(key(/^edit$/i));
-    expect(screen.getByText("Today's intentions")).toBeInTheDocument();
+    await renderTimer();
+    expect(screen.queryByRole('group', { name: "Today's intention: Ship the rail" })).toBeNull();
+    expect(queryKey(/^edit$/i)).toBeNull();
   });
 
   it('Set intention → type → Done saves it for the local day and the row shows it', async () => {
@@ -525,13 +577,11 @@ describe('Timer — active states', () => {
     expect(key(/^edit$/i)).toBeInTheDocument();
   });
 
-  it('paused with no intention: a compact SET INTENTION key sits in the row and opens the modal', async () => {
+  it('paused: no SET INTENTION key either; the card keeps its INTENT line (Q16)', async () => {
     setTimer({ status: 'focus', isPaused: true, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, intervalId: 1 });
-    const { user } = await renderTimer();
-    const set = key(/set intention/i);
-    expect(set).toHaveClass('h-7');
-    await user.click(set);
-    expect(screen.getByText("Today's intentions")).toBeInTheDocument();
+    await renderTimer();
+    expect(queryKey(/set intention/i)).toBeNull();
+    expect(screen.getByTestId('intent-line')).toBeInTheDocument();
   });
 
   it('break with an intention: the row shows it with EDIT, which opens the modal', async () => {
