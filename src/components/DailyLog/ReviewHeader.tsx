@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import CalendarPopover from './CalendarPopover';
-import { dateLabel, formatMinutesPadded, type DayStats } from './reviewLogic';
+import { dateLabel, formatMinutesPadded } from './reviewLogic';
 
 interface Props {
   /** Selected `YYYY-MM-DD`. */
@@ -12,7 +12,9 @@ interface Props {
   onSelectDate: (date: string) => void;
   onSync: () => void;
   isSyncing: boolean;
-  stats: DayStats;
+  /** Every work entry of the day (R24: always to log + logged). */
+  trackedMinutes: number;
+  billableMinutes: number;
 }
 
 const dragRegion = { WebkitAppRegion: 'drag' } as CSSProperties;
@@ -21,10 +23,11 @@ const noDrag = { WebkitAppRegion: 'no-drag' } as CSSProperties;
 const ICON_KEY = 'w-[26px] h-[26px] flex items-center justify-center rounded-[2px] text-txt-muted hover:text-txt-primary hover:bg-focus/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
 
 /**
- * 52px Review header (mockup Review.dc.html:44-58): `Review` + `‹ Fri 25 Sep ›`
- * with the month popover on the date, a sync key, and the day stats on the right.
+ * 52px Review header (mockup Review.dc.html): `Review` + `‹ Fri 25 Sep ›` with
+ * the month popover on the date and the sync key, `Xh tracked · Yh billable` on
+ * the right in small mono (the other counts live in the summary bar, R24).
  */
-export default function ReviewHeader({ date, today, onPrev, onNext, onSelectDate, onSync, isSyncing, stats }: Props) {
+export default function ReviewHeader({ date, today, onPrev, onNext, onSelectDate, onSync, isSyncing, trackedMinutes, billableMinutes }: Props) {
   const [showCalendar, setShowCalendar] = useState(false);
   const label = dateLabel(date, today);
 
@@ -78,19 +81,9 @@ export default function ReviewHeader({ date, today, onPrev, onNext, onSelectDate
         </div>
       </div>
 
-      <div className="flex items-center gap-[18px] font-display text-[12px] text-txt-muted whitespace-nowrap" style={noDrag} data-testid="review-stats">
-        <span><span className="font-mono text-txt-primary">{formatMinutesPadded(stats.trackedMinutes)}</span> tracked</span>
-        <span><span className="font-mono text-txt-primary">{formatMinutesPadded(stats.billableMinutes)}</span> billable</span>
-        {stats.markedCount > 0 && (
-          <span><span className="font-mono text-focus">{stats.markedCount}</span> to log</span>
-        )}
-        {stats.breakMinutes > 0 && (
-          <span><span className="font-mono text-break">{stats.breakMinutes}m</span> break</span>
-        )}
-        {stats.loggedCount > 0 && (
-          <span><span className="font-mono text-break">{stats.loggedCount}</span> logged</span>
-        )}
-      </div>
+      <span className="font-mono text-[11px] tracking-[1px] text-txt-muted whitespace-nowrap" style={noDrag} data-testid="review-stats">
+        <span className="text-txt-primary">{formatMinutesPadded(trackedMinutes)}</span> tracked · <span className="text-txt-primary">{formatMinutesPadded(billableMinutes)}</span> billable
+      </span>
     </header>
   );
 }

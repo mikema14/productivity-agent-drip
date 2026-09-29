@@ -1,23 +1,23 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import type { LogEntry } from '../../stores/logStore';
 import type { MergedEntry } from '../../utils/mergeEntries';
-import TaskIdInput from '../shared/TaskIdInput';
 import BillableToggle from '../shared/BillableToggle';
-import KeyButton from '../Timer/KeyButton';
-import { Pill } from '../shared/Pill';
-import { errorHint, rowModel } from './reviewLogic';
+import { useTaskName } from '../../hooks/useTaskName';
+import TaskPickerPopover from './TaskPickerPopover';
+import { errorHint, parseDuration, rowModel, sentComment } from './reviewLogic';
 
 export interface EntryRowProps {
   entry: MergedEntry;
   onUpdate: (id: string, changes: Partial<LogEntry>) => void;
+  /** Delete (open rows) or Dismiss (calendar rows; `deleteEntry` dismisses them). */
   onDelete: (id: string) => void;
   onToggleLog: (id: string) => void;
+  /** R30: checking an unaccepted proposal that has a task accepts it. */
   onAccept?: (id: string) => void;
-  onDismiss?: (id: string) => void;
   onMove?: (id: string) => void;
-  /** R8: saving a proposal with a task id accepts it with that id. */
+  /** R26 / R8: a task picked in the Task cell (a proposal is accepted with it). */
   onAssignTask?: (id: string, taskId: string) => void;
-  /** R7: the live Billable pill writes straight through. */
+  /** R7: the live Billable key writes straight through. */
   onToggleBillable?: (id: string, billable: boolean) => void;
   /** R18: last log error for this row (server message). */
   error?: string;
@@ -25,203 +25,225 @@ export interface EntryRowProps {
 }
 
 /**
- * Column template shared with the EntriesTable header: Time · Dur · Task · Comment · Billable · Log · actions.
- * The actions track is fixed at the width of the widest hover group (`Edit · Move · Delete`) so it never
- * overflows leftwards over the Log checkbox; Comment is the only track that gives way (and truncates).
+ * Column template shared with the EntriesTable header (mockup Review.dc.html):
+ * select · Time · Dur · Task · Comment → Easy8 · Billable · actions.
  */
-export const ROW_GRID = 'grid grid-cols-[52px_44px_150px_minmax(0,1fr)_84px_28px_132px] gap-3 px-4 items-center';
+export const ROW_GRID = 'grid grid-cols-[28px_52px_64px_minmax(140px,180px)_minmax(0,1fr)_76px_52px] gap-3 px-4 items-center';
 
-const INPUT = 'h-8 px-3 text-sm bg-transparent border border-drip-border rounded-[2px] text-txt-primary placeholder-txt-dim focus:outline-none focus:border-focus/40';
-const ACTION = 'h-6 px-1.5 rounded-[2px] font-display text-[11.5px] text-txt-muted hover:text-txt-primary hover:bg-focus/10 transition-colors';
+const CHECKBOX = 'w-4 h-4 m-0 accent-focus';
+const ICON_KEY = 'w-6 h-6 flex items-center justify-center rounded-[2px] text-txt-muted hover:text-txt-primary hover:bg-focus/10 transition-colors';
 
-/** Cached title for the id pill tooltip; cache only, never the API. */
-function useCachedTitle(taskId: string | null): string | null {
-  const [title, setTitle] = useState<string | null>(null);
+/** Dur: a key that becomes an input; `45m`, `1h10`, `1:10` … (R28). */
+function DurationCell({ minutes, text, editable, lockedTitle, onCommit }: {
+  minutes: number; text: string; editable: boolean; lockedTitle?: string; onCommit: (minutes: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [invalid, setInvalid] = useState(false);
+  // Closing unmounts the focused input; the ref keeps a trailing blur from committing twice (or after Esc)
+  const open = useRef(false);
+
+  const close = () => { open.current = false; setEditing(false); };
+  const commit = (closeOnInvalid: boolean) => {
+    if (!open.current) return;
+    const next = parseDuration(draft);
+    if (next === null) {
+      if (closeOnInvalid) close();
+      else setInvalid(true);
+      return;
+    }
+    close();
+    if (next !== minutes) onCommit(next);
+  };
+
+  if (!editable) {
+    return <span className="font-mono text-[12px]" title={lockedTitle}>{text}</span>;
+  }
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => { setDraft(text); setInvalid(false); open.current = true; setEditing(true); }}
+        aria-label={`Duration ${text}`}
+        title="Edit duration"
+        className="justify-self-start h-[30px] px-2 bg-drip-surface border border-drip-border rounded-[2px] font-mono text-[12px] text-txt-primary hover:border-focus/40 transition-colors whitespace-nowrap"
+      >
+        {text}
+      </button>
+    );
+  }
+  return (
+    <input
+      autoFocus
+      aria-label="Duration"
+      aria-invalid={invalid}
+      value={draft}
+      onChange={e => { setDraft(e.target.value); setInvalid(false); }}
+      onFocus={e => e.currentTarget.select()}
+      onBlur={() => commit(true)}
+      onKeyDown={e => {
+        if (e.key === 'Enter') { e.preventDefault(); commit(false); }
+        else if (e.key === 'Escape') { e.preventDefault(); close(); }
+      }}
+      title="45m, 1h10, 1:10"
+      className={`w-full h-[30px] px-2 bg-drip-surface border rounded-[2px] font-mono text-[12px] text-txt-primary focus:outline-none ${
+        invalid ? 'border-alert' : 'border-focus/40'
+      }`}
+    />
+  );
+}
+
+/** Comment → Easy8: shows exactly what is sent; commits on blur / Enter, Esc reverts (R25). */
+function CommentInput({ value, onCommit }: { value: string; onCommit: (comment: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  const focused = useRef(false);
+  const skipCommit = useRef(false);
+
   useEffect(() => {
-    let alive = true;
-    setTitle(null);
-    if (!taskId) return;
-    window.logAPI.getCachedTask?.(taskId)
-      .then(task => { if (alive && task) setTitle(task.title); })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, [taskId]);
-  return title;
+    if (!focused.current) setDraft(value);
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      aria-label="Comment"
+      value={draft}
+      placeholder="Comment for Easy8"
+      onChange={e => setDraft(e.target.value)}
+      onFocus={() => { focused.current = true; }}
+      onBlur={() => {
+        focused.current = false;
+        if (skipCommit.current) { skipCommit.current = false; setDraft(value); return; }
+        const next = draft.trim();
+        if (next !== value) onCommit(next);
+      }}
+      onKeyDown={e => {
+        if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+        else if (e.key === 'Escape') { e.preventDefault(); skipCommit.current = true; e.currentTarget.blur(); }
+      }}
+      className="min-w-0 w-full h-[34px] px-2.5 bg-transparent border border-drip-border rounded-[2px] font-display text-sm text-txt-primary placeholder-txt-dim focus:outline-none focus:border-focus/40 transition-colors"
+    />
+  );
 }
 
 /**
- * One 48px Review row (mockup Review.dc.html:108-151): time · dur · dot + id ·
- * comment · Billable pill · log checkbox, hover actions in a 7th column, and
- * the inline editor of the old EntryRow when editing.
+ * One 56px Review row (mockup Review.dc.html): select · time · Dur key ·
+ * task id + name (or `+ Assign task`) · the comment Easy8 receives · Billable
+ * Yes/No · hover Move / Delete. Every field is edited in place (R25–R28).
  */
 function EntryRow(props: EntryRowProps) {
-  const { entry, onUpdate, onDelete, onToggleLog, onAccept, onDismiss, onMove, onAssignTask, onToggleBillable, error, onOpenSettings } = props;
-  const [isEditing, setIsEditing] = useState(false);
-  const [focusTask, setFocusTask] = useState(false);
-  const [editedEntry, setEditedEntry] = useState<MergedEntry>(entry);
-  const editorRef = useRef<HTMLDivElement>(null);
+  const { entry, onUpdate, onDelete, onToggleLog, onAccept, onMove, onAssignTask, onToggleBillable, error, onOpenSettings } = props;
+  const [pickerOpen, setPickerOpen] = useState(false);
   const model = rowModel(entry);
-  const cachedTitle = useCachedTitle(entry.taskId);
+  const taskName = useTaskName(entry.taskId);
 
-  // Keep the edit buffer in sync with the latest entry prop. The row is memo-ized
-  // and persists across reloads, so without this the buffer would be a stale
-  // mount-time snapshot and Save could revert fields (e.g. billable) to old values.
-  useEffect(() => {
-    if (!isEditing) setEditedEntry(entry);
-  }, [entry, isEditing]);
-
-  // `Assign task` opens the editor with the task field focused (R8)
-  useEffect(() => {
-    if (isEditing && focusTask) {
-      editorRef.current?.querySelector<HTMLInputElement>('input')?.focus();
-      setFocusTask(false);
-    }
-  }, [isEditing, focusTask]);
-
-  const handleTaskSelect = (taskId: string, title: string) => {
-    if (entry.type === 'calendar') {
-      // Keep original event name; copy it to comment if comment is empty
-      setEditedEntry(prev => ({ ...prev, taskId, comment: prev.comment || prev.title }));
-    } else {
-      setEditedEntry(prev => ({ ...prev, taskId, title }));
-    }
-  };
-
-  const handleSave = () => {
-    const taskId = editedEntry.taskId?.trim() || null;
-    if (entry.isProposal && taskId && onAssignTask) {
-      // R8: accept + assign in one; the other fields go through the normal update first
-      onUpdate(entry.id, {
-        title: editedEntry.title,
-        comment: editedEntry.comment,
-        durationMinutes: editedEntry.durationMinutes,
-        billable: editedEntry.billable,
-      });
-      onAssignTask(entry.id, taskId);
-    } else {
-      onUpdate(entry.id, {
-        taskId,
-        title: editedEntry.title,
-        comment: editedEntry.comment,
-        durationMinutes: editedEntry.durationMinutes,
-        billable: editedEntry.billable,
-      });
-    }
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditedEntry(entry);
-    setIsEditing(false);
-  };
-
-  const openEditor = (focusTaskField = false) => {
-    setFocusTask(focusTaskField);
-    setIsEditing(true);
-  };
-
-  const isBreak = model.kind === 'break';
   const isLogged = model.kind === 'logged';
   const isProposal = model.kind === 'proposal';
-  const muted = isBreak || isLogged;
-  const canAssign = !entry.taskId && (model.kind === 'open' || isProposal);
+  const needsTask = !entry.taskId && !isLogged;
+  const isCalendar = entry.type === 'calendar';
 
   const dot = <span data-testid="entry-dot" className={`w-1.5 h-1.5 rounded-full shrink-0 ${model.dotClass}`} />;
 
-  const editor = isEditing && (
-    <div ref={editorRef} data-testid="entry-editor" className="px-4 py-3 bg-focus/5 border-y border-focus/20 flex flex-col gap-2">
-      <div className="flex gap-2">
-        <div className="w-36">
-          <TaskIdInput
-            value={editedEntry.taskId || ''}
-            onChange={(value) => setEditedEntry(prev => ({ ...prev, taskId: value }))}
-            onTaskSelect={handleTaskSelect}
-            placeholder="Task ID"
-          />
-        </div>
-        <input
-          type="text"
-          value={editedEntry.title}
-          onChange={(e) => setEditedEntry(prev => ({ ...prev, title: e.target.value }))}
-          placeholder="Title"
-          aria-label="Title"
-          className={`flex-1 ${INPUT}`}
-        />
-        <input
-          type="number"
-          value={editedEntry.durationMinutes}
-          onChange={(e) => setEditedEntry(prev => ({ ...prev, durationMinutes: parseInt(e.target.value) || 0 }))}
-          min="1"
-          placeholder="Duration"
-          aria-label="Duration"
-          className={`w-24 ${INPUT}`}
-        />
-      </div>
-      <div className="flex gap-2 items-center">
-        <input
-          type="text"
-          value={editedEntry.comment || ''}
-          onChange={(e) => setEditedEntry(prev => ({ ...prev, comment: e.target.value }))}
-          placeholder="Comment"
-          aria-label="Comment"
-          className={`flex-1 ${INPUT}`}
-        />
-        <BillableToggle
-          size="sm"
-          checked={editedEntry.billable ?? true}
-          onChange={(v) => setEditedEntry(prev => ({ ...prev, billable: v }))}
-        />
-        <KeyButton variant="amber" size="sm" onClick={handleSave}>Save</KeyButton>
-        <KeyButton variant="ghost" size="sm" onClick={handleCancel}>Cancel</KeyButton>
-      </div>
-    </div>
-  );
+  let select;
+  if (isLogged) {
+    select = (
+      <span className="text-break" aria-label="Logged" title="Logged to Easy8" role="img">
+        <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 6.2l2.3 2.3 4.7-5" /></svg>
+      </span>
+    );
+  } else if (needsTask) {
+    select = <input type="checkbox" disabled checked={false} readOnly aria-label="Log this entry (needs a task)" title="Needs a task" className={`${CHECKBOX} opacity-40`} />;
+  } else if (isProposal) {
+    select = (
+      <input
+        type="checkbox"
+        checked={false}
+        onChange={() => onAccept?.(entry.id)}
+        aria-label="Accept and log this entry"
+        title="Calendar event: checking accepts it"
+        className={`${CHECKBOX} cursor-pointer`}
+      />
+    );
+  } else {
+    select = (
+      <input
+        type="checkbox"
+        checked={entry.markedToLog}
+        onChange={() => onToggleLog(entry.id)}
+        aria-label="Log this entry"
+        className={`${CHECKBOX} cursor-pointer`}
+      />
+    );
+  }
+
+  const pick = (taskId: string) => {
+    setPickerOpen(false);
+    if (taskId !== entry.taskId) onAssignTask?.(entry.id, taskId);
+  };
+
+  let task;
+  if (entry.taskId) {
+    const content = (
+      <>
+        <span data-testid="entry-task-id" className={`font-mono text-[12px] ${isLogged ? 'text-txt-muted' : 'text-focus'}`}>{entry.taskId}</span>
+        <span className="font-display text-[12px] text-txt-muted truncate">{taskName ?? ' '}</span>
+      </>
+    );
+    task = isLogged ? (
+      <span className="flex flex-col gap-0.5 min-w-0" title={taskName ?? undefined}>{content}</span>
+    ) : (
+      <button type="button" onClick={() => setPickerOpen(v => !v)} title={taskName ? `${taskName} · change task` : 'Change task'} className="flex flex-col gap-0.5 min-w-0 text-left">
+        {content}
+      </button>
+    );
+  } else {
+    task = (
+      <button
+        type="button"
+        onClick={() => setPickerOpen(v => !v)}
+        className="justify-self-start h-8 px-3 border border-dashed border-focus/60 rounded-[2px] font-mono text-[10.5px] font-medium tracking-[1.2px] uppercase text-focus hover:bg-focus/10 transition-colors whitespace-nowrap"
+      >
+        + Assign task
+      </button>
+    );
+  }
 
   const hint = error ? errorHint(error) : null;
+  const deleteLabel = isCalendar ? 'Dismiss' : 'Delete';
 
   return (
     <div
       data-testid="entry-row"
       data-kind={model.kind}
-      className={`group border-b border-drip-elevated ${isProposal ? 'bg-focus/[0.04]' : ''} ${muted ? 'text-txt-muted' : 'text-txt-primary'} ${isEditing ? '' : 'hover:bg-focus/[0.03]'}`}
+      className={`group border-b border-drip-elevated ${needsTask ? 'bg-focus/[0.05]' : 'hover:bg-focus/[0.03]'} ${isLogged ? 'text-txt-muted opacity-70' : 'text-txt-primary'}`}
     >
-      <div className={`${ROW_GRID} min-h-[48px]`}>
-        {/* Time */}
-        <span className={`font-mono text-[12px] ${entry.startTime ? 'text-txt-secondary' : 'text-txt-dim'}`}>{model.timeText}</span>
+      <div className={`${ROW_GRID} min-h-[56px]`}>
+        <span className="flex items-center">{select}</span>
 
-        {/* Dur */}
-        <span className="font-mono text-[12px]">{model.durText}</span>
-
-        {/* Task */}
-        <span className="flex items-center gap-1.5 min-w-0">
+        <span className="flex items-center gap-1.5">
           {dot}
-          {entry.taskId ? (
-            <span
-              data-testid="entry-task-id"
-              title={cachedTitle ?? undefined}
-              className={`font-mono text-[12px] truncate ${isLogged ? 'text-txt-muted' : 'text-focus'}`}
-            >
-              {entry.taskId}
-            </span>
-          ) : canAssign ? (
-            <button
-              type="button"
-              onClick={() => openEditor(true)}
-              className="h-6 px-2 border border-dashed border-focus/45 rounded-[2px] font-display text-[12px] text-focus hover:bg-focus/10 transition-colors whitespace-nowrap"
-            >
-              Assign task
-            </button>
-          ) : !isBreak ? (
-            <span className="font-display text-[11.5px] text-txt-dim">No task</span>
-          ) : null}
+          <span className={`font-mono text-[12px] ${entry.startTime ? 'text-txt-secondary' : 'text-txt-dim'}`}>{model.timeText}</span>
         </span>
 
-        {/* Comment */}
-        <span className="min-w-0 flex items-center gap-2" title={model.secondaryText ? `${model.primaryText} · ${model.secondaryText}` : model.primaryText}>
-          <span className="font-display text-[13.5px] truncate">
-            {model.primaryText}
-            {model.secondaryText && <span className="text-txt-muted"> · {model.secondaryText}</span>}
-          </span>
+        <DurationCell
+          minutes={entry.durationMinutes}
+          text={model.durText}
+          editable={!isLogged && !entry.isMerged}
+          lockedTitle={entry.isMerged ? 'Ungroup to edit' : undefined}
+          onCommit={durationMinutes => onUpdate(entry.id, { durationMinutes })}
+        />
+
+        <span className="relative flex min-w-0">
+          {task}
+          {pickerOpen && <TaskPickerPopover onPick={pick} onClose={() => setPickerOpen(false)} />}
+        </span>
+
+        <span className="min-w-0 flex items-center gap-2">
+          {isLogged ? (
+            <span className="font-display text-[13.5px] truncate" title={sentComment(entry)}>{sentComment(entry)}</span>
+          ) : (
+            <CommentInput value={sentComment(entry)} onCommit={comment => onUpdate(entry.id, { comment })} />
+          )}
           {entry.isMerged && (
             <span className="shrink-0 font-mono text-[10.5px] text-txt-muted border border-drip-border rounded-[2px] px-1.5 leading-4">
               {entry.sourceCount} sessions
@@ -229,68 +251,37 @@ function EntryRow(props: EntryRowProps) {
           )}
         </span>
 
-        {/* Billable */}
         <span className="justify-self-start">
-          {model.billableInteractive ? (
-            <Pill
-              pressed={model.billable}
-              onClick={() => onToggleBillable?.(entry.id, !model.billable)}
-              aria-label="Billable"
-              title={model.billable ? 'Billable' : 'Not billable'}
-              className="h-[22px] px-2 text-[11.5px] rounded-full"
-            >
-              Billable
-            </Pill>
-          ) : !isBreak ? (
-            <span className="font-display text-[11.5px] text-txt-muted">{model.billable ? 'Billable' : 'Not billable'}</span>
-          ) : null}
-        </span>
-
-        {/* Log */}
-        <span className="flex items-center justify-center">
           {isLogged ? (
-            <span className="text-break" aria-label="Logged" title="Logged to Easy Project" role="img">
-              <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 6.2l2.3 2.3 4.7-5" /></svg>
-            </span>
-          ) : isProposal ? (
-            <input type="checkbox" disabled aria-label="Log this entry (needs accepting)" className="w-4 h-4 accent-focus opacity-40" />
-          ) : model.canToggle ? (
-            <input
-              type="checkbox"
-              checked={entry.markedToLog}
-              onChange={(e) => { e.stopPropagation(); onToggleLog(entry.id); }}
-              aria-label="Log this entry"
-              className="w-4 h-4 cursor-pointer accent-focus"
-            />
-          ) : null}
+            <span className="font-mono text-[10.5px] tracking-[1px] uppercase">{model.billable ? 'Yes' : 'No'}</span>
+          ) : (
+            <BillableToggle variant="yesno" checked={model.billable} onChange={v => onToggleBillable?.(entry.id, v)} />
+          )}
         </span>
 
-        {/* Actions (hover / focus-within) */}
-        <span className="row-actions flex items-center justify-end gap-0.5 whitespace-nowrap">
-          {isProposal && onAccept && onDismiss && (
+        <span className="row-actions flex items-center justify-end gap-1">
+          {!isLogged && (
             <>
-              <button type="button" onClick={() => onAccept(entry.id)} className={`${ACTION} text-break hover:text-break`}>Accept</button>
-              <button type="button" onClick={() => onDismiss(entry.id)} className={ACTION}>Dismiss</button>
-            </>
-          )}
-          {model.kind === 'open' && !isEditing && (
-            <>
-              <button type="button" onClick={() => openEditor(false)} className={ACTION}>Edit</button>
-              {onMove && <button type="button" onClick={() => onMove(entry.id)} className={ACTION}>Move</button>}
+              {!isProposal && onMove && (
+                <button type="button" onClick={() => onMove(entry.id)} aria-label="Move" title="Move to another day" className={ICON_KEY}>
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="3" width="12" height="11" rx="1" /><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" />
+                  </svg>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => onDelete(entry.id)}
-                className={`${ACTION} hover:text-alert`}
-                title={entry.isMerged ? `Delete all ${entry.sourceCount} sessions` : 'Delete this entry'}
+                aria-label={deleteLabel}
+                title={entry.isMerged ? `Delete all ${entry.sourceCount} sessions` : isCalendar ? 'Dismiss this event' : 'Delete this entry'}
+                className={`${ICON_KEY} hover:text-alert`}
               >
-                Delete
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 3l6 6M9 3l-6 6" /></svg>
               </button>
             </>
           )}
         </span>
       </div>
-
-      {editor}
 
       {error && (
         <div role="alert" className="h-6 px-4 flex items-center gap-3 font-display text-[11.5px] text-alert">
@@ -321,6 +312,7 @@ export default memo(EntryRow, (prev, next) =>
   prev.entry.sourceCount     === next.entry.sourceCount &&
   prev.error                 === next.error &&
   prev.onMove                === next.onMove &&
+  prev.onAccept              === next.onAccept &&
   prev.onAssignTask          === next.onAssignTask &&
   prev.onToggleBillable      === next.onToggleBillable &&
   prev.onOpenSettings        === next.onOpenSettings

@@ -5,9 +5,9 @@ import { formatMinutes } from '../../utils/time';
 import { DAY_TARGET_MINUTES } from '../Timer/TimerDayTimeline';
 
 /**
- * Pure logic behind the Review screen (PHASE3_PLAN.md §3.3). No React, no
- * store: the header stats, the footer summary, the date arithmetic and every
- * per-row display rule live here so they can be tested without JSX.
+ * Pure logic behind the Review screen (PHASE3_PLAN.md §3.3, §9 R22–R33). No
+ * React, no store: every count, the filters, duration parsing, the date
+ * arithmetic and the per-row display rules live here, testable without JSX.
  */
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -62,61 +62,6 @@ export function nextWorkday(date: string): string {
 /** `Mon 28 Sep` for the aside heading. */
 export function tomorrowLabel(date: string): string {
   return shortDate(nextWorkday(date));
-}
-
-export interface DayStats {
-  trackedMinutes: number;
-  billableMinutes: number;
-  breakMinutes: number;
-  markedCount: number;
-  loggedCount: number;
-  toggleableCount: number;
-  allSelected: boolean;
-}
-
-/**
- * Header stats over the rows on screen (merged or flat). `tracked` is the old
- * Daily Log `Total:` verbatim (every non-break row, including unaccepted
- * calendar proposals, which `loadDay` lists). `billable` is new in the
- * redesign and never counts an unaccepted proposal: nothing is billable
- * until it is accepted.
- */
-export function dayStats(entries: MergedEntry[]): DayStats {
-  const work = entries.filter(e => e.source !== 'break');
-  const breaks = entries.filter(e => e.source === 'break');
-  const trackedMinutes = work.reduce((sum, e) => sum + e.durationMinutes, 0);
-  const billableMinutes = work
-    .filter(e => !e.isProposal && e.billable !== false)
-    .reduce((sum, e) => sum + e.durationMinutes, 0);
-  const breakMinutes = breaks.reduce((sum, e) => sum + e.durationMinutes, 0);
-  const markedCount = entries.filter(e => e.markedToLog && !e.logged).length;
-  const loggedCount = entries.filter(e => e.logged).length;
-  const toggleableCount = entries.filter(e => !e.logged && !e.isProposal && e.source !== 'break').length;
-  return {
-    trackedMinutes,
-    billableMinutes,
-    breakMinutes,
-    markedCount,
-    loggedCount,
-    toggleableCount,
-    allSelected: toggleableCount > 0 && markedCount === toggleableCount,
-  };
-}
-
-export interface SelectionSummary {
-  selectedCount: number;
-  selectedMinutes: number;
-  needsTaskCount: number;
-}
-
-/** Footer summary: what `logSelected` would send (`markedToLog && !logged && !break`), and how many lack an id (R9). */
-export function selectionSummary(entries: MergedEntry[]): SelectionSummary {
-  const selected = entries.filter(e => e.markedToLog && !e.logged && e.source !== 'break');
-  return {
-    selectedCount: selected.length,
-    selectedMinutes: selected.reduce((sum, e) => sum + e.durationMinutes, 0),
-    needsTaskCount: selected.filter(e => !e.taskId).length,
-  };
 }
 
 export { isLoggable };
@@ -234,15 +179,6 @@ export interface RowModel {
   dotClass: string;
   timeText: string;
   durText: string;
-  primaryText: string;
-  /** Comment when it differs from the title (R5); null otherwise. */
-  secondaryText: string | null;
-  canToggle: boolean;
-  canEdit: boolean;
-  canMove: boolean;
-  canDelete: boolean;
-  canAcceptDismiss: boolean;
-  billableInteractive: boolean;
   /** Effective billable flag (undefined reads as billable, as logging does). */
   billable: boolean;
 }
@@ -255,27 +191,14 @@ export function formatTimeOfDay(iso: string | null): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-/** Every display rule of the old EntryRow (`:151-284`) and the mockup row, in one place. */
+/** The display rules every Review row shares (time, duration, dot, kind). */
 export function rowModel(entry: MergedEntry | LogEntry): RowModel {
   const isBreak = entry.source === 'break';
-  const kind: RowKind = isBreak ? 'break' : entry.isProposal ? 'proposal' : entry.logged ? 'logged' : 'open';
-  const dotClass = isBreak ? 'bg-break' : entry.type === 'calendar' ? 'bg-blue-400' : 'bg-focus';
-  const comment = entry.comment?.trim() || '';
-  const primaryText = isBreak ? 'Break' : entry.title;
-  const secondaryText = !isBreak && comment && comment !== entry.title ? comment : null;
   return {
-    kind,
-    dotClass,
+    kind: isBreak ? 'break' : entry.isProposal ? 'proposal' : entry.logged ? 'logged' : 'open',
+    dotClass: isBreak ? 'bg-break' : entry.type === 'calendar' ? 'bg-blue-400' : 'bg-focus',
     timeText: formatTimeOfDay(entry.startTime),
     durText: formatMinutes(entry.durationMinutes),
-    primaryText,
-    secondaryText,
-    canToggle: kind === 'open',
-    canEdit: kind === 'open',
-    canMove: kind === 'open',
-    canDelete: kind === 'open',
-    canAcceptDismiss: kind === 'proposal',
-    billableInteractive: kind === 'open' || kind === 'proposal',
     billable: entry.billable !== false,
   };
 }

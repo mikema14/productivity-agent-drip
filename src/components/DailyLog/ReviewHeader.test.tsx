@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ReviewHeader from './ReviewHeader';
-import type { DayStats } from './reviewLogic';
 
 vi.mock('./CalendarPopover', () => ({
   default: ({ onSelectDate, onClose }: { onSelectDate: (d: string) => void; onClose: () => void }) => (
@@ -13,11 +12,10 @@ vi.mock('./CalendarPopover', () => ({
   ),
 }));
 
-const stats: DayStats = { trackedMinutes: 340, billableMinutes: 265, breakMinutes: 0, markedCount: 3, loggedCount: 0, toggleableCount: 4, allSelected: false };
 
 function renderHeader(overrides: Partial<React.ComponentProps<typeof ReviewHeader>> = {}) {
   const props = {
-    date: '2026-09-25', today: '2026-09-25', onPrev: vi.fn(), onNext: vi.fn(), onSelectDate: vi.fn(), onSync: vi.fn(), isSyncing: false, stats, ...overrides,
+    date: '2026-09-25', today: '2026-09-25', onPrev: vi.fn(), onNext: vi.fn(), onSelectDate: vi.fn(), onSync: vi.fn(), isSyncing: false, trackedMinutes: 340, billableMinutes: 265, ...overrides,
   };
   render(<ReviewHeader {...props} />);
   return { ...props, user: userEvent.setup() };
@@ -67,21 +65,16 @@ describe('ReviewHeader', () => {
     expect(screen.getByTestId('sync-icon')).toHaveClass('animate-spin');
   });
 
-  it('renders tracked · billable · to log, and break / logged only when > 0', () => {
+  it('renders only `tracked · billable` in mono on the right (R24)', () => {
     renderHeader();
     const s = screen.getByTestId('review-stats');
-    expect(s).toHaveTextContent('5h 40m tracked');
-    expect(s).toHaveTextContent('4h 25m billable');
-    expect(s).toHaveTextContent('3 to log');
-    expect(s).not.toHaveTextContent('break');
-    expect(s).not.toHaveTextContent('logged');
+    expect(s).toHaveTextContent('5h 40m tracked · 4h 25m billable');
+    expect(s).toHaveClass('font-mono');
+    expect(s).not.toHaveTextContent(/to log|break|logged/);
   });
 
-  it('appends break and logged counts when present, omits to log at 0', () => {
-    renderHeader({ stats: { ...stats, markedCount: 0, breakMinutes: 15, loggedCount: 2 } });
-    const s = screen.getByTestId('review-stats');
-    expect(s).not.toHaveTextContent('to log');
-    expect(s).toHaveTextContent('15m break');
-    expect(s).toHaveTextContent('2 logged');
+  it('zero minutes read `0m`', () => {
+    renderHeader({ trackedMinutes: 0, billableMinutes: 0 });
+    expect(screen.getByTestId('review-stats')).toHaveTextContent('0m tracked · 0m billable');
   });
 });

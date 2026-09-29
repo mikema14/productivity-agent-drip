@@ -1,59 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
-  buildEPLink, carriedDays, dateLabel, dayStats, errorHint, filterEntries, formatMinutesPadded, formatTimeOfDay, isLoggable,
-  logSummary, nextWorkday, parseDuration, rowModel, selectionSummary, sentComment, shiftDate, tomorrowCalendar, tomorrowLabel,
+  buildEPLink, carriedDays, dateLabel, errorHint, filterEntries, formatMinutesPadded, formatTimeOfDay, isLoggable,
+  logSummary, nextWorkday, parseDuration, rowModel, sentComment, shiftDate, tomorrowCalendar, tomorrowLabel,
 } from './reviewLogic';
 import { DAY_TARGET_MINUTES } from '../Timer/TimerDayTimeline';
 import { makeEntry, asMerged, FIXTURE_DATE } from '../../test/logFixtures';
 import type { CalendarProposal } from '../../types';
-
-const rows = (...list: ReturnType<typeof makeEntry>[]) => list.map(e => asMerged(e));
-
-describe('reviewLogic.dayStats', () => {
-  it('excludes breaks from tracked, sums billable over rows not marked false, counts marks and logged', () => {
-    const stats = dayStats(rows(
-      makeEntry('pomodoro', { id: 'a', durationMinutes: 25 }),
-      makeEntry('adhoc', { id: 'b', durationMinutes: 30, billable: false }),
-      makeEntry('calendar', { id: 'c', durationMinutes: 60, billable: undefined }),
-      makeEntry('break', { id: 'd', durationMinutes: 5 }),
-      makeEntry('logged', { id: 'e', durationMinutes: 15 }),
-      makeEntry('proposal', { id: 'f', durationMinutes: 45 }),
-    ));
-    expect(stats.trackedMinutes).toBe(25 + 30 + 60 + 15 + 45);
-    expect(stats.billableMinutes).toBe(25 + 60 + 15);
-    expect(stats.breakMinutes).toBe(5);
-    expect(stats.markedCount).toBe(3);
-    expect(stats.loggedCount).toBe(1);
-    expect(stats.toggleableCount).toBe(3);
-    expect(stats.allSelected).toBe(true);
-  });
-
-  it('an unaccepted proposal counts as tracked (old Daily Log total parity) but never as billable', () => {
-    const stats = dayStats(rows(makeEntry('proposal', { id: 'p', durationMinutes: 510, billable: true })));
-    expect(stats.trackedMinutes).toBe(510);
-    expect(stats.billableMinutes).toBe(0);
-    const accepted = dayStats(rows(makeEntry('calendar', { id: 'c', durationMinutes: 510, billable: true })));
-    expect(accepted.billableMinutes).toBe(510);
-  });
-
-  it('allSelected is false with no toggleable rows or with an unmarked one', () => {
-    expect(dayStats([]).allSelected).toBe(false);
-    expect(dayStats(rows(makeEntry('pomodoro', { markedToLog: false }))).allSelected).toBe(false);
-  });
-});
-
-describe('reviewLogic.selectionSummary', () => {
-  it('counts marked unlogged non-break rows and those without a task', () => {
-    const s = selectionSummary(rows(
-      makeEntry('pomodoro', { id: 'a', durationMinutes: 25 }),
-      makeEntry('adhoc', { id: 'b', durationMinutes: 80, taskId: null }),
-      makeEntry('pomodoro', { id: 'c', markedToLog: false, taskId: null }),
-      makeEntry('logged', { id: 'd', markedToLog: true }),
-      makeEntry('break', { id: 'e', markedToLog: true }),
-    ));
-    expect(s).toEqual({ selectedCount: 2, selectedMinutes: 105, needsTaskCount: 1 });
-  });
-});
 
 describe('reviewLogic.logSummary', () => {
   const day = [
@@ -190,34 +142,21 @@ describe('reviewLogic.tomorrowCalendar', () => {
 });
 
 describe('reviewLogic.rowModel', () => {
-  it('open pomodoro row: amber dot, every capability, comment hidden when equal to the title', () => {
-    const m = rowModel(asMerged(makeEntry('pomodoro', { startTime: `${FIXTURE_DATE}T09:05:00`, durationMinutes: 85 })));
-    expect(m).toMatchObject({
-      kind: 'open', dotClass: 'bg-focus', timeText: '09:05', durText: '1h 25m', primaryText: 'Focus session', secondaryText: null,
-      canToggle: true, canEdit: true, canMove: true, canDelete: true, canAcceptDismiss: false, billableInteractive: true, billable: true,
+  it('open pomodoro row: amber dot, local time, compact duration', () => {
+    expect(rowModel(asMerged(makeEntry('pomodoro', { startTime: `${FIXTURE_DATE}T09:05:00`, durationMinutes: 85 })))).toEqual({
+      kind: 'open', dotClass: 'bg-focus', timeText: '09:05', durText: '1h 25m', billable: true,
     });
   });
 
-  it('shows the comment as secondary text only when it differs from the title (R5)', () => {
-    expect(rowModel(asMerged(makeEntry('adhoc', { title: 'Call', comment: 'Follow-up notes' }))).secondaryText).toBe('Follow-up notes');
-    expect(rowModel(asMerged(makeEntry('adhoc', { title: 'Call', comment: '   ' }))).secondaryText).toBeNull();
-    expect(rowModel(asMerged(makeEntry('adhoc', { title: 'Call', comment: null }))).secondaryText).toBeNull();
-  });
-
-  it('calendar rows use the blue dot; proposals expose Accept / Dismiss and no toggle / edit', () => {
+  it('calendar rows use the blue dot; kinds follow proposal / logged / break', () => {
     expect(rowModel(asMerged(makeEntry('calendar'))).dotClass).toBe('bg-blue-400');
-    const p = rowModel(asMerged(makeEntry('proposal')));
-    expect(p).toMatchObject({ kind: 'proposal', canToggle: false, canEdit: false, canMove: false, canDelete: false, canAcceptDismiss: true, billableInteractive: true });
+    expect(rowModel(asMerged(makeEntry('proposal'))).kind).toBe('proposal');
+    expect(rowModel(asMerged(makeEntry('logged', { billable: false })))).toMatchObject({ kind: 'logged', billable: false });
+    expect(rowModel(asMerged(makeEntry('break', { startTime: null })))).toMatchObject({ kind: 'break', dotClass: 'bg-break', timeText: '--:--', durText: '5m' });
   });
 
-  it('logged rows are read-only with a static billable state', () => {
-    const l = rowModel(asMerged(makeEntry('logged', { billable: false })));
-    expect(l).toMatchObject({ kind: 'logged', canToggle: false, canEdit: false, canMove: false, canDelete: false, billableInteractive: false, billable: false });
-  });
-
-  it('break rows: emerald dot, `Break` text, unscheduled time when missing, no capabilities', () => {
-    const b = rowModel(asMerged(makeEntry('break', { startTime: null })));
-    expect(b).toMatchObject({ kind: 'break', dotClass: 'bg-break', timeText: '--:--', durText: '5m', primaryText: 'Break', secondaryText: null, canToggle: false, canEdit: false, canDelete: false, billableInteractive: false });
+  it('undefined billable reads as billable, as logging does', () => {
+    expect(rowModel(asMerged(makeEntry('calendar', { billable: undefined }))).billable).toBe(true);
   });
 });
 
