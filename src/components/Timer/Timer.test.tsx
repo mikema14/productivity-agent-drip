@@ -182,7 +182,7 @@ describe('Timer — ready states', () => {
     expect(screen.getByText("Today's intentions")).toBeInTheDocument();
   });
 
-  it('aside footer counts unlogged work and REVIEW DAY opens Review for today', async () => {
+  it('aside summary counts sessions, focus and unlogged work; REVIEW DAY opens Review for today', async () => {
     window.timerAPI.getSessions = vi.fn(async () => [
       makeSession(1), makeSession(2), makeSession(3, { logged: 1 }), makeSession(4, { source: 'break' }),
     ]);
@@ -190,7 +190,7 @@ describe('Timer — ready states', () => {
     // R1: the link must select today even when Review was left on another day
     useLogStore.setState({ loadDay, selectedDate: '2020-01-01' });
     const { user, nav } = await renderTimer();
-    expect(await screen.findByText('2 unlogged')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('day-summary')).toHaveTextContent('3 sessions · 1h 15m focus · 2 unlogged'));
 
     await user.click(key(/review day/i));
     expect(useLogStore.getState().selectedDate).toBe(today);
