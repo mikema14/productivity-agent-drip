@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import type { TaskList, ListItem, ListItemColumn } from '../types';
+import { getCurrentDate } from '../utils/time';
+import { todaySinceFor } from '../utils/todaySince';
 
 interface ListsState {
   lists: TaskList[];
@@ -123,7 +125,11 @@ export const useListsStore = create<ListsState>((set, get) => ({
   },
 
   updateItem: async (id, updates) => {
-    set(s => ({ items: s.items.map(i => i.id === id ? { ...i, ...updates } : i) }));
+    set(s => ({ items: s.items.map(i => {
+      if (i.id !== id) return i;
+      const since = updates.column ? { today_since: todaySinceFor(i.column, updates.column, i.today_since, getCurrentDate()) } : {};
+      return { ...i, ...updates, ...since };
+    }) }));
     try {
       await window.listsAPI.updateListItem(id, updates);
     } catch {
@@ -142,7 +148,10 @@ export const useListsStore = create<ListsState>((set, get) => ({
   },
 
   moveItem: async (id, column, order) => {
-    set(s => ({ items: s.items.map(i => i.id === id ? { ...i, column, order } : i) }));
+    // Mirror main's `today_since` bookkeeping so Review's carry badge is right before the next load (R29)
+    set(s => ({ items: s.items.map(i => i.id === id
+      ? { ...i, column, order, today_since: todaySinceFor(i.column, column, i.today_since, getCurrentDate()) }
+      : i) }));
     try {
       await window.listsAPI.updateListItem(id, { column, order });
     } catch {
