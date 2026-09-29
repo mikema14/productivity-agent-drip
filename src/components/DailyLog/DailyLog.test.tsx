@@ -451,6 +451,7 @@ describe('DailyLog (Review)', () => {
     expect(window.logAPI.getCalendarProposals).toHaveBeenCalledWith('2026-09-28');
     expect(screen.getByTestId('tomorrow-date')).toHaveTextContent('Mon 28 Sep');
     expect(await screen.findByText(/4h 30m/)).toBeInTheDocument();
+    expect(screen.getByTestId('tomorrow-calendar')).toHaveTextContent('1 meeting · 4h 30m free');
   });
 
   it('shows Calendar unavailable when the tomorrow feed fails', async () => {
@@ -479,18 +480,16 @@ describe('DailyLog (Review)', () => {
     expect(screen.queryByRole('button', { name: 'End day' })).toBeNull();
   });
 
-  it('aside lists open today items from the lists store only when the selected date is today', async () => {
+  it('the aside starts tomorrow with the first open today item only when the selected date is today', async () => {
     useListsStore.setState({
       lists: [],
       items: [{ id: 'i1', list_id: 'l1', title: 'Carry me', task_id: '77', column: 'today', order: 0, completed: 0, archived: 0, completed_at: null, description: null, subtasks: '[]', billable: 1, created_at: '' }],
     });
     await renderLog([], '2020-01-02');
-    const aside = () => within(screen.getByRole('complementary', { name: 'Tomorrow' }));
-    expect(aside().queryByText('Starts in Today')).toBeNull();
-    expect(aside().queryByText('Carry me')).toBeNull();
+    const aside = () => within(screen.getByRole('complementary', { name: 'Close the day' }));
+    expect(aside().queryByTestId('tomorrow-start')).toBeNull();
     await act(async () => { useLogStore.setState({ selectedDate: today }); });
-    expect(aside().getByText('Starts in Today')).toBeInTheDocument();
-    expect(aside().getByText('Carry me')).toBeInTheDocument();
+    expect(aside().getByTestId('tomorrow-start')).toHaveTextContent('Starts with 77');
     useListsStore.setState({ lists: [], items: [] });
   });
 
@@ -502,11 +501,13 @@ describe('DailyLog (Review)', () => {
     expect(table()).toBeInTheDocument();
   });
 
-  it('the Today section renders only when the selected date is today', async () => {
+  it('the Today triage lives in the aside and renders only when the selected date is today', async () => {
     await renderLog([], '2020-01-02');
     expect(screen.queryByRole('region', { name: 'Today' })).toBeNull();
     await act(async () => { useLogStore.setState({ selectedDate: today }); });
-    expect(screen.getByRole('region', { name: 'Today' })).toBeInTheDocument();
+    const aside = screen.getByRole('complementary', { name: 'Close the day' });
+    expect(within(aside).getByRole('region', { name: 'Today' })).toBeInTheDocument();
+    expect(within(screen.getByTestId('review-main')).queryByRole('region', { name: 'Today' })).toBeNull();
   });
 
   it('the summary bar and filter sit above the table, which takes the remaining height and scrolls its rows', async () => {

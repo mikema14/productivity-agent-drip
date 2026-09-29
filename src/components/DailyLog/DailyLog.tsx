@@ -10,8 +10,7 @@ import TemplateManagerModal from './TemplateManagerModal';
 import TimelineView from './TimelineView';
 import EndDayModal from './EndDayModal';
 import ReviewHeader from './ReviewHeader';
-import TodaysThree from './TodaysThree';
-import TomorrowAside from './TomorrowAside';
+import CloseDayAside from './CloseDayAside';
 import { filterEntries, logSummary, shiftDate, todayString, buildEPLink, errorHint, nextWorkday, type EntryFilter } from './reviewLogic';
 import type { CalendarProposal } from '../../types';
 import type { LogEntry } from '../../stores/logStore';
@@ -490,8 +489,6 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
               )}
             </div>
           )}
-          {/* Plan's Today column is not date-specific: only today's review triages it */}
-          {isToday && <TodaysThree />}
           <LogSummaryBar summary={summary} onLog={handleLogSelected} isLogging={isLogging} busy={rowsStale} />
           <EntriesFilterRow
             filter={filter}
@@ -526,9 +523,9 @@ export default function DailyLog({ onNavigate }: DailyLogProps) {
             {body}
           </EntriesTable>
         </div>
-        <TomorrowAside
+        <CloseDayAside
           date={selectedDate}
-          isToday={selectedDate === todayString()}
+          isToday={isToday}
           todayItems={listItems.filter(i => i.column === 'today')}
           lists={lists}
           proposals={tomorrowProposals}
