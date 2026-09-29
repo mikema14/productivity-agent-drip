@@ -78,4 +78,15 @@ describe('TimerDayTimeline', () => {
     expect(block).toHaveTextContent('667776');
     expect(block).toHaveTextContent('23:55 left');
   });
+
+  it('a short row just before the running session never covers it (the live block joins the overlap pass)', () => {
+    const start = new Date(Date.now() - 60_000);
+    const before = session('short', start.getHours(), start.getMinutes(), 4);
+    before.start_at = new Date(start.getTime() - 4 * 60_000).toISOString();
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: start, totalDuration: 900, remainingSeconds: 840, currentTaskId: '696966', intervalId: 1 });
+    render(<TimerDayTimeline sessions={[before]} selectedDate={new Date()} />);
+    const shortSlot = screen.getByText('4m').closest('[style]') as HTMLElement;
+    const liveSlot = screen.getByTestId('running-block').parentElement as HTMLElement;
+    expect(parseFloat(liveSlot.style.top)).toBeGreaterThanOrEqual(parseFloat(shortSlot.style.top) + parseFloat(shortSlot.style.height));
+  });
 });

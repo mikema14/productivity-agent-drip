@@ -104,7 +104,7 @@ export default function NowAside({ sessions, calendarProposals, adhocEntries, on
       type="button"
       onClick={() => setPanel(id)}
       aria-pressed={panel === id}
-      className={`px-3 h-[30px] now-label transition-colors ${extra} ${
+      className={`px-2.5 wide:px-3 h-[30px] now-label whitespace-nowrap transition-colors ${extra} ${
         panel === id ? 'bg-focus text-drip-bg' : 'text-txt-secondary hover:text-txt-primary hover:bg-focus/5'
       }`}
     >
@@ -117,7 +117,7 @@ export default function NowAside({ sessions, calendarProposals, adhocEntries, on
       type="button"
       onClick={() => navigateDate(delta)}
       aria-label={label}
-      className="w-7 h-[30px] flex items-center justify-center text-[14px] text-txt-muted hover:text-txt-primary transition-colors"
+      className="w-6 wide:w-7 h-[30px] flex items-center justify-center text-[14px] text-txt-muted hover:text-txt-primary transition-colors"
     >
       {glyph}
     </button>
@@ -125,21 +125,21 @@ export default function NowAside({ sessions, calendarProposals, adhocEntries, on
 
   return (
     <aside aria-label="Day" className="w-[280px] wide:w-[340px] shrink-0 border-l border-drip-elevated flex flex-col overflow-hidden">
-      <div className="px-5 pt-5 pb-3.5 shrink-0 flex flex-col gap-3.5 border-b border-drip-elevated">
+      <div className="px-4 wide:px-5 pt-5 pb-3.5 shrink-0 flex flex-col gap-3.5 border-b border-drip-elevated">
         <div className="flex items-center justify-between gap-2">
           <span role="group" aria-label="Sidebar view" className="inline-flex border border-drip-border">
             {tab('timeline', 'Timeline')}
             {tab('tasks', 'Tasks', 'border-l border-drip-border')}
           </span>
           {panel === 'timeline' && (
-            <span className="flex items-center gap-0.5 font-mono text-[11px] tracking-[1px]">
+            <span className="flex items-center gap-0.5 font-mono text-[11px] tracking-[1px] whitespace-nowrap">
               {arrow(-1, 'Previous day', '‹')}
               <span data-testid="aside-day" className={isToday ? 'text-focus' : 'text-txt-secondary'}>{dayLabel(selectedDate)}</span>
               {arrow(1, 'Next day', '›')}
             </span>
           )}
         </div>
-        <span data-testid="day-summary" className="font-mono text-[10.5px] tracking-[1px] text-txt-muted">
+        <span data-testid="day-summary" className="font-mono text-[10.5px] tracking-[0.5px] wide:tracking-[1px] text-txt-muted whitespace-nowrap truncate">
           <span className="text-txt-primary">{focus.length}</span> session{focus.length === 1 ? '' : 's'} ·{' '}
           <span className="text-txt-primary">{formatMinutesPadded(focusMinutes)}</span> focus ·{' '}
           <span className="text-focus">{unlogged}</span> unlogged
@@ -154,7 +154,7 @@ export default function NowAside({ sessions, calendarProposals, adhocEntries, on
         )}
       </div>
 
-      <div className="shrink-0 flex items-center justify-between gap-3 px-5 h-14 border-t border-drip-elevated">
+      <div className="shrink-0 flex items-center justify-between gap-3 px-4 wide:px-5 h-14 border-t border-drip-elevated">
         <KeyButton variant="ghost" size="sm" onClick={() => setShowAddModal(true)}>+ Entry</KeyButton>
         <button
           type="button"

@@ -258,15 +258,30 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
             );
           })}
 
-          {/* Session groups, sessions, meetings and adhoc blocks with overlap resolution */}
+          {/* Session groups, sessions, meetings, adhoc and the live session / break, with overlap resolution */}
           {(() => {
             const OVERLAP_GAP = 3;
             type Block =
               | { id: string; top: number; height: number; type: 'session'; data: PomodoroSession; group?: SessionGroup }
               | { id: string; top: number; height: number; type: 'group'; data: SessionGroup }
               | { id: string; top: number; height: number; type: 'calendar'; data: CalendarProposal }
-              | { id: string; top: number; height: number; type: 'adhoc'; data: AdhocEntry };
+              | { id: string; top: number; height: number; type: 'adhoc'; data: AdhocEntry }
+              | { id: string; top: number; height: number; type: 'live'; data: 'focus' | 'break' };
             const blocks: Block[] = [];
+
+            // The running session or break joins the overlap pass so a short row just before it
+            // (drawn at its 22px minimum) never sits on top of it.
+            if ((status === 'focus' || status === 'break') && isToday && sessionStartTime) {
+              const startDate = new Date(sessionStartTime);
+              const totalDurationMin = Math.ceil((Date.now() - startDate.getTime()) / 60000 + remainingSeconds / 60);
+              blocks.push({
+                id: `live:${status}`,
+                top: Math.max(0, getTop(startDate)),
+                height: Math.max(getHeight(totalDurationMin), 24),
+                type: 'live',
+                data: status,
+              });
+            }
 
             groups.forEach(group => {
               if (expanded.has(group.id)) {
@@ -343,6 +358,35 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
                 return slot(block.id, top, height, renderSession(block.data, height, block.group));
               }
 
+              if (block.type === 'live' && block.data === 'focus') {
+                return slot(block.id, top, height, (
+                  <div
+                    data-testid="running-block"
+                    className="h-full px-3 flex items-center gap-2 border border-dashed border-focus/55 bg-focus/5 rounded-[2px] overflow-hidden font-mono text-[10.5px] text-focus"
+                  >
+                    <span aria-hidden className={`w-1.5 h-1.5 shrink-0 ${isPaused ? 'bg-txt-dim' : 'bg-focus shadow-led'}`} />
+                    {currentTaskId && <span>{currentTaskId}</span>}
+                    <span className="flex-1" />
+                    <span className="text-txt-primary">{formatTime(remainingSeconds)} left</span>
+                  </div>
+                ));
+              }
+
+              if (block.type === 'live') {
+                const elapsedMin = sessionStartTime ? Math.floor((Date.now() - new Date(sessionStartTime).getTime()) / 60000) : 0;
+                return slot(block.id, top, height, (
+                  <div className="h-full rounded-[2px] border border-break/40 hatched-pattern-break bg-break/5 overflow-hidden">
+                    <div className="px-2 py-1 flex items-center gap-2 h-full">
+                      <span className="font-mono text-[10.5px] text-break font-medium">{elapsedMin}m</span>
+                      <span className="text-xs text-break/70">Break</span>
+                      <span className="text-xs text-break/60 ml-auto font-mono animate-pulse-subtle">
+                        On break...
+                      </span>
+                    </div>
+                  </div>
+                ));
+              }
+
               if (block.type === 'calendar') {
                 const proposal = block.data;
                 const isAccepted = proposal.accepted === 1;
@@ -392,47 +436,6 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
                 </div>
               ));
             });
-          })()}
-
-          {/* Running session: dashed amber block with the time left */}
-          {status === 'focus' && isToday && sessionStartTime && (() => {
-            const startDate = new Date(sessionStartTime);
-            const totalDurationMin = Math.ceil((Date.now() - startDate.getTime()) / 60000 + remainingSeconds / 60);
-            const top = Math.max(0, getTop(startDate));
-            const height = Math.max(getHeight(totalDurationMin), 24);
-
-            return slot('running', top, height, (
-              <div
-                data-testid="running-block"
-                className="h-full px-3 flex items-center gap-2 border border-dashed border-focus/55 bg-focus/5 rounded-[2px] overflow-hidden font-mono text-[10.5px] text-focus"
-              >
-                <span aria-hidden className={`w-1.5 h-1.5 shrink-0 ${isPaused ? 'bg-txt-dim' : 'bg-focus shadow-led'}`} />
-                {currentTaskId && <span>{currentTaskId}</span>}
-                <span className="flex-1" />
-                <span className="text-txt-primary">{formatTime(remainingSeconds)} left</span>
-              </div>
-            ));
-          })()}
-
-          {/* Active break hatched block */}
-          {status === 'break' && isToday && sessionStartTime && (() => {
-            const startDate = new Date(sessionStartTime);
-            const totalDurationMin = Math.ceil((Date.now() - startDate.getTime()) / 60000 + remainingSeconds / 60);
-            const top = Math.max(0, getTop(startDate));
-            const height = Math.max(getHeight(totalDurationMin), 24);
-            const elapsedMin = Math.floor((Date.now() - startDate.getTime()) / 60000);
-
-            return slot('break', top, height, (
-              <div className="h-full rounded-[2px] border border-break/40 hatched-pattern-break bg-break/5 overflow-hidden">
-                <div className="px-2 py-1 flex items-center gap-2 h-full">
-                  <span className="font-mono text-[10.5px] text-break font-medium">{elapsedMin}m</span>
-                  <span className="text-xs text-break/70">Break</span>
-                  <span className="text-xs text-break/60 ml-auto font-mono animate-pulse-subtle">
-                    On break...
-                  </span>
-                </div>
-              </div>
-            ));
           })()}
 
           {/* Now: amber time chip in the hour gutter + a 1px line behind the blocks */}
