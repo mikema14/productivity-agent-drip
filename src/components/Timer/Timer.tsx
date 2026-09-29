@@ -11,7 +11,8 @@ import DurationSegments from './DurationSegments';
 import TaskPicker from './TaskPicker';
 import TaskCardWithPicker from './TaskCardWithPicker';
 import ActiveFocus from './ActiveFocus';
-import { focusReadouts } from './nowLogic';
+import UpNext from './UpNext';
+import { focusReadouts, minutesByTask, upNextRows } from './nowLogic';
 import IntentionRow from './IntentionRow';
 import NowHeader, { type NowPillState } from './NowHeader';
 import { useNudgePause } from '../../hooks/useNudgePause';
@@ -75,8 +76,9 @@ export default function Timer({ onNavigate }: TimerProps) {
   // Plan's Today / This week, for the picker's Planned switch (the store is shared with Plan).
   const planLists = useListsStore(s => s.lists);
   const planItems = useListsStore(s => s.items);
+  const planned = useMemo(() => plannedRows(planItems, planLists), [planItems, planLists]);
   const plannedTasks: PickerTask[] = useMemo(
-    () => plannedRows(planItems, planLists).map(r => ({
+    () => planned.map(r => ({
       task_id: r.taskId ?? '',
       title: r.title,
       project_id: 0,
@@ -84,7 +86,7 @@ export default function Timer({ onNavigate }: TimerProps) {
       last_seen_at: '',
       planned: { itemId: r.itemId, column: r.column, listName: r.listName, listColor: r.listColor },
     })),
-    [planItems, planLists]
+    [planned]
   );
 
   // Local state
@@ -368,6 +370,16 @@ export default function Timer({ onNavigate }: TimerProps) {
     setSelectedTask(null);
   };
 
+  // Up next (Q17): end the running session (saved if ≥ 1 min, else reset with no row) and
+  // start focus on the clicked task with its title as the note. startFocus resolves the
+  // task's billable default, hides the finished session's overlay card and clears the due break.
+  const switchTo = async (taskId: string, title: string) => {
+    await finishEarly();
+    setSelectedTask(null);
+    setIntention(title);
+    await startFocus(taskId);
+  };
+
   const handleDurationChange = (minutes: number) => {
     setDurationMinutes(minutes);
   };
@@ -427,6 +439,9 @@ export default function Timer({ onNavigate }: TimerProps) {
     [sessions, currentTaskId, elapsedSeconds]
   );
 
+  const upNext = useMemo(() => upNextRows(planned, currentTaskId), [planned, currentTaskId]);
+  const trackedToday = useMemo(() => minutesByTask(sessions), [sessions]);
+
   const activeTask: { task_id: string; title: string } | null =
     isActive && currentTaskId
       ? { task_id: currentTaskId, title: resolvedTaskName || '' }
@@ -479,6 +494,10 @@ export default function Timer({ onNavigate }: TimerProps) {
                 onExtend={() => extendSession(5)}
               />
             </FocusBlock>
+          )}
+
+          {isActive && (
+            <UpNext rows={upNext} trackedMinutes={trackedToday} onSwitch={switchTo} onOpenPlan={() => onNavigate('all-lists')} />
           )}
 
           {/* ready / break — countdown column + context column */}

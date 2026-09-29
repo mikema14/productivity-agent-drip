@@ -650,3 +650,72 @@ describe('Timer — Planned picker', () => {
     expect(key(/begin focus/i)).toBeDisabled();
   });
 });
+
+describe('Timer — Up next (running)', () => {
+  const planList = { id: 'l1', name: 'GDI Corporation', color: '#22c55e', icon_path: null, task_id: null, order: 0, archived: 0, billable: 1, created_at: '' };
+  const planItem = (id: string, order: number, overrides: Record<string, unknown>) => ({
+    id, list_id: 'l1', title: `Item ${id}`, task_id: null, column: 'today', order, completed: 0, archived: 0,
+    completed_at: null, description: null, subtasks: '[]', billable: 1, created_at: '', ...overrides,
+  });
+
+  beforeEach(() => {
+    useIntentionsStore.setState({ intentions: new Map() });
+    useListsStore.setState({
+      lists: [planList] as never,
+      items: [
+        planItem('p1', 0, { task_id: '667776', title: 'ER to Raynet integration' }),
+        planItem('p2', 1, { task_id: '689742', title: 'Automatizovať dokumentáciu' }),
+        planItem('p3', 2, { title: 'Share skills' }),
+        planItem('p4', 3, { task_id: '645001', title: 'Next level' }),
+        planItem('p5', 0, { task_id: '700000', title: 'Week item', column: 'this_week' }),
+      ] as never,
+    });
+    window.timerAPI.getSessions = vi.fn(async () => [makeSession(0, { task_id: '689742', duration_minutes: 75 })]);
+  });
+  afterEach(() => {
+    resetTimer();
+    useListsStore.setState({ lists: [], items: [] });
+  });
+
+  it('lists two Today rows without the running task, keeps Today positions, tracked minutes, id-less row disabled', async () => {
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1500, currentTaskId: '667776', intervalId: 1 });
+    await renderTimer();
+    const section = screen.getByRole('region', { name: 'Up next' });
+    const rows = await within(section).findAllByTestId('up-next-row');
+    expect(rows).toHaveLength(2);
+    await waitFor(() => expect(rows[0]).toHaveTextContent(/^02689742Automatizovať dokumentáciu1h 15m$/));
+    expect(rows[1]).toHaveTextContent(/^03Share skills$/);
+    expect(rows[1]).toBeDisabled();
+    expect(rows[1]).toHaveAttribute('title', 'No Easy8 task — set one in Plan');
+    expect(within(section).queryByText('Next level')).toBeNull();
+  });
+
+  it('All today → opens Plan; Up next is absent in ready', async () => {
+    setTimer({ status: 'focus', isPaused: true, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1500, currentTaskId: '667776', intervalId: 1 });
+    const { nav, user } = await renderTimer();
+    await user.click(key(/all today/i));
+    expect(nav).toHaveBeenCalledWith('all-lists');
+    setTimer({ status: 'idle', isPaused: false, sessionStartTime: null, intervalId: null, currentTaskId: null });
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Up next' })).toBeNull());
+  });
+
+  it('clicking a row finishes the running session, then starts focus on that task with its title as the note (Q17)', async () => {
+    const calls: string[] = [];
+    const finishEarly = vi.fn(async () => { calls.push('finish'); });
+    const startFocus = vi.fn(async () => { calls.push(`start:${useTimerStore.getState().intention}`); });
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1500, currentTaskId: '667776', intervalId: 1, finishEarly, startFocus });
+    const { user } = await renderTimer();
+    const rows = await screen.findAllByTestId('up-next-row');
+    await user.click(rows[0]);
+    await waitFor(() => expect(startFocus).toHaveBeenCalledWith('689742'));
+    expect(calls).toEqual(['finish', 'start:Automatizovať dokumentáciu']);
+  });
+
+  it('nothing else on Today: the header stays with a quiet line', async () => {
+    useListsStore.setState({ items: [planItem('p1', 0, { task_id: '667776', title: 'Only one' })] as never });
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1500, currentTaskId: '667776', intervalId: 1 });
+    await renderTimer();
+    expect(screen.getByText('Nothing else on Today')).toBeInTheDocument();
+    expect(screen.queryAllByTestId('up-next-row')).toHaveLength(0);
+  });
+});
