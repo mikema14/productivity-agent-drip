@@ -134,7 +134,7 @@ describe('logStore — safety: posting reaches the network only through the IPC 
     expect(result.errors[0].error).toMatch(/API not configured/);
   });
 
-  it('rows without a task id or with zero duration fail validation before any IPC call', async () => {
+  it('rows without a task id are blocked, never sent and never errored (R22); zero duration fails validation', async () => {
     useLogStore.setState({ entries: [
       makeEntry('adhoc', { id: 'a1', taskId: null }),
       makeEntry('pomodoro', { id: 's1', durationMinutes: 0 }),
@@ -142,10 +142,8 @@ describe('logStore — safety: posting reaches the network only through the IPC 
     const result = await useLogStore.getState().logSelected();
     expect(window.timerAPI.getIssue).not.toHaveBeenCalled();
     expect(window.timerAPI.postTimeEntry).not.toHaveBeenCalled();
-    expect(result.errors).toEqual([
-      { entryId: 'a1', error: 'Task ID is required' },
-      { entryId: 's1', error: 'Duration must be greater than 0' },
-    ]);
+    expect(result).toMatchObject({ success: 0, failed: 1 });
+    expect(result.errors).toEqual([{ entryId: 's1', error: 'Duration must be greater than 0' }]);
   });
 
   it('skips unmarked, logged and break rows', async () => {
@@ -234,12 +232,14 @@ describe('logStore — marks, edits, deletes, moves', () => {
     expect(byId.p1.markedToLog).toBe(false);
   });
 
-  it('toggleSelectAll marks every toggleable row (persisting adhoc only), then unmarks', async () => {
+  it('toggleSelectAll marks every loggable row (persisting adhoc only), then unmarks', async () => {
     useLogStore.setState({ entries: [
       makeEntry('adhoc', { id: 'a1', markedToLog: false }),
       makeEntry('pomodoro', { id: 's1', markedToLog: true }),
       makeEntry('proposal', { id: 'p1' }),
       makeEntry('logged', { id: 'l1' }),
+      makeEntry('adhoc', { id: 'n1', taskId: null, markedToLog: false }),
+      makeEntry('break', { id: 'b1' }),
     ] });
     await useLogStore.getState().toggleSelectAll();
     expect(window.logAPI.updateAdhocEntry).toHaveBeenCalledWith('a1', { marked_to_log: 1 });
@@ -249,6 +249,10 @@ describe('logStore — marks, edits, deletes, moves', () => {
     expect(byId.s1.markedToLog).toBe(true);
     expect(byId.p1.markedToLog).toBe(false);
     expect(byId.l1.markedToLog).toBe(false);
+    // R22: a row without a task and a break are never selected
+    expect(byId.n1.markedToLog).toBe(false);
+    expect(byId.b1.markedToLog).toBe(false);
+    expect(window.logAPI.updateAdhocEntry).not.toHaveBeenCalledWith('n1', expect.anything());
 
     await useLogStore.getState().toggleSelectAll();
     byId = Object.fromEntries(useLogStore.getState().entries.map(e => [e.id, e]));

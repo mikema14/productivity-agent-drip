@@ -30,6 +30,15 @@ export interface LogResult {
   errors: Array<{ entryId: string; error: string }>;
 }
 
+/**
+ * A row `logSelected` can post: unlogged work (not a break), accepted (not a
+ * calendar proposal) and with a task id. Rows without a task are blocked until
+ * one is assigned (R22); their checkbox is disabled and they are never sent.
+ */
+export function isLoggable(e: LogEntry): boolean {
+  return !e.logged && !e.isProposal && e.source !== 'break' && !!e.taskId;
+}
+
 // A single piece of time to record — used by both the "save locally" and the
 // "post to Easy Project now" paths.
 export interface TimeEntryInput {
@@ -307,38 +316,28 @@ export const useLogStore = create<LogState>()(
   toggleSelectAll: async () => {
     const { entries, selectedDate } = get();
 
-    // Get all toggleable entries (not logged, not proposals)
-    const toggleableEntries = entries.filter(e => !e.logged && !e.isProposal);
+    // Only loggable rows: never a break, a proposal, a logged row or one without a task (R22)
+    const toggleableEntries = entries.filter(isLoggable);
 
     if (toggleableEntries.length === 0) {
       return;
     }
 
     // Determine new state: if any are unmarked, mark all; if all marked, unmark all
-    const anyUnmarked = toggleableEntries.some(e => !e.markedToLog);
-    const newState = anyUnmarked;
+    const newState = toggleableEntries.some(e => !e.markedToLog);
+    const ids = new Set(toggleableEntries.map(e => e.id));
 
     try {
-      // Update database for all entry types
+      // Only adhoc rows persist the mark; the others keep it in UI state
       for (const entry of toggleableEntries) {
         if (entry.type === 'adhoc') {
           await window.logAPI.updateAdhocEntry(entry.id, {
             marked_to_log: newState ? 1 : 0
           });
-        } else if (entry.type === 'pomodoro') {
-          // Pomodoro sessions don't have marked_to_log field, they use markedToLog in UI only
-          // But we should still update the UI state for them
         }
       }
 
-      // Update UI state for all toggleable entries
-      const updatedEntries = entries.map(e => {
-        if (e.logged || e.isProposal) {
-          return e; // Don't change logged or proposal entries
-        }
-        return { ...e, markedToLog: newState };
-      });
-      set({ entries: updatedEntries });
+      set({ entries: entries.map(e => (ids.has(e.id) ? { ...e, markedToLog: newState } : e)) });
 
     } catch (error) {
       console.error('Failed to toggle select all:', error);
@@ -349,7 +348,8 @@ export const useLogStore = create<LogState>()(
 
   logSelected: async () => {
     const { entries, selectedDate } = get();
-    const toLog = entries.filter(e => e.markedToLog && !e.logged && e.source !== 'break');
+    // Rows without a task are blocked, not sent (R22)
+    const toLog = entries.filter(e => e.markedToLog && isLoggable(e));
 
     console.log('Logging these entries:', toLog);
 
@@ -359,10 +359,7 @@ export const useLogStore = create<LogState>()(
 
     for (const entry of toLog) {
       try {
-        // Validate required fields
-        if (!entry.taskId) {
-          throw new Error('Task ID is required');
-        }
+        if (!entry.taskId) continue; // unreachable: isLoggable requires it (narrows the type)
         if (entry.durationMinutes <= 0) {
           throw new Error('Duration must be greater than 0');
         }

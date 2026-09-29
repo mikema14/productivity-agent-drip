@@ -1,5 +1,5 @@
 import type { CalendarProposal } from '../../types';
-import type { LogEntry } from '../../stores/logStore';
+import { isLoggable, type LogEntry } from '../../stores/logStore';
 import type { MergedEntry } from '../../utils/mergeEntries';
 import { formatMinutes } from '../../utils/time';
 import { DAY_TARGET_MINUTES } from '../Timer/TimerDayTimeline';
@@ -117,6 +117,96 @@ export function selectionSummary(entries: MergedEntry[]): SelectionSummary {
     selectedMinutes: selected.reduce((sum, e) => sum + e.durationMinutes, 0),
     needsTaskCount: selected.filter(e => !e.taskId).length,
   };
+}
+
+export { isLoggable };
+
+export interface LogSummary {
+  /** Unlogged work rows (proposals and rows without a task included). */
+  toLog: { count: number; minutes: number };
+  /** Unlogged work rows without a task: blocked until one is assigned (R22). */
+  needsTask: number;
+  logged: { count: number; minutes: number };
+  /** Every work row of the day; always `toLog.minutes + logged.minutes`. */
+  trackedMinutes: number;
+  /** Work rows not marked non-billable; an unaccepted proposal never counts. */
+  billableMinutes: number;
+  /** Marked and loggable: exactly what `Log N to Easy8` posts. */
+  selected: { count: number; minutes: number };
+  /** Rows the select-all checkbox acts on (`isLoggable`). */
+  selectableCount: number;
+  allSelected: boolean;
+}
+
+const sumMinutes = (list: LogEntry[]) => list.reduce((sum, e) => sum + e.durationMinutes, 0);
+
+/**
+ * Every number on the Review screen (R24): the header, the summary bar, the
+ * filter counts and the table footer. Always over the flat entries, never the
+ * merged rows, so grouping by task cannot change a count. Breaks are not work.
+ */
+export function logSummary(entries: LogEntry[]): LogSummary {
+  const work = entries.filter(e => e.source !== 'break');
+  const open = work.filter(e => !e.logged);
+  const logged = work.filter(e => e.logged);
+  const selectable = work.filter(isLoggable);
+  const selected = selectable.filter(e => e.markedToLog);
+  return {
+    toLog: { count: open.length, minutes: sumMinutes(open) },
+    needsTask: open.filter(e => !e.taskId).length,
+    logged: { count: logged.length, minutes: sumMinutes(logged) },
+    trackedMinutes: sumMinutes(work),
+    billableMinutes: sumMinutes(work.filter(e => !e.isProposal && e.billable !== false)),
+    selected: { count: selected.length, minutes: sumMinutes(selected) },
+    selectableCount: selectable.length,
+    allSelected: selectable.length > 0 && selected.length === selectable.length,
+  };
+}
+
+export type EntryFilter = 'all' | 'to-log' | 'logged';
+
+/** The rows the table lists for a filter: work only (breaks live in Timeline, R23). */
+export function filterEntries<T extends LogEntry>(entries: T[], filter: EntryFilter): T[] {
+  const work = entries.filter(e => e.source !== 'break');
+  if (filter === 'to-log') return work.filter(e => !e.logged);
+  if (filter === 'logged') return work.filter(e => e.logged);
+  return work;
+}
+
+/** The comment Easy8 receives, with `logSelected`'s fallback (R25: the input shows exactly this). */
+export function sentComment(entry: Pick<LogEntry, 'comment' | 'title'>): string {
+  return entry.comment?.trim() || entry.title || 'Work session';
+}
+
+/**
+ * Duration typed into the Dur cell → minutes: `45`, `45m`, `1h`, `1h10`,
+ * `1h 10m`, `1:10`, `1.5h`. Null when unreadable, zero, or longer than a day.
+ */
+export function parseDuration(text: string): number | null {
+  const t = text.trim().toLowerCase().replace(/\s+/g, '');
+  let minutes: number | null = null;
+  let m: RegExpMatchArray | null;
+  if ((m = t.match(/^(\d+)(?:m|min)?$/))) minutes = Number(m[1]);
+  else if ((m = t.match(/^(\d+):([0-5]\d)$/))) minutes = Number(m[1]) * 60 + Number(m[2]);
+  else if ((m = t.match(/^(\d+(?:[.,]\d+)?)h$/))) minutes = Math.round(Number(m[1].replace(',', '.')) * 60);
+  else if ((m = t.match(/^(\d+)h(\d+)(?:m|min)?$/))) minutes = Number(m[1]) * 60 + Number(m[2]);
+  if (minutes === null || !Number.isFinite(minutes) || minutes <= 0 || minutes > 24 * 60) return null;
+  return minutes;
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Workdays an item has sat in Today since `todaySince` (R29): each Mon–Fri
+ * after it, up to and including `today`. Entered Thu → Mon reads 2.
+ */
+export function carriedDays(todaySince: string | null | undefined, today: string): number {
+  if (!todaySince || !DATE_RE.test(todaySince) || todaySince >= today) return 0;
+  let days = 0;
+  for (let d = shiftDate(todaySince, 1); d <= today; d = shiftDate(d, 1)) {
+    if (![0, 6].includes(parseLocalDate(d).getDay())) days++;
+  }
+  return days;
 }
 
 export interface TomorrowCalendar {

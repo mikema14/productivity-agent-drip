@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  buildEPLink, dateLabel, dayStats, errorHint, formatMinutesPadded, formatTimeOfDay, nextWorkday,
-  rowModel, selectionSummary, shiftDate, tomorrowCalendar, tomorrowLabel,
+  buildEPLink, carriedDays, dateLabel, dayStats, errorHint, filterEntries, formatMinutesPadded, formatTimeOfDay, isLoggable,
+  logSummary, nextWorkday, parseDuration, rowModel, selectionSummary, sentComment, shiftDate, tomorrowCalendar, tomorrowLabel,
 } from './reviewLogic';
 import { DAY_TARGET_MINUTES } from '../Timer/TimerDayTimeline';
 import { makeEntry, asMerged, FIXTURE_DATE } from '../../test/logFixtures';
@@ -52,6 +52,96 @@ describe('reviewLogic.selectionSummary', () => {
       makeEntry('break', { id: 'e', markedToLog: true }),
     ));
     expect(s).toEqual({ selectedCount: 2, selectedMinutes: 105, needsTaskCount: 1 });
+  });
+});
+
+describe('reviewLogic.logSummary', () => {
+  const day = [
+    makeEntry('pomodoro', { id: 'a', durationMinutes: 30 }),
+    makeEntry('adhoc', { id: 'b', durationMinutes: 50, billable: false }),
+    makeEntry('pomodoro', { id: 'c', durationMinutes: 25, markedToLog: false }),
+    makeEntry('adhoc', { id: 'd', durationMinutes: 60, taskId: null }),
+    makeEntry('proposal', { id: 'p', durationMinutes: 45 }),
+    makeEntry('logged', { id: 'l', durationMinutes: 25 }),
+    makeEntry('break', { id: 'k', durationMinutes: 5, markedToLog: true }),
+  ];
+
+  it('counts to log, needs a task, logged and the selection over work rows only', () => {
+    const s = logSummary(day);
+    expect(s.toLog).toEqual({ count: 5, minutes: 30 + 50 + 25 + 60 + 45 });
+    expect(s.needsTask).toBe(2); // the adhoc row and the task-less proposal
+    expect(s.logged).toEqual({ count: 1, minutes: 25 });
+    expect(s.selected).toEqual({ count: 2, minutes: 80 }); // a + b; d is blocked, c unmarked
+    expect(s.selectableCount).toBe(3);
+    expect(s.allSelected).toBe(false);
+    expect(s.billableMinutes).toBe(30 + 25 + 60 + 25);
+  });
+
+  it('tracked is always to log + logged, and breaks never count (R24)', () => {
+    const s = logSummary(day);
+    expect(s.trackedMinutes).toBe(s.toLog.minutes + s.logged.minutes);
+    expect(logSummary([makeEntry('break')]).trackedMinutes).toBe(0);
+  });
+
+  it('allSelected needs at least one loggable row, all marked', () => {
+    expect(logSummary([]).allSelected).toBe(false);
+    expect(logSummary([makeEntry('pomodoro'), makeEntry('adhoc', { taskId: null, markedToLog: false })]).allSelected).toBe(true);
+  });
+
+  it('isLoggable: unlogged, accepted, not a break, with a task', () => {
+    expect(isLoggable(makeEntry('pomodoro'))).toBe(true);
+    expect(isLoggable(makeEntry('calendar'))).toBe(true);
+    expect(isLoggable(makeEntry('adhoc', { taskId: null }))).toBe(false);
+    expect(isLoggable(makeEntry('proposal', { taskId: '1' }))).toBe(false);
+    expect(isLoggable(makeEntry('logged'))).toBe(false);
+    expect(isLoggable(makeEntry('break', { taskId: '1' }))).toBe(false);
+  });
+});
+
+describe('reviewLogic.filterEntries', () => {
+  const list = [makeEntry('pomodoro', { id: 'a' }), makeEntry('logged', { id: 'l' }), makeEntry('break', { id: 'k' }), makeEntry('proposal', { id: 'p' })];
+  it('splits work rows into to log / logged; breaks are never listed (R23)', () => {
+    expect(filterEntries(list, 'all').map(e => e.id)).toEqual(['a', 'l', 'p']);
+    expect(filterEntries(list, 'to-log').map(e => e.id)).toEqual(['a', 'p']);
+    expect(filterEntries(list, 'logged').map(e => e.id)).toEqual(['l']);
+  });
+});
+
+describe('reviewLogic.parseDuration', () => {
+  it.each([
+    ['45', 45], ['45m', 45], ['45 min', 45], ['1h', 60], ['1h10', 70], ['1h 10m', 70], ['1H10M', 70],
+    ['1:10', 70], ['0:05', 5], ['1.5h', 90], ['1,5h', 90], ['  90  ', 90], ['24h', 1440],
+  ])('%s → %i', (text, minutes) => {
+    expect(parseDuration(text)).toBe(minutes);
+  });
+
+  it.each(['', '0', '0m', 'abc', '1:75', '-5', '1h-10', '25h', 'h', '1.5'])('rejects %j', text => {
+    expect(parseDuration(text)).toBeNull();
+  });
+});
+
+describe('reviewLogic.sentComment', () => {
+  it('is the comment, else the title, else `Work session` — as logSelected sends it', () => {
+    expect(sentComment({ comment: ' Standup notes ', title: 'Standup' })).toBe('Standup notes');
+    expect(sentComment({ comment: '  ', title: 'Standup' })).toBe('Standup');
+    expect(sentComment({ comment: null, title: '' })).toBe('Work session');
+  });
+});
+
+describe('reviewLogic.carriedDays', () => {
+  it('counts workdays after entering Today, up to today (Thu → Mon = 2)', () => {
+    expect(carriedDays('2026-09-24', '2026-09-28')).toBe(2);
+    expect(carriedDays('2026-09-24', '2026-09-25')).toBe(1);
+    expect(carriedDays('2026-09-28', '2026-09-28')).toBe(0);
+    expect(carriedDays('2026-09-21', '2026-09-28')).toBe(5);
+    expect(carriedDays('2026-09-26', '2026-09-27')).toBe(0); // Sat → Sun
+  });
+
+  it('is 0 for a missing, malformed or future date', () => {
+    expect(carriedDays(null, '2026-09-28')).toBe(0);
+    expect(carriedDays(undefined, '2026-09-28')).toBe(0);
+    expect(carriedDays('2026-09-24T10:00:00Z', '2026-09-28')).toBe(0);
+    expect(carriedDays('2026-10-01', '2026-09-28')).toBe(0);
   });
 });
 
