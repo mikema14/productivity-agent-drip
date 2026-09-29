@@ -11,6 +11,8 @@ export default {
       screens: {
         // Now screen: the aside narrows and the focus block's right column wraps below this
         wide: '1000px',
+        // Running card: the countdown column grows to the mockup's 470px
+        xwide: '1280px',
       },
       fontFamily: {
         display: ['Outfit', 'system-ui', 'sans-serif'],

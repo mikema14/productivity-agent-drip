@@ -11,7 +11,11 @@ import { useListsStore } from '../../stores/listsStore';
 import type { PomodoroSession } from '../../types';
 import { getCurrentDate } from '../../utils/time';
 
-vi.mock('./TimerDayTimeline', () => ({ default: () => <div>TimelineStub</div> }));
+// Keep the real exports (DAY_TARGET_MINUTES / DAY_BAR_SEGMENTS feed the running card's readouts).
+vi.mock('./TimerDayTimeline', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./TimerDayTimeline')>()),
+  default: () => <div>TimelineStub</div>,
+}));
 vi.mock('../Lists/TimerTaskList', () => ({ default: () => <div>TaskListStub</div> }));
 
 const today = getCurrentDate();
@@ -178,7 +182,7 @@ describe('Timer — ready states', () => {
     expect(screen.getByText("Today's intentions")).toBeInTheDocument();
   });
 
-  it('aside footer counts unlogged work and REVIEW DAY opens Review for today', async () => {
+  it('aside summary counts sessions, focus and unlogged work; REVIEW DAY opens Review for today', async () => {
     window.timerAPI.getSessions = vi.fn(async () => [
       makeSession(1), makeSession(2), makeSession(3, { logged: 1 }), makeSession(4, { source: 'break' }),
     ]);
@@ -186,7 +190,7 @@ describe('Timer — ready states', () => {
     // R1: the link must select today even when Review was left on another day
     useLogStore.setState({ loadDay, selectedDate: '2020-01-01' });
     const { user, nav } = await renderTimer();
-    expect(await screen.findByText('2 unlogged')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('day-summary')).toHaveTextContent('3 sessions · 1h 15m focus · 2 unlogged'));
 
     await user.click(key(/review day/i));
     expect(useLogStore.getState().selectedDate).toBe(today);
@@ -245,17 +249,66 @@ describe('Timer — active states', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 
-  it('running: calm single-column block — no start time, no session counter or squares, title from the cache', async () => {
+  it('running: calm block — no start time, no intention row or 01 Focus header, title from the cache', async () => {
     window.logAPI.getCachedTask = vi.fn(async () => makeTasks(1)[0]);
     setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(2026, 8, 25, 22, 22, 0), totalDuration: 900, remainingSeconds: 800, currentTaskId: '600001', intervalId: 1, sessionCount: 0 });
     await renderTimer();
     expect(screen.getByRole('region', { name: 'Focus' })).toHaveAttribute('data-layout', 'calm');
     expect(screen.queryByTestId('countdown-label')).toBeNull();
     expect(screen.queryByText(/22:22/)).toBeNull();
-    expect(screen.queryByText(/Session/)).toBeNull();
-    expect(screen.queryAllByTestId('session-square')).toHaveLength(0);
+    expect(screen.queryByText('01 Focus')).toBeNull();
+    expect(queryKey(/set intention/i)).toBeNull();
+    expect(screen.queryByTestId('continue-slot')).toBeNull();
     expect(screen.getByTestId('focus-header')).toHaveTextContent('Ends 22:37');
     expect(await screen.findByTestId('active-task-title')).toHaveTextContent('Task number 1');
+  });
+
+  it('running: readouts count today with the running session — focus / 6h bar, session number + squares, this task', async () => {
+    window.timerAPI.getSessions = vi.fn(async () => [
+      makeSession(0, { duration_minutes: 25 }),
+      makeSession(1, { duration_minutes: 50 }),
+      makeSession(2, { duration_minutes: 11, task_id: '662962' }),
+      makeSession(3, { duration_minutes: 5, source: 'break', task_id: null }),
+    ]);
+    // 10 minutes into the running session on 600001
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(Date.now() - 600_000), totalDuration: 1500, remainingSeconds: 900, currentTaskId: '600001', intervalId: 1 });
+    await renderTimer();
+    const readouts = await screen.findByTestId('focus-readouts');
+    await waitFor(() => expect(within(readouts).getByText(/^1h 36m/)).toBeInTheDocument());
+    const bar = within(readouts).getByTestId('day-bar');
+    expect(bar).toHaveAttribute('aria-label', '1 hour 36 minutes of 6 hours');
+    expect(bar.querySelectorAll('[data-filled]')).toHaveLength(3);
+    expect(within(readouts).getByTestId('session-number')).toHaveTextContent('04');
+    const squares = within(readouts).getAllByTestId('session-square');
+    expect(squares).toHaveLength(4);
+    expect(squares[3]).toHaveAttribute('data-current');
+    expect(squares.filter(q => q.hasAttribute('data-current'))).toHaveLength(1);
+    expect(within(readouts).getByTestId('task-readout')).toHaveTextContent('1h 25m · 3 sessions');
+  });
+
+  it('running with no task: no ON THIS TASK readout', async () => {
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1500, currentTaskId: null, intervalId: 1 });
+    await renderTimer();
+    expect(screen.getByTestId('session-number')).toHaveTextContent('01');
+    expect(screen.queryByTestId('task-readout')).toBeNull();
+  });
+
+  it('running: the INTENT line edits the session note in place — Enter saves, Escape reverts, empty shows the placeholder', async () => {
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, currentTaskId: '600001', intention: '', intervalId: 1 });
+    const { user } = await renderTimer();
+    const line = screen.getByTestId('intent-line');
+    expect(line).toHaveTextContent('Add an intent for this session');
+    await user.click(line);
+    await user.type(screen.getByRole('textbox', { name: 'Session intent' }), 'error preview{Enter}');
+    expect(useTimerStore.getState().intention).toBe('error preview');
+    expect(screen.getByTestId('intent-line')).toHaveTextContent('error preview');
+
+    await user.click(screen.getByTestId('intent-line'));
+    const input = screen.getByRole('textbox', { name: 'Session intent' });
+    await user.clear(input);
+    await user.type(input, 'something else{Escape}');
+    expect(useTimerStore.getState().intention).toBe('error preview');
+    expect(screen.queryByRole('textbox', { name: 'Session intent' })).toBeNull();
   });
 
   it('running: key set and variants — Pause light, Finish outline, +5 min text, Cancel text-danger', async () => {
@@ -491,26 +544,25 @@ describe('Timer — active states', () => {
     expect(key(/^pause$/i)).toHaveAttribute('data-variant', 'light');
   });
 
-  it('kickoff: calm layout with a 2-minute ruler and no session counter', async () => {
+  it('kickoff: calm layout with a 2-minute ruler, the running readouts and no /8 counter', async () => {
     setTimer({ status: 'focus', isPaused: false, kickoff: 'warmup', sessionStartTime: new Date(), totalDuration: 120, remainingSeconds: 100, intervalId: 1, durationMinutes: 25, sessionCount: 0 });
     await renderTimer();
     expect(screen.getByRole('region', { name: 'Focus' })).toHaveAttribute('data-layout', 'calm');
     expect(screen.queryByTestId('countdown-label')).toBeNull();
-    expect(screen.queryByText(/Session/)).toBeNull();
     expect(screen.queryByText('/8', { exact: false })).toBeNull();
-    expect(screen.queryAllByTestId('session-square')).toHaveLength(0);
+    expect(screen.getByTestId('session-number')).toHaveTextContent('01');
+    expect(screen.getAllByTestId('session-square')).toHaveLength(1);
     const labels = Array.from(screen.getByTestId('tick-ruler').querySelectorAll('[data-label]')).map(l => l.textContent);
     expect(labels).toEqual(['00', '01', '02']);
   });
 
-  it('running with an intention: EDIT stays available and opens SetIntentionModal (parity)', async () => {
+  it('running with an intention: the daily intention row is hidden while the card runs (Q16)', async () => {
     useIntentionsStore.setState({ intentions: new Map([[today, ['Ship the rail']]]) });
     window.dashboardAPI.getDailyIntentions = vi.fn(async () => ({ date: today, intentions: ['Ship the rail'] }));
     setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, intervalId: 1 });
-    const { user } = await renderTimer();
-    expect(screen.getByRole('group', { name: "Today's intention: Ship the rail" })).toBeInTheDocument();
-    await user.click(key(/^edit$/i));
-    expect(screen.getByText("Today's intentions")).toBeInTheDocument();
+    await renderTimer();
+    expect(screen.queryByRole('group', { name: "Today's intention: Ship the rail" })).toBeNull();
+    expect(queryKey(/^edit$/i)).toBeNull();
   });
 
   it('Set intention → type → Done saves it for the local day and the row shows it', async () => {
@@ -525,13 +577,11 @@ describe('Timer — active states', () => {
     expect(key(/^edit$/i)).toBeInTheDocument();
   });
 
-  it('paused with no intention: a compact SET INTENTION key sits in the row and opens the modal', async () => {
+  it('paused: no SET INTENTION key either; the card keeps its INTENT line (Q16)', async () => {
     setTimer({ status: 'focus', isPaused: true, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1200, intervalId: 1 });
-    const { user } = await renderTimer();
-    const set = key(/set intention/i);
-    expect(set).toHaveClass('h-7');
-    await user.click(set);
-    expect(screen.getByText("Today's intentions")).toBeInTheDocument();
+    await renderTimer();
+    expect(queryKey(/set intention/i)).toBeNull();
+    expect(screen.getByTestId('intent-line')).toBeInTheDocument();
   });
 
   it('break with an intention: the row shows it with EDIT, which opens the modal', async () => {
@@ -598,5 +648,74 @@ describe('Timer — Planned picker', () => {
     expect(useTimerStore.getState().intention).toBe('Share skills');
     expect(screen.getByRole('listbox')).toBeInTheDocument();
     expect(key(/begin focus/i)).toBeDisabled();
+  });
+});
+
+describe('Timer — Up next (running)', () => {
+  const planList = { id: 'l1', name: 'GDI Corporation', color: '#22c55e', icon_path: null, task_id: null, order: 0, archived: 0, billable: 1, created_at: '' };
+  const planItem = (id: string, order: number, overrides: Record<string, unknown>) => ({
+    id, list_id: 'l1', title: `Item ${id}`, task_id: null, column: 'today', order, completed: 0, archived: 0,
+    completed_at: null, description: null, subtasks: '[]', billable: 1, created_at: '', ...overrides,
+  });
+
+  beforeEach(() => {
+    useIntentionsStore.setState({ intentions: new Map() });
+    useListsStore.setState({
+      lists: [planList] as never,
+      items: [
+        planItem('p1', 0, { task_id: '667776', title: 'ER to Raynet integration' }),
+        planItem('p2', 1, { task_id: '689742', title: 'Automatizovať dokumentáciu' }),
+        planItem('p3', 2, { title: 'Share skills' }),
+        planItem('p4', 3, { task_id: '645001', title: 'Next level' }),
+        planItem('p5', 0, { task_id: '700000', title: 'Week item', column: 'this_week' }),
+      ] as never,
+    });
+    window.timerAPI.getSessions = vi.fn(async () => [makeSession(0, { task_id: '689742', duration_minutes: 75 })]);
+  });
+  afterEach(() => {
+    resetTimer();
+    useListsStore.setState({ lists: [], items: [] });
+  });
+
+  it('lists two Today rows without the running task, keeps Today positions, tracked minutes, id-less row disabled', async () => {
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1500, currentTaskId: '667776', intervalId: 1 });
+    await renderTimer();
+    const section = screen.getByRole('region', { name: 'Up next' });
+    const rows = await within(section).findAllByTestId('up-next-row');
+    expect(rows).toHaveLength(2);
+    await waitFor(() => expect(rows[0]).toHaveTextContent(/^02689742Automatizovať dokumentáciu1h 15m$/));
+    expect(rows[1]).toHaveTextContent(/^03Share skills$/);
+    expect(rows[1]).toBeDisabled();
+    expect(rows[1]).toHaveAttribute('title', 'No Easy8 task — set one in Plan');
+    expect(within(section).queryByText('Next level')).toBeNull();
+  });
+
+  it('All today → opens Plan; Up next is absent in ready', async () => {
+    setTimer({ status: 'focus', isPaused: true, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1500, currentTaskId: '667776', intervalId: 1 });
+    const { nav, user } = await renderTimer();
+    await user.click(key(/all today/i));
+    expect(nav).toHaveBeenCalledWith('all-lists');
+    setTimer({ status: 'idle', isPaused: false, sessionStartTime: null, intervalId: null, currentTaskId: null });
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Up next' })).toBeNull());
+  });
+
+  it('clicking a row finishes the running session, then starts focus on that task with its title as the note (Q17)', async () => {
+    const calls: string[] = [];
+    const finishEarly = vi.fn(async () => { calls.push('finish'); });
+    const startFocus = vi.fn(async () => { calls.push(`start:${useTimerStore.getState().intention}`); });
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1500, currentTaskId: '667776', intervalId: 1, finishEarly, startFocus });
+    const { user } = await renderTimer();
+    const rows = await screen.findAllByTestId('up-next-row');
+    await user.click(rows[0]);
+    await waitFor(() => expect(startFocus).toHaveBeenCalledWith('689742'));
+    expect(calls).toEqual(['finish', 'start:Automatizovať dokumentáciu']);
+  });
+
+  it('nothing else on Today: the header stays with a quiet line', async () => {
+    useListsStore.setState({ items: [planItem('p1', 0, { task_id: '667776', title: 'Only one' })] as never });
+    setTimer({ status: 'focus', isPaused: false, sessionStartTime: new Date(), totalDuration: 1500, remainingSeconds: 1500, currentTaskId: '667776', intervalId: 1 });
+    await renderTimer();
+    expect(screen.getByText('Nothing else on Today')).toBeInTheDocument();
+    expect(screen.queryAllByTestId('up-next-row')).toHaveLength(0);
   });
 });

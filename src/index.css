@@ -33,6 +33,21 @@
     }
   }
 
+  /* Running card: the large countdown (204px from 1280px, 172px from 1000px, 120px below) */
+  .now-digits-xl {
+    font-size: 172px;
+  }
+  @media (min-width: 1280px) {
+    .now-digits-xl {
+      font-size: 204px;
+    }
+  }
+  @media (max-width: 999px) {
+    .now-digits-xl {
+      font-size: 120px;
+    }
+  }
+
   /* Now screen: mono uppercase micro-label */
   .now-label {
     @apply font-mono uppercase tracking-label;

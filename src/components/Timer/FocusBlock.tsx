@@ -36,11 +36,11 @@ export function SectionHeader({ children, right }: { children: ReactNode; right?
  * hairline divider, context on the right. Without one: a single column.
  */
 export default function FocusBlock({ topRule, countdown, children }: Props) {
-  const frame = `shrink-0 px-6 py-5 border border-drip-border border-t-2 ${RULE[topRule]}`;
+  const frame = `shrink-0 border border-drip-border border-t-2 ${RULE[topRule]}`;
 
   if (countdown === undefined) {
     return (
-      <section aria-label="Focus" data-layout="calm" className={`${frame} flex flex-col`}>
+      <section aria-label="Focus" data-layout="calm" className={`${frame} px-8 pt-[26px] pb-7 flex flex-col`}>
         {children}
       </section>
     );
@@ -50,7 +50,7 @@ export default function FocusBlock({ topRule, countdown, children }: Props) {
     <section
       aria-label="Focus"
       data-layout="split"
-      className={`${frame} flex flex-col wide:flex-row wide:items-center gap-6`}
+      className={`${frame} px-6 py-5 flex flex-col wide:flex-row wide:items-center gap-6`}
     >
       <div className="w-full wide:w-[330px] shrink-0">{countdown}</div>
       <div aria-hidden className="w-full h-px wide:w-px wide:h-auto wide:self-stretch bg-drip-border shrink-0" />

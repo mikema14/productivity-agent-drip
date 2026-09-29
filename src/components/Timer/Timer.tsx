@@ -11,6 +11,8 @@ import DurationSegments from './DurationSegments';
 import TaskPicker from './TaskPicker';
 import TaskCardWithPicker from './TaskCardWithPicker';
 import ActiveFocus from './ActiveFocus';
+import UpNext from './UpNext';
+import { focusReadouts, minutesByTask, upNextRows } from './nowLogic';
 import IntentionRow from './IntentionRow';
 import NowHeader, { type NowPillState } from './NowHeader';
 import { useNudgePause } from '../../hooks/useNudgePause';
@@ -74,8 +76,9 @@ export default function Timer({ onNavigate }: TimerProps) {
   // Plan's Today / This week, for the picker's Planned switch (the store is shared with Plan).
   const planLists = useListsStore(s => s.lists);
   const planItems = useListsStore(s => s.items);
+  const planned = useMemo(() => plannedRows(planItems, planLists), [planItems, planLists]);
   const plannedTasks: PickerTask[] = useMemo(
-    () => plannedRows(planItems, planLists).map(r => ({
+    () => planned.map(r => ({
       task_id: r.taskId ?? '',
       title: r.title,
       project_id: 0,
@@ -83,7 +86,7 @@ export default function Timer({ onNavigate }: TimerProps) {
       last_seen_at: '',
       planned: { itemId: r.itemId, column: r.column, listName: r.listName, listColor: r.listColor },
     })),
-    [planItems, planLists]
+    [planned]
   );
 
   // Local state
@@ -367,6 +370,16 @@ export default function Timer({ onNavigate }: TimerProps) {
     setSelectedTask(null);
   };
 
+  // Up next (Q17): end the running session (saved if ≥ 1 min, else reset with no row) and
+  // start focus on the clicked task with its title as the note. startFocus resolves the
+  // task's billable default, hides the finished session's overlay card and clears the due break.
+  const switchTo = async (taskId: string, title: string) => {
+    await finishEarly();
+    setSelectedTask(null);
+    setIntention(title);
+    await startFocus(taskId);
+  };
+
   const handleDurationChange = (minutes: number) => {
     setDurationMinutes(minutes);
   };
@@ -421,6 +434,14 @@ export default function Timer({ onNavigate }: TimerProps) {
   );
   const beginVariant = breakDue ? 'outline' : 'amber';
 
+  const readouts = useMemo(
+    () => focusReadouts(sessions, currentTaskId, elapsedSeconds),
+    [sessions, currentTaskId, elapsedSeconds]
+  );
+
+  const upNext = useMemo(() => upNextRows(planned, currentTaskId), [planned, currentTaskId]);
+  const trackedToday = useMemo(() => minutesByTask(sessions), [sessions]);
+
   const activeTask: { task_id: string; title: string } | null =
     isActive && currentTaskId
       ? { task_id: currentTaskId, title: resolvedTaskName || '' }
@@ -432,10 +453,11 @@ export default function Timer({ onNavigate }: TimerProps) {
 
       <div className="flex-1 min-h-0 flex">
         {/* MAIN COLUMN */}
-        <div className="flex-1 min-w-0 flex flex-col gap-4 px-7 py-5 overflow-y-auto">
+        <div className={`flex-1 min-w-0 flex flex-col overflow-y-auto ${isActive ? 'gap-6 px-7 pt-6 pb-7' : 'gap-4 px-7 py-5'}`}>
 
-          {/* Intention row — every state, editable (parity with the old app's Edit + sidebar button) */}
-          <IntentionRow intentions={intentions} onEdit={() => setShowIntentionModal(true)} />
+          {/* Intention row — ready and break, editable (parity with the old app's Edit + sidebar button).
+              The running card has no room for it (Q16); its INTENT line is the session note. */}
+          {!isActive && <IntentionRow intentions={intentions} onEdit={() => setShowIntentionModal(true)} />}
 
           {/* Continue previous — the 44px slot is reserved in idle ready states so it never pops in.
               During a break the CTA still shows when a previous session exists (Q6), but no empty
@@ -448,7 +470,7 @@ export default function Timer({ onNavigate }: TimerProps) {
             </div>
           )}
 
-          <SectionHeader>01 Focus</SectionHeader>
+          {!isActive && <SectionHeader>01 Focus</SectionHeader>}
 
           {/* running / paused / kickoff — the calm single-column block */}
           {isActive && (
@@ -457,12 +479,14 @@ export default function Timer({ onNavigate }: TimerProps) {
                 state={isKickoff ? 'kickoff' : focusState === 'paused' ? 'paused' : 'running'}
                 task={activeTask}
                 note={intention}
+                onNoteChange={setIntention}
                 endsAt={endsAt}
                 rollsIntoMinutes={isKickoff ? durationMinutes : undefined}
                 remainingSeconds={displaySeconds}
                 rulerMinutes={rulerMinutes}
                 elapsedSeconds={elapsedSeconds}
                 rulerRef={clockRef}
+                readouts={readouts}
                 onPause={() => pause()}
                 onResume={() => resume()}
                 onFinish={handleFinish}
@@ -470,6 +494,10 @@ export default function Timer({ onNavigate }: TimerProps) {
                 onExtend={() => extendSession(5)}
               />
             </FocusBlock>
+          )}
+
+          {isActive && (
+            <UpNext rows={upNext} trackedMinutes={trackedToday} onSwitch={switchTo} onOpenPlan={() => onNavigate('all-lists')} />
           )}
 
           {/* ready / break — countdown column + context column */}
