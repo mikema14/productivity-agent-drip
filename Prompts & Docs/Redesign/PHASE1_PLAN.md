@@ -280,6 +280,15 @@ Risks: `Timer.tsx` is a 718-line rewrite of JSX with an untested store behind it
 - Q15 The Now window mirrors the session-end card, for when that card is on another screen: after a focus completes (or finishes early) Now prompts for the break — pill `Break due`, label `SESSION DONE`, the line `Session done. Take a N-minute break, or pick the next task below`, and `Start break Nm` as the amber primary key (Begin Focus drops to outline) (`timerStore.pendingBreakMinutes`, set by the completion, cleared by any break / focus start, reset or the card's dismiss); it runs `startBreakFromModal`, so an open card collapses into the break pill. During a break Now has `Pause` / `Resume` (label `BREAK · PAUSED`) next to `Skip Break`.
 - Q14 `SetIntentionModal`: `Done` and a backdrop click save a typed draft; Esc and × discard it; a failed save shows `role=alert` and keeps the modal.
 
+### Owner decisions (2026-09-29, running layout — `mockups/NowRunning.dc.html`)
+
+- Q16 Running, paused and kickoff drop the daily-intention row (SET INTENTION / EDIT), the `01 Focus` header and the continue slot; daily intentions stay editable in ready and break. The card's `Intent` line is the session note (`timerStore.intention`), edited in place (Enter / blur saves, Esc reverts, empty shows `Add an intent for this session`); the saved row's comment reads it at save time.
+- Q17 `Up next` (two of Plan's open Today items under the card, running task excluded, Today positions kept): a click ends the running session — saved when it ran ≥ 1 min, else reset with no row (`finishEarly`) — and starts focus on the clicked task with the item title as the note (`startFocus` resolves its billable, hides the finished card, clears the due break). No boundary check. Rows without a task are disabled. `All today →` opens Plan. Shown while running / paused only.
+- Q18 The row's time is focus tracked today on that task (omitted at 0); list items keep no estimate.
+- Q19 The Day aside loses the week strip (not moved to Plan), the Focus / 6h bar (now in the card), the Today key and the floating `+`; header = Timeline | Tasks + `‹ MON 28 ›` (Timeline panel only), one line `N sessions · Xh Ym focus · U unlogged` (saved rows of the shown day), footer `+ Entry` (opens `AddEntryModal`) and `Review day →`.
+- Q20 The running card's readouts (`TODAY · FOCUS` + 12-segment day bar, `SESSION` nn + one square per session today with the current one amber, `ON THIS TASK TODAY`) count the running session's elapsed minutes. Supersedes §9's "no session counter while running".
+- Q21 Timeline: focus sessions, meetings and scheduled entries are walked in start order; adjacent focus sessions with the same task id merge into one block (breaks between them are not drawn; a meeting or entry splits the run). A click expands the run into its sessions, a click on one folds it. 110 px per hour; the now marker is a gutter chip with a line behind opaque blocks; the running block reads `mm:ss left`.
+
 ## 8. Roadmap scope (owner, 2026-09-25)
 
 Only surfaces covered by the design proposal get redesigned:
@@ -291,6 +300,8 @@ Only surfaces covered by the design proposal get redesigned:
 Settings, Insights (Progress) and every other view are out of scope. They stay hosted unchanged behind the rail.
 
 ## 9. Calm running state — added by owner (2026-09-26)
+
+> Superseded in part by Q16–Q21 (§7, 2026-09-29): the running card now carries readouts, the INTENT line and Up next; the intention row and `01 FOCUS` leave the running states.
 
 Spec: `mockups/Running.dc.html` (880×360, "Focus running — calm state"). The two-column focus block felt crowded while a session runs. Running, paused and the kickoff warmup on Now become a single column inside the same bordered block; ready states and break keep the split layout (`CountdownDisplay` + right column) untouched.
 
