@@ -8,12 +8,16 @@ import type { TimerListener } from './timer';
  */
 
 const settings = new Map<string, string>();
+let calendarRows: Array<{ start_at: string; end_at: string; duration_minutes: number; dismissed: 0 | 1 }> = [];
 vi.mock('../src/services/db', () => ({
   getSetting: vi.fn((key: string) => settings.get(key) ?? null),
   saveSetting: vi.fn((key: string, value: string) => {
     settings.set(key, value);
   }),
-  getCalendarProposals: vi.fn(() => []),
+  // Same contract as db.ts: includeAll keeps the rows dismissed in Review.
+  getCalendarProposals: vi.fn((_date: string, includeAll = false) =>
+    includeAll ? calendarRows : calendarRows.filter((row) => row.dismissed === 0)
+  ),
   getLastSessionWithTask: vi.fn(() => null),
   getCachedTask: vi.fn(() => undefined),
 }));
@@ -209,5 +213,32 @@ describe('idleNudge — pause', () => {
     mod.pauseNudges('15m');
     vi.advanceTimersByTime(60 * MIN);
     expect(showOverlay).not.toHaveBeenCalled();
+  });
+
+  describe('meeting gate', () => {
+    // WED_10 local: a 09:30–11:00 meeting is running.
+    const meeting = (dismissed: 0 | 1) => ({
+      start_at: new Date(WED_10 - 30 * MIN).toISOString(),
+      end_at: new Date(WED_10 + 60 * MIN).toISOString(),
+      duration_minutes: 90,
+      dismissed,
+    });
+    afterEach(() => {
+      calendarRows = [];
+    });
+
+    it('a running meeting holds the nudge', async () => {
+      calendarRows = [meeting(0)];
+      await boot();
+      vi.advanceTimersByTime(20 * MIN);
+      expect(showOverlay).not.toHaveBeenCalled();
+    });
+
+    it('a meeting dismissed in Review does not: the nudge comes after 10 minutes', async () => {
+      calendarRows = [meeting(1)];
+      await boot();
+      vi.advanceTimersByTime(11 * MIN);
+      expect(showOverlay).toHaveBeenCalledTimes(1);
+    });
   });
 });
