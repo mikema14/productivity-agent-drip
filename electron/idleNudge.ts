@@ -139,11 +139,12 @@ function localDateKey(d: Date): string {
 /**
  * Uses today's calendar proposals already in the DB (synced by the renderer
  * from the ICS feed), so it costs one indexed query and no network. All-day
- * events are ignored — they would silence the whole day.
+ * events are ignored — they would silence the whole day — and so are events
+ * dismissed in Review: dismissed means "I wasn't in it".
  */
 function isInMeeting(now: number): boolean {
   try {
-    const rows = getCalendarProposals(localDateKey(new Date(now)), true) as Array<{
+    const rows = getCalendarProposals(localDateKey(new Date(now))) as Array<{
       start_at: string;
       end_at: string;
       duration_minutes: number;
