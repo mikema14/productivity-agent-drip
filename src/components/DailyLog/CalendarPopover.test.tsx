@@ -34,3 +34,21 @@ describe('CalendarPopover — Today is the local date', () => {
     expect(screen.queryByRole('button', { name: 'Today' })).toBeNull();
   });
 });
+
+describe('CalendarPopover — placement', () => {
+  beforeEach(() => {
+    useLogStore.setState({ getMonthlyStats: vi.fn(async () => ({ dailyMinutes: [] })) } as never);
+  });
+
+  it('opens rightward from the Review header date, clear of the rail', () => {
+    render(<CalendarPopover selectedDate="2026-09-22" align="left" onSelectDate={() => {}} onClose={() => {}} />);
+    const popover = screen.getByTestId('calendar-popover');
+    expect(popover.className).toContain('left-0');
+    expect(popover.className).not.toContain('right-0');
+  });
+
+  it('keeps the right-edge anchor by default (the toolbar Move popover)', () => {
+    render(<CalendarPopover selectedDate="2026-09-22" onSelectDate={() => {}} onClose={() => {}} />);
+    expect(screen.getByTestId('calendar-popover').className).toContain('right-0');
+  });
+});

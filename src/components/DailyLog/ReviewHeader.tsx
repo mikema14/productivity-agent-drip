@@ -55,6 +55,7 @@ export default function ReviewHeader({ date, today, onPrev, onNext, onSelectDate
             {showCalendar && (
               <CalendarPopover
                 selectedDate={date}
+                align="left"
                 onSelectDate={(d) => { onSelectDate(d); setShowCalendar(false); }}
                 onClose={() => setShowCalendar(false)}
               />
