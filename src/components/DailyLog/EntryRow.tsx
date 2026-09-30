@@ -186,7 +186,8 @@ function EntryRow(props: EntryRowProps) {
     const content = (
       <>
         <span data-testid="entry-task-id" className={`font-mono text-[12px] ${isLogged ? 'text-txt-muted' : 'text-focus'}`}>{entry.taskId}</span>
-        <span className="font-display text-[12px] text-txt-muted truncate">{taskName ?? ' '}</span>
+        {/* max-w-full: Chromium 120 sizes a flex-col <button>'s children to their content, so truncate alone spills into Comment */}
+        <span className="max-w-full font-display text-[12px] text-txt-muted truncate">{taskName ?? ' '}</span>
       </>
     );
     task = isLogged ? (

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { useLogStore } from '../../stores/logStore';
 import { todayString } from './reviewLogic';
 
@@ -12,7 +12,13 @@ interface CalendarPopoverProps {
   selectedDate: string;
   onSelectDate: (date: string) => void;
   onClose: () => void;
+  /** Which edge of the anchor the popover lines up with. The Review header opens it rightward (`left`)
+   *  so it never slides under the rail; the toolbar's Move popover sits at the right end (`right`). */
+  align?: 'left' | 'right';
 }
+
+// The popover can sit inside a drag region (the Review header): opt it out, or Electron eats the clicks.
+const noDrag = { WebkitAppRegion: 'no-drag' } as CSSProperties;
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -21,7 +27,7 @@ const MONTH_NAMES = [
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-export default function CalendarPopover({ selectedDate, onSelectDate, onClose }: CalendarPopoverProps) {
+export default function CalendarPopover({ selectedDate, onSelectDate, onClose, align = 'right' }: CalendarPopoverProps) {
   const initDate = new Date(selectedDate);
   const [viewYear, setViewYear] = useState(initDate.getFullYear());
   const [viewMonth, setViewMonth] = useState(initDate.getMonth() + 1);
@@ -131,7 +137,8 @@ export default function CalendarPopover({ selectedDate, onSelectDate, onClose }:
     <div
       ref={popoverRef}
       data-testid="calendar-popover"
-      className="absolute top-full right-0 mt-2 z-50 w-72 bg-drip-elevated border border-focus/30 rounded-[2px] shadow-glass p-4 animate-scale-in"
+      className={`absolute top-full ${align === 'left' ? 'left-0' : 'right-0'} mt-2 z-50 w-72 bg-drip-elevated border border-focus/30 rounded-[2px] shadow-glass p-4 animate-scale-in`}
+      style={noDrag}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {/* Header: month nav + today button */}
