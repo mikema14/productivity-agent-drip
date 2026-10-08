@@ -100,6 +100,7 @@ import {
   extendTimer,
   cleanupTimer
 } from './timer';
+import { revealWindow } from './revealWindow';
 import { initIdleNudge, stopIdleNudge, startKickoff, handleIdleOverlayAction, getNudgePausedUntil, resumeNudges } from './idleNudge';
 
 let mainWindow: BrowserWindow | null = null;
@@ -138,7 +139,16 @@ function createWindow() {
   mainWindow.on('close', (event) => {
     if (!app.isQuitting) {
       event.preventDefault();
-      mainWindow?.hide();
+      const win = mainWindow;
+      if (!win) return;
+      // Hiding a fullscreen window strands it in an empty Space: show() later
+      // reports success and nothing appears. Leave fullscreen first.
+      if (win.isFullScreen()) {
+        win.once('leave-full-screen', () => win.hide());
+        win.setFullScreen(false);
+      } else {
+        win.hide();
+      }
     }
   });
 
@@ -165,7 +175,7 @@ function handleDripUrl(url: string) {
         // Send to renderer to start focus via the store (handles session count, break logic, etc.)
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('url-start-focus', { taskId, intention });
-          mainWindow.show();
+          revealWindow(mainWindow);
         }
         break;
       }
@@ -238,11 +248,7 @@ if (!gotTheLock) {
       handleDripUrl(url);
     }
     // Focus the window
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
-      mainWindow.focus();
-    }
+    if (mainWindow && !mainWindow.isDestroyed()) revealWindow(mainWindow);
   });
 }
 
@@ -288,7 +294,7 @@ app.whenReady().then(() => {
       // Without this the timer module keeps sending to a dead window
       setMainWindowReference(mainWindow);
     } else {
-      mainWindow.show();
+      revealWindow(mainWindow);
     }
   });
 });
@@ -542,13 +548,7 @@ ipcMain.on('show-notification', (_event, title: string, body: string) => {
 
 // Show main window
 ipcMain.on('show-window', () => {
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) {
-      mainWindow.restore();
-    }
-    mainWindow.show();
-    mainWindow.focus();
-  }
+  if (mainWindow && !mainWindow.isDestroyed()) revealWindow(mainWindow);
 });
 
 // Toggle tray icon visibility

@@ -51,6 +51,8 @@ const showOverlay = vi.fn(() => {
 const hideOverlay = vi.fn(() => {
   visibleKind = null;
 });
+vi.mock('./revealWindow', () => ({ revealWindow: vi.fn() }));
+
 vi.mock('./overlayWindow', () => ({
   getVisibleOverlayKind: () => visibleKind,
   hideOverlay: (...args: unknown[]) => hideOverlay(...args),
