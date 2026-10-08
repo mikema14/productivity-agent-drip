@@ -287,6 +287,8 @@ export type IdleCommand =
 export interface OverlayAPI {
   onState: (callback: (payload: SessionOverlayPayload) => void) => void;
   onTick: (callback: (remainingSeconds: number) => void) => void;
+  /** Main hid the card (the user moved on in the main window). */
+  onHidden: (callback: () => void) => void;
   action: (type: OverlayActionType, data?: OverlayActionData) => void;
   saveNote: (sessionId: string, note: string) => Promise<void>;
   setInteractive: (interactive: boolean) => void;

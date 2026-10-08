@@ -11,6 +11,10 @@ const overlayAPI: OverlayAPI = {
     ipcRenderer.on('overlay:state', (_event, payload: SessionOverlayPayload) => callback(payload));
   },
 
+  onHidden: (callback: () => void): void => {
+    ipcRenderer.on('overlay:hidden', () => callback());
+  },
+
   onTick: (callback: (remainingSeconds: number) => void): void => {
     ipcRenderer.on('overlay:tick', (_event, remainingSeconds: number) => callback(remainingSeconds));
   },

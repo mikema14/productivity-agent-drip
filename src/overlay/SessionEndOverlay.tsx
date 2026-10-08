@@ -214,6 +214,7 @@ export function SessionEndOverlay() {
     });
 
     window.overlayAPI?.onTick((seconds) => setRemaining(seconds));
+    window.overlayAPI?.onHidden(stopEscalation);
 
     const onBeforeUnload = () => flushNote(true);
     const onKey = (event: KeyboardEvent) => {

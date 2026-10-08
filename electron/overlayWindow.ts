@@ -276,6 +276,10 @@ export function setOverlayEscalated(escalated: boolean): void {
     hideEdgeGlow();
     return;
   }
+  // The card's 60-s escalation clock lives in its renderer and outlives a
+  // hide: a request from a card nobody can see would light the strips over a
+  // running session, with nothing left to turn them off.
+  if (!isOverlayVisible()) return;
 
   // Escalation happens a minute after the session ended, by which time the
   // timer has stopped sampling — so re-read where the user is now and bring
@@ -334,6 +338,8 @@ export function hideOverlay(): void {
   if (isOverlayVisible()) {
     state.win!.setIgnoreMouseEvents(true, { forward: true });
     state.win!.hide();
+    // Stops the card's escalation clock; a hidden card must not escalate.
+    state.win!.webContents.send('overlay:hidden');
   }
   hideEdgeGlow();
   state.lastKind = null;

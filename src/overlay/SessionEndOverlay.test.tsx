@@ -4,6 +4,7 @@ import type { OverlayAPI, SessionOverlayPayload } from '../types';
 import { SessionEndOverlay } from './SessionEndOverlay';
 
 let push: (payload: SessionOverlayPayload) => void;
+let hide: () => void;
 let overlayAPI: OverlayAPI;
 
 beforeEach(() => {
@@ -12,6 +13,9 @@ beforeEach(() => {
       push = cb;
     }),
     onTick: vi.fn(),
+    onHidden: vi.fn((cb) => {
+      hide = cb;
+    }),
     action: vi.fn(),
     saveNote: vi.fn(async () => undefined),
     setInteractive: vi.fn(),
@@ -171,6 +175,40 @@ const focusDone: SessionOverlayPayload = {
   nextBreakMinutes: 5,
   isLongBreak: false,
 };
+
+// The focus-complete card focuses its note on show, and focusing the note stops
+// the escalation, so the break-over card is the one that reliably escalates.
+const breakDone: SessionOverlayPayload = { kind: 'break-complete', nextFocusMinutes: 25 };
+
+describe('SessionEndOverlay — escalation', () => {
+  it('escalates a break-over card left alone for 60 s', () => {
+    vi.useFakeTimers();
+    try {
+      show(breakDone);
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+      expect(overlayAPI.setEscalated).toHaveBeenCalledWith(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never escalates once main has hidden the card', () => {
+    vi.useFakeTimers();
+    try {
+      show(breakDone);
+      act(() => {
+        vi.advanceTimersByTime(20_000);
+        hide();
+        vi.advanceTimersByTime(120_000);
+      });
+      expect(overlayAPI.setEscalated).not.toHaveBeenCalledWith(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
 
 describe('SessionEndOverlay — focus-complete card (pinned)', () => {
   it('renders the label, time range, id, focused note input and the three keys', () => {
