@@ -5,6 +5,7 @@ import { getVisibleOverlayKind, hideOverlay, sampleActiveDisplay, showOverlay } 
 import { getTimerState, setTimerListener } from './timer';
 import { raycastFocusEnd, isRaycastFocusEnabled } from './raycastFocus';
 import { buildNudgePayload } from './nudgePayload';
+import { revealWindow } from './revealWindow';
 import {
   IDLE_DEFAULTS,
   IDLE_FAST,
@@ -247,13 +248,7 @@ export function startKickoff(source: Exclude<KickoffSource, 'now'>): void {
 
   const win = getWindow();
   if (!win || win.isDestroyed()) return;
-  if (win.isMinimized()) win.restore();
-  if (source === 'auto') {
-    win.showInactive();
-    win.moveTop();
-  } else {
-    win.show();
-  }
+  revealWindow(win, { inactive: source === 'auto' });
 }
 
 function clearPromptTimer(): void {

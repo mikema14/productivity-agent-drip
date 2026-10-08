@@ -120,6 +120,7 @@ function positionOverlay(win: BrowserWindow): void {
 
 function createOverlay(): BrowserWindow {
   const win = new BrowserWindow({
+    type: 'panel',
     width: OVERLAY_W,
     height: OVERLAY_H,
     show: false,
@@ -149,7 +150,11 @@ function createOverlay(): BrowserWindow {
   });
 
   win.setAlwaysOnTop(true, 'screen-saver');
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // skipTransformProcessType: without it Electron turns Drip into a UIElement
+  // app (app.dock.hide()) — the Dock icon vanishes and stays gone, so a hidden
+  // main window can no longer be brought back. The panel type is what lets
+  // the window float over fullscreen apps without that transform.
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   // Click-through by default; `forward: true` still delivers mousemove so the
   // renderer can ask for interactivity when the cursor enters the shape.
   win.setIgnoreMouseEvents(true, { forward: true });
@@ -213,6 +218,7 @@ function showEdgeGlow(): void {
     try {
       const { workArea } = display;
       const win = new BrowserWindow({
+        type: 'panel',
         x: workArea.x,
         y: workArea.y,
         width: workArea.width,
@@ -239,7 +245,7 @@ function showEdgeGlow(): void {
       });
 
       win.setAlwaysOnTop(true, 'screen-saver');
-      win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
       win.setIgnoreMouseEvents(true);
 
       loadOverlayHtml(win, 'edge=1');
