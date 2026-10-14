@@ -43,10 +43,11 @@ USER_ID = 28668  # src/services/api.ts USER_ID
 EASY8_TIMEOUT_S = 30
 MIN_PREFIX = 4
 COMMENT_CHARS = 200
+BUSY_TIMEOUT_S = 10
 DEFAULT_LIST_COLOR = "#10b981"  # src/utils/listColors.ts DEFAULT_LIST_COLOR
 # `easy8 issue show` returns status {id, name} without is_closed / closed_on /
 # done_ratio, so "closed" falls back to the status name.
-CLOSED_STATUS_WORDS = ("closed", "done", "resolved", "rejected", "finished", "cancel",
+CLOSED_STATUS_WORDS = ("to backlog", "closed", "done", "resolved", "rejected", "finished", "cancel",
                        "uzavřen", "hotovo", "vyřešen", "zamítnut", "dokončen", "zrušen")
 
 
@@ -81,11 +82,11 @@ def connect(db_path: Path, write: bool) -> sqlite3.Connection:
     if not db_path.exists():
         raise PlanError(f"Drip DB not found at {db_path}")
     if write:
-        conn = sqlite3.connect(str(db_path), timeout=10)
+        conn = sqlite3.connect(str(db_path), timeout=BUSY_TIMEOUT_S)
     else:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=10)
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=BUSY_TIMEOUT_S)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute(f"PRAGMA busy_timeout = {int(BUSY_TIMEOUT_S * 1000)}")
     return conn
 
 
@@ -273,14 +274,17 @@ def journal_digest(issue: dict, since_days: int, now: datetime) -> dict:
             continue
         who = (j.get("user") or {}).get("name", "?")
         note = strip_html(j.get("notes") or "")
-        if note and not j.get("private_notes"):
-            comments.append({"on": when.astimezone().date().isoformat(), "by": who, "text": trim(note),
-                             "recent": when >= cutoff, "_ts": when})
+        private = bool(j.get("private_notes"))
+        if note:
+            comments.append({"on": when.astimezone().date().isoformat(), "by": who,
+                             "text": trim(("private note: " if private else "") + note),
+                             "private": private, "recent": when >= cutoff, "_ts": when})
         if when >= cutoff:
             for d in j.get("details") or []:
                 changes.append(f"{when.astimezone().date().isoformat()} {describe_detail(d)} ({who})")
             if note:
-                changes.append(f"{when.astimezone().date().isoformat()} comment ({who})")
+                kind = "private note" if private else "comment"
+                changes.append(f"{when.astimezone().date().isoformat()} {kind} ({who})")
     comments.sort(key=lambda c: c["_ts"], reverse=True)
     for c in comments:
         del c["_ts"]
@@ -508,13 +512,12 @@ def cmd_add(args, fetch=None) -> None:
         lst = target[0]
         if lst["task_id"] and lst["task_id"] != task_id:
             raise PlanError(f"List '{lst['name']}' logs to {lst['task_id']}; its items cannot carry task {task_id}")
-        dupes = conn.execute(
-            "SELECT i.id, i.title, l.name FROM list_items i JOIN lists l ON l.id = i.list_id "
-            "WHERE i.task_id = ? AND i.completed = 0 AND COALESCE(i.archived, 0) = 0 AND COALESCE(l.archived, 0) = 0",
-            (task_id,)).fetchall()
+        # Effective task id (list.task_id overrides item.task_id), same rule as resolve_ref.
+        dupes = [r for r in conn.execute(ITEM_SQL + " AND i.completed = 0 AND COALESCE(i.archived, 0) = 0").fetchall()
+                 if effective_task_id(r) == task_id]
         if dupes and not args.force:
             raise PlanError(f"Open item with task {task_id} already exists: "
-                            + "; ".join(f"{d['id'][:8]} \"{d['title']}\" [{d['name']}]" for d in dupes)
+                            + "; ".join(f"{d['id'][:8]} \"{d['title']}\" [{d['list_name']}]" for d in dupes)
                             + " — use --force to add anyway")
         title = (args.title or "").strip()
         if not title:
@@ -599,6 +602,11 @@ def main(argv=None) -> int:
     except PlanError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
+    except sqlite3.OperationalError as e:
+        if "locked" in str(e) or "busy" in str(e):
+            print("ERROR: Drip database is busy, try again", file=sys.stderr)
+            return 1
+        raise
     return 0
 
 

@@ -280,14 +280,14 @@ export async function getLists(): Promise<DripList[]> {
 
 export async function getActiveListItems(): Promise<DripListItem[]> {
   return query<DripListItem>(
-    `SELECT li.id, li.list_id, li.title, li.task_id, li."column", li."order", li.completed, li.subtasks, l.name AS list_name, l.color AS list_color, l.task_id AS list_task_id FROM list_items li JOIN lists l ON l.id = li.list_id WHERE li.completed = 0 ORDER BY CASE li."column" WHEN 'today' THEN 0 WHEN 'this_week' THEN 1 WHEN 'backlog' THEN 2 END, li."order" ASC`
+    `SELECT li.id, li.list_id, li.title, li.task_id, li."column", li."order", li.completed, li.subtasks, l.name AS list_name, l.color AS list_color, l.task_id AS list_task_id FROM list_items li JOIN lists l ON l.id = li.list_id WHERE li.completed = 0 AND COALESCE(li.archived, 0) = 0 ORDER BY CASE li."column" WHEN 'today' THEN 0 WHEN 'this_week' THEN 1 WHEN 'backlog' THEN 2 END, li."order" ASC`
   );
 }
 
 export async function searchListItems(queryStr: string): Promise<DripListItem[]> {
   const escaped = escapeSql(queryStr);
   return query<DripListItem>(
-    `SELECT li.id, li.list_id, li.title, li.task_id, li."column", li."order", li.completed, li.subtasks, l.name AS list_name, l.color AS list_color, l.task_id AS list_task_id FROM list_items li JOIN lists l ON l.id = li.list_id WHERE li.completed = 0 AND (li.title LIKE '%${escaped}%' OR li.task_id LIKE '%${escaped}%' OR l.task_id LIKE '%${escaped}%') ORDER BY CASE li."column" WHEN 'today' THEN 0 WHEN 'this_week' THEN 1 WHEN 'backlog' THEN 2 END, li."order" ASC LIMIT 50`
+    `SELECT li.id, li.list_id, li.title, li.task_id, li."column", li."order", li.completed, li.subtasks, l.name AS list_name, l.color AS list_color, l.task_id AS list_task_id FROM list_items li JOIN lists l ON l.id = li.list_id WHERE li.completed = 0 AND COALESCE(li.archived, 0) = 0 AND (li.title LIKE '%${escaped}%' OR li.task_id LIKE '%${escaped}%' OR l.task_id LIKE '%${escaped}%') ORDER BY CASE li."column" WHEN 'today' THEN 0 WHEN 'this_week' THEN 1 WHEN 'backlog' THEN 2 END, li."order" ASC LIMIT 50`
   );
 }
 

@@ -204,8 +204,15 @@ class TestAdd(Base):
         self.assertEqual(code, 0)
         self.assertEqual(self.count("SELECT COUNT(*) FROM list_items WHERE task_id = '700001'"), 2)
 
+    def test_duplicate_uses_effective_task_id(self):
+        # list L2 is bound to 667776 and has open items with item.task_id NULL
+        code, _, err = self.run_cli("add", "667776", "--title", "Sub job")
+        self.assertEqual(code, 1)
+        self.assertIn("already exists", err)
+        self.assertIn("cccc1111", err)
+
     def test_default_list_is_bound_list_and_item_task_null(self):
-        code, out, _ = self.run_cli("add", "667776", "--title", "Sub job")
+        code, out, _ = self.run_cli("add", "667776", "--title", "Sub job", "--force")
         self.assertEqual(code, 0, out)
         c = sqlite3.connect(self.db)
         r = c.execute("SELECT list_id, task_id, billable, \"order\" FROM list_items WHERE title = 'Sub job'").fetchone()
@@ -230,6 +237,21 @@ class TestAdd(Base):
         self.assertEqual(code, 0)
         self.assertIn("DRY RUN: ADDED", out)
         self.assertEqual(self.count("SELECT COUNT(*) FROM list_items"), before)
+
+
+class TestBusy(Base):
+    def test_locked_db_clean_error(self):
+        holder = sqlite3.connect(self.db, isolation_level=None)
+        holder.execute("BEGIN EXCLUSIVE")
+        try:
+            with mock.patch.object(drip_plan, "BUSY_TIMEOUT_S", 0.1):
+                code, _, err = self.run_cli("move", "700001", "today")
+        finally:
+            holder.execute("ROLLBACK")
+            holder.close()
+        self.assertEqual(code, 1)
+        self.assertIn("ERROR: Drip database is busy, try again", err)
+        self.assertEqual(self.row("aaaa1111-0000-0000-0000-000000000001")["col"], "backlog")
 
 
 class TestAddList(Base):
@@ -326,6 +348,20 @@ class TestStatusReview(Base):
         code, text, _ = self.run_cli("review", stub=stub)
         self.assertEqual(code, 0)
         self.assertTrue(re.search(r"== today \(\d\) ==", text))
+
+    def test_to_backlog_status_counts_as_closed(self):
+        self.assertTrue(drip_plan.is_closed(issue(status={"id": 30, "name": "To backlog"})))
+        self.assertFalse(drip_plan.is_closed(issue(status={"id": 15, "name": "Realisation"})))
+        self.assertTrue(drip_plan.is_closed(issue(status={"id": 1, "name": "New", "is_closed": True})))
+
+    def test_private_notes_shown_as_private(self):
+        now = datetime.now(timezone.utc)
+        iss = issue(journals=[{"user": {"name": "Jana"}, "notes": "secret plan", "private_notes": True,
+                               "created_on": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "details": []}])
+        d = drip_plan.journal_digest(iss, 7, now + timedelta(seconds=1))
+        self.assertEqual(d["changes"][0].split(" ", 1)[1], "private note (Jana)")
+        self.assertEqual(d["latest_comments"][0]["text"], "private note: secret plan")
+        self.assertTrue(d["latest_comments"][0]["private"])
 
     def test_compact_changes(self):
         out = drip_plan.compact_changes(["2026-10-14 description edited (A)", "2026-10-12 description edited (B)",
