@@ -20,6 +20,8 @@ declare type Preferences = ExtensionPreferences
 declare namespace Preferences {
   /** Preferences accessible in the `start-focus` command */
   export type StartFocus = ExtensionPreferences & {}
+  /** Preferences accessible in the `kickoff` command */
+  export type Kickoff = ExtensionPreferences & {}
   /** Preferences accessible in the `add-entry` command */
   export type AddEntry = ExtensionPreferences & {}
   /** Preferences accessible in the `todays-log` command */
@@ -37,6 +39,8 @@ declare namespace Preferences {
 declare namespace Arguments {
   /** Arguments passed to the `start-focus` command */
   export type StartFocus = {}
+  /** Arguments passed to the `kickoff` command */
+  export type Kickoff = {}
   /** Arguments passed to the `add-entry` command */
   export type AddEntry = {}
   /** Arguments passed to the `todays-log` command */
