@@ -206,7 +206,7 @@ export default function TimelineView({ entries }: TimelineViewProps) {
                       <span className="text-xs text-break/70">Break</span>
                     )}
                     {!isBreak && entry.taskId && (
-                      <span className="text-xs font-mono text-txt-muted">{entry.taskId}</span>
+                      <span data-task-id={entry.taskId} className="text-xs font-mono text-txt-muted">{entry.taskId}</span>
                     )}
                     {!isBreak && entry.type === 'calendar' && (
                       <span className="text-xs text-blue-400/70 truncate">{entry.title}</span>
@@ -241,7 +241,7 @@ export default function TimelineView({ entries }: TimelineViewProps) {
                     {elapsedMin}m
                   </span>
                   {currentTaskId && (
-                    <span className="text-xs font-mono text-txt-muted">{currentTaskId}</span>
+                    <span data-task-id={currentTaskId} className="text-xs font-mono text-txt-muted">{currentTaskId}</span>
                   )}
                   {intention && height > 30 && (
                     <span className="text-xs text-txt-dim truncate">{intention}</span>
@@ -310,7 +310,7 @@ export default function TimelineView({ entries }: TimelineViewProps) {
                     {entry.durationMinutes}m
                   </span>
                   {entry.taskId && (
-                    <span className="font-mono text-txt-muted">{entry.taskId}</span>
+                    <span data-task-id={entry.taskId} className="font-mono text-txt-muted">{entry.taskId}</span>
                   )}
                   <span className="text-txt-primary truncate">{entry.title}</span>
                   {entry.logged && (

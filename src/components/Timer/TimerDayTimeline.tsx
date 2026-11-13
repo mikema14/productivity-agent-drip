@@ -60,7 +60,7 @@ function MergedBlock({ group, height, onExpand }: { group: SessionGroup; height:
       </span>
       <span className="flex-1 min-w-0 px-3 py-2 flex flex-col gap-1">
         <span className="flex items-baseline gap-2 font-mono text-[11px] text-focus">
-          {group.taskId}
+          <span data-task-id={group.taskId}>{group.taskId}</span>
           <span className="flex-1" />
           {allLogged && <span className="text-focus">&#10003;</span>}
           <span className="text-txt-primary">{formatMinutesPadded(group.totalMinutes)}</span>
@@ -214,7 +214,7 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
     const content = (
       <>
         <span className="text-txt-primary">{session.duration_minutes}m</span>
-        {session.task_id && <span>{session.task_id}</span>}
+        {session.task_id && <span data-task-id={session.task_id}>{session.task_id}</span>}
         {session.comment && height > 30 && (
           <span className="font-display text-xs text-txt-muted truncate">{session.comment}</span>
         )}
@@ -365,7 +365,7 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
                     className="h-full px-3 flex items-center gap-2 border border-dashed border-focus/55 bg-focus/5 rounded-[2px] overflow-hidden font-mono text-[10.5px] text-focus"
                   >
                     <span aria-hidden className={`w-1.5 h-1.5 shrink-0 ${isPaused ? 'bg-txt-dim' : 'bg-focus shadow-led'}`} />
-                    {currentTaskId && <span>{currentTaskId}</span>}
+                    {currentTaskId && <span data-task-id={currentTaskId}>{currentTaskId}</span>}
                     <span className="flex-1" />
                     <span className="text-txt-primary">{formatTime(remainingSeconds)} left</span>
                   </div>
@@ -404,7 +404,7 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
                       </span>
                       <span className="text-xs text-blue-300/80 truncate">{proposal.title}</span>
                       {proposal.task_id && (
-                        <span className="font-mono text-[10.5px] text-txt-muted">{proposal.task_id}</span>
+                        <span data-task-id={proposal.task_id} className="font-mono text-[10.5px] text-txt-muted">{proposal.task_id}</span>
                       )}
                     </div>
                   </div>
@@ -427,7 +427,7 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
                     </span>
                     <span className="text-xs text-txt-muted truncate">{entry.title}</span>
                     {entry.task_id && (
-                      <span className="font-mono text-[10.5px] text-txt-dim">{entry.task_id}</span>
+                      <span data-task-id={entry.task_id} className="font-mono text-[10.5px] text-txt-dim">{entry.task_id}</span>
                     )}
                     {isLogged && (
                       <span className="text-xs text-txt-secondary ml-auto">&#10003;</span>
@@ -463,7 +463,7 @@ export default function TimerDayTimeline({ sessions, calendarProposals, adhocEnt
                 <span className="font-mono text-[10.5px] text-txt-secondary">{entry.duration_minutes}m</span>
                 <span className="text-xs text-txt-muted truncate">{entry.title}</span>
                 {entry.task_id && (
-                  <span className="font-mono text-[10.5px] text-txt-dim">{entry.task_id}</span>
+                  <span data-task-id={entry.task_id} className="font-mono text-[10.5px] text-txt-dim">{entry.task_id}</span>
                 )}
                 {entry.logged === 1 && (
                   <span className="text-xs text-txt-secondary ml-auto">&#10003;</span>

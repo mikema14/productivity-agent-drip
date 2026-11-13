@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, Notification, net, shell, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, Notification, net, shell, screen, clipboard, Menu } from 'electron';
+import { isTaskId, taskUrl, type TaskIdAction } from '../src/utils/taskLink';
 import { join } from 'path';
 import { readFileSync, statSync, writeFileSync } from 'fs';
 import type { FocusCompletePayload, BreakCompletePayload, OverlayActionData, OverlayActionType } from '../src/types';
@@ -374,6 +375,25 @@ ipcMain.handle('open-external', async (_event, url: string) => {
     console.error('Failed to open external URL:', error);
     return { success: false, error: (error as Error).message };
   }
+});
+
+// Task id actions: copy the id, copy its Easy8 link, open it, or show the right-click menu for all three.
+ipcMain.handle('task-id:action', async (_event, action: TaskIdAction, taskId: string) => {
+  if (!isTaskId(taskId)) return { success: false, error: 'Not a task id' };
+  const url = taskUrl(getSetting('apiBaseUrl'), taskId);
+  const open = () => { void shell.openExternal(url); };
+  if (action === 'copy') clipboard.writeText(taskId);
+  else if (action === 'copy-link') clipboard.writeText(url);
+  else if (action === 'open') open();
+  else if (action === 'menu') {
+    Menu.buildFromTemplate([
+      { label: `Copy ${taskId}`, click: () => clipboard.writeText(taskId) },
+      { label: 'Copy link', click: () => clipboard.writeText(url) },
+      { type: 'separator' },
+      { label: 'Open in Easy8', click: open },
+    ]).popup(mainWindow ? { window: mainWindow } : undefined);
+  }
+  return { success: true };
 });
 
 // Get setting

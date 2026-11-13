@@ -69,7 +69,7 @@ export default function LogTimeModal({ taskTitle, taskId, billable, onClose, onS
           <div className="mt-1 flex items-center gap-2 text-xs">
             <span className="text-txt-secondary truncate">{taskTitle}</span>
             {taskId ? (
-              <span className="font-mono text-focus shrink-0">{taskId}</span>
+              <span data-task-id={taskId} className="font-mono text-focus shrink-0">{taskId}</span>
             ) : (
               <span className="text-txt-dim shrink-0">no task ID</span>
             )}

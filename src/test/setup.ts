@@ -43,6 +43,7 @@ function installBridgeStubs() {
     // Review posts through this IPC stub only; the fetch trap below catches any other path.
     postTimeEntry: vi.fn(async () => 1001),
     openExternal: vi.fn(async () => undefined),
+    taskIdAction: vi.fn(async () => undefined),
     getSessions: vi.fn(async () => []),
     getLastSessionWithTask: vi.fn(async () => null),
     startMainTimer: vi.fn(async () => ({ raycastFocus: false })),

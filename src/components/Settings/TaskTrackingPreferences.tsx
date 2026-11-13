@@ -132,7 +132,7 @@ export default function TaskTrackingPreferences() {
                     onChange={() => handleToggleTracked(pref.taskId, pref.tracked)}
                     className="w-4 h-4 text-focus border-focus/20 bg-transparent rounded"
                   />
-                  <span className="font-mono text-sm font-semibold text-txt-primary">
+                  <span data-task-id={pref.taskId} className="font-mono text-sm font-semibold text-txt-primary">
                     {pref.taskId}
                   </span>
                   {pref.pinned && (

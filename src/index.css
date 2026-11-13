@@ -9,6 +9,14 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  /* Task ids: click copies, right-click = Copy / Copy link / Open in Easy8, ⌘-click opens (shared/TaskIdActions). */
+  [data-task-id] {
+    cursor: pointer;
+  }
+  [data-task-id]:hover {
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+  }
 }
 
 /* Component classes */

@@ -108,7 +108,7 @@ export default function ActiveFocus({
           <span aria-hidden className={`w-1.5 h-1.5 ${paused ? 'bg-txt-dim' : 'bg-focus shadow-led'}`} />
           <span>{STATE_WORD[state]}</span>
         </span>
-        {task && <span data-testid="active-task-id">{task.task_id}</span>}
+        {task && <span data-testid="active-task-id" data-task-id={task.task_id}>{task.task_id}</span>}
         <span aria-hidden className="flex-1 border-t border-drip-elevated" />
         {state === 'kickoff' && rollsIntoMinutes !== undefined ? (
           <span>Rolls into {rollsIntoMinutes}m</span>

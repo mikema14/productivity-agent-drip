@@ -175,7 +175,7 @@ export default function AddItemInline({ listId, defaultBillable = true, lists, c
                 onMouseDown={(e) => { e.preventDefault(); pick(task); }}
                 className={`flex items-center gap-2 px-2 py-1.5 cursor-pointer ${i === highlighted ? 'bg-focus/10' : ''}`}
               >
-                <span className="font-mono text-[12px] text-focus bg-focus/10 rounded-[2px] px-1.5 shrink-0">{task.task_id}</span>
+                <span data-task-id={task.task_id} className="font-mono text-[12px] text-focus bg-focus/10 rounded-[2px] px-1.5 shrink-0">{task.task_id}</span>
                 <span className="text-[13px] text-txt-primary truncate" title={task.title}>{task.title}</span>
               </div>
             ))}
@@ -187,7 +187,7 @@ export default function AddItemInline({ listId, defaultBillable = true, lists, c
       )}
       {!boundTaskId && lookup.state === 'found' && (
         <p className="px-1 text-[11px] text-txt-muted truncate" title={lookup.title}>
-          <span className="font-mono text-focus">{lookup.id}</span> {lookup.title}
+          <span data-task-id={lookup.id} className="font-mono text-focus">{lookup.id}</span> {lookup.title}
         </p>
       )}
       {!boundTaskId && lookup.state === 'error' && (

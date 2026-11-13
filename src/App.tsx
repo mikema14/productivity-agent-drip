@@ -9,6 +9,7 @@ import ProgressPage from './components/Progress/ProgressPage';
 import PlanView from './components/Plan/PlanView';
 import CreateListModal from './components/Lists/CreateListModal';
 import KickoffTakeover from './components/Kickoff/KickoffTakeover';
+import TaskIdActions from './components/shared/TaskIdActions';
 import { useListsStore } from './stores/listsStore';
 import { loadSessionCount, checkTimerHydration, cleanupTimerIntervals, setupMainTimerListeners } from './stores/timerStore';
 import { useLogStore } from './stores/logStore';
@@ -83,6 +84,7 @@ function App() {
       <Rail view={currentView} onNavigate={setCurrentView} />
       <MainContent>{renderView()}</MainContent>
       <KickoffTakeover />
+      <TaskIdActions />
       {showCreateList && (
         <CreateListModal onClose={() => { setShowCreateList(false); useListsStore.getState().loadLists(); }} />
       )}

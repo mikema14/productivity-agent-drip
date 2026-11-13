@@ -117,7 +117,7 @@ export default function TaskResultList({
                   <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-7 bg-focus" />
                 )}
                 {task.task_id ? (
-                  <span className="font-mono text-[12px] leading-4 text-focus bg-focus/10 rounded-[2px] px-1.5 py-0.5">
+                  <span data-task-id={task.task_id} className="font-mono text-[12px] leading-4 text-focus bg-focus/10 rounded-[2px] px-1.5 py-0.5">
                     {task.task_id}
                   </span>
                 ) : (

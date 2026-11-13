@@ -135,7 +135,7 @@ export default function TaskIdInput({ value, onChange, onTaskSelect, placeholder
               className="px-3 py-2.5 hover:bg-focus/5 cursor-pointer transition-colors first:rounded-t-xl last:rounded-b-xl"
             >
               <div className="flex items-center gap-3">
-                <span className="text-focus font-mono shrink-0 w-20">
+                <span data-task-id={task.task_id} className="text-focus font-mono shrink-0 w-20">
                   #{task.task_id}
                 </span>
                 <span className="text-txt-secondary flex-1 truncate min-w-0">

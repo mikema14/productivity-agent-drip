@@ -14,7 +14,7 @@ export default function ContinuePreviousCTA({ previous, onContinue }: Props) {
     <div className="h-[44px] w-full flex items-center gap-3 border-b border-drip-elevated overflow-hidden">
       <span className="now-label text-focus shrink-0">Continue previous</span>
       {previous.task_id && (
-        <span className="font-mono text-[11px] leading-4 text-focus bg-focus/10 px-1.5 py-0.5 rounded-[2px] shrink-0">
+        <span data-task-id={previous.task_id} className="font-mono text-[11px] leading-4 text-focus bg-focus/10 px-1.5 py-0.5 rounded-[2px] shrink-0">
           {previous.task_id}
         </span>
       )}

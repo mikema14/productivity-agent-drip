@@ -57,7 +57,7 @@ export default function CloseDayAside(props: CloseDayAsideProps) {
           {isToday && (
             <span data-testid="tomorrow-start">
               {first ? (
-                <>Starts with {firstId ? <span className="font-mono text-focus">{firstId}</span> : <span title={first.title}>{first.title}</span>}</>
+                <>Starts with {firstId ? <span data-task-id={firstId} className="font-mono text-focus">{firstId}</span> : <span title={first.title}>{first.title}</span>}</>
               ) : 'Starts empty'}
               {' · '}
             </span>
