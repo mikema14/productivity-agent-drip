@@ -185,6 +185,27 @@ describe('EntryRow — Comment and Billable', () => {
     expect(input).toHaveValue('Dev work');
   });
 
+  it('the comment box shows the full text on hover and wraps while editing', async () => {
+    const long = 'Prepared routine n8n update report for Delcap, checked all three instances';
+    const { user } = renderRow(openRow({ comment: long, title: long }));
+    const box = screen.getByLabelText('Comment');
+    expect(box.tagName).toBe('TEXTAREA');
+    expect(box).toHaveAttribute('title', long);
+    expect(box.className).toContain('whitespace-nowrap');
+    await user.click(box);
+    expect(box.className).toContain('whitespace-pre-wrap');
+    expect(box).not.toHaveAttribute('title');
+  });
+
+  it('pasted line breaks become spaces, so Easy8 gets one line', async () => {
+    const { user, onUpdate } = renderRow(openRow({ comment: 'Dev work', title: 'Dev work' }));
+    const box = screen.getByLabelText('Comment');
+    await user.clear(box);
+    await user.paste('Line one\nLine two');
+    await user.keyboard('{Enter}');
+    expect(onUpdate).toHaveBeenCalledWith('pomodoro-1', { comment: 'Line one Line two' });
+  });
+
   it('Billable is a Yes / No key that toggles through onToggleBillable', async () => {
     const { user, onToggleBillable } = renderRow(openRow());
     const key = screen.getByRole('button', { name: 'Billable' });

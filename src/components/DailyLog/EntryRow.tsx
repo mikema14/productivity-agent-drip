@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, memo } from 'react';
 import type { LogEntry } from '../../stores/logStore';
 import type { MergedEntry } from '../../utils/mergeEntries';
 import BillableToggle from '../shared/BillableToggle';
@@ -93,26 +93,46 @@ function DurationCell({ minutes, text, editable, lockedTitle, onCommit }: {
   );
 }
 
-/** Comment → Easy8: shows exactly what is sent; commits on blur / Enter, Esc reverts (R25). */
+/**
+ * Comment → Easy8: shows exactly what is sent; commits on blur / Enter, Esc reverts (R25).
+ * One line at rest (hover shows the full text); while focused it wraps and grows to fit,
+ * so the whole comment is readable and the row grows with it. Easy8 comments are one line:
+ * Enter never inserts a newline and pasted newlines become spaces.
+ */
+const COMMENT_REST_HEIGHT = 34;
+
 function CommentInput({ value, onCommit }: { value: string; onCommit: (comment: string) => void }) {
   const [draft, setDraft] = useState(value);
+  const [editing, setEditing] = useState(false);
   const focused = useRef(false);
   const skipCommit = useRef(false);
+  const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!focused.current) setDraft(value);
   }, [value]);
 
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (!editing) { el.style.height = `${COMMENT_REST_HEIGHT}px`; return; }
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(COMMENT_REST_HEIGHT, el.scrollHeight + 2)}px`;
+  }, [draft, editing]);
+
   return (
-    <input
-      type="text"
+    <textarea
+      ref={ref}
+      rows={1}
       aria-label="Comment"
       value={draft}
+      title={editing ? undefined : value || undefined}
       placeholder="Comment for Easy8"
-      onChange={e => setDraft(e.target.value)}
-      onFocus={() => { focused.current = true; }}
+      onChange={e => setDraft(e.target.value.replace(/\r?\n/g, ' '))}
+      onFocus={() => { focused.current = true; setEditing(true); }}
       onBlur={() => {
         focused.current = false;
+        setEditing(false);
         if (skipCommit.current) { skipCommit.current = false; setDraft(value); return; }
         const next = draft.trim();
         if (next !== value) onCommit(next);
@@ -121,7 +141,9 @@ function CommentInput({ value, onCommit }: { value: string; onCommit: (comment: 
         if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
         else if (e.key === 'Escape') { e.preventDefault(); skipCommit.current = true; e.currentTarget.blur(); }
       }}
-      className="min-w-0 w-full h-[34px] px-2.5 bg-transparent border border-drip-border rounded-[2px] font-display text-sm text-txt-primary placeholder-txt-dim focus:outline-none focus:border-focus/40 transition-colors"
+      className={`block min-w-0 w-full px-2.5 py-[6px] leading-5 resize-none bg-transparent border border-drip-border rounded-[2px] font-display text-sm text-txt-primary placeholder-txt-dim focus:outline-none focus:border-focus/40 transition-colors ${
+        editing ? 'whitespace-pre-wrap break-words overflow-y-auto' : 'whitespace-nowrap overflow-hidden'
+      }`}
     />
   );
 }
