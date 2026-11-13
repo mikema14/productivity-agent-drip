@@ -32,10 +32,13 @@ export default function TaskIdActions() {
       }
     };
 
-    // Picker rows pick on mousedown: keep right-click and ⌘-click on an id from reaching them.
+    // Picker rows pick on mousedown: keep right-click, Ctrl-click (= right-click on a Mac) and ⌘-click on an id
+    // from reaching them; preventDefault keeps focus in the search box so its suggestion list stays open.
     const onMouseDown = (e: MouseEvent) => {
-      if (!(e.button === 2 || (e.button === 0 && e.metaKey))) return;
-      if (taskIdFrom(e)) e.stopPropagation();
+      if (!(e.button === 2 || (e.button === 0 && (e.metaKey || e.ctrlKey)))) return;
+      if (!taskIdFrom(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
     };
     const onClick = (e: MouseEvent) => {
       if (e.button !== 0) return;
@@ -48,7 +51,9 @@ export default function TaskIdActions() {
         return;
       }
       if (e.shiftKey || e.altKey || e.ctrlKey) return;
-      if (hit.el.parentElement?.closest(INTERACTIVE)) return; // the row's own click wins
+      // The row's own click wins; a draggable Plan card (dnd-kit role=button) is not a row action.
+      const row = hit.el.parentElement?.closest(INTERACTIVE);
+      if (row && row.getAttribute('aria-roledescription') !== 'sortable') return;
       e.preventDefault();
       e.stopPropagation();
       act('copy', hit.id);

@@ -82,7 +82,7 @@ export default function ListsPanel({ view, onNavigate, onCreateList }: ListsPane
               <span data-testid="list-color" className="w-2 h-2 rounded-full shrink-0 mx-[3px]" style={{ backgroundColor: list.color }} />
               <span className="flex-1 min-w-0 flex flex-col gap-px">
                 <span className="text-[13.5px] truncate">{list.name}</span>
-                <span className={`text-[11px] truncate ${active ? 'text-focus/70' : 'text-txt-muted'} ${list.task_id ? 'font-mono text-[10.5px]' : ''}`}>
+                <span data-task-id={list.task_id || undefined} className={`text-[11px] truncate ${active ? 'text-focus/70' : 'text-txt-muted'} ${list.task_id ? 'font-mono text-[10.5px]' : ''}`}>
                   {listSubtitle(list)}
                 </span>
               </span>

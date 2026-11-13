@@ -50,6 +50,18 @@ describe('TaskIdActions', () => {
     expect(onRowDown).not.toHaveBeenCalled();
   });
 
+  it('Ctrl-click (Mac right-click) does not pick the row', () => {
+    const { onRowDown } = setup();
+    fireEvent.mouseDown(screen.getByText('111'), { ctrlKey: true });
+    expect(onRowDown).not.toHaveBeenCalled();
+  });
+
+  it('copies an id on a draggable Plan card', () => {
+    render(<><TaskIdActions /><div role="button" aria-roledescription="sortable"><span data-task-id="42">42</span></div></>);
+    fireEvent.click(screen.getByText('42'));
+    expect(window.timerAPI.taskIdAction).toHaveBeenCalledWith('copy', '42');
+  });
+
   it('ignores elements whose value is not a task id', () => {
     setup();
     fireEvent.click(screen.getByText('x'));

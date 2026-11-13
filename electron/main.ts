@@ -381,7 +381,7 @@ ipcMain.handle('open-external', async (_event, url: string) => {
 ipcMain.handle('task-id:action', async (_event, action: TaskIdAction, taskId: string) => {
   if (!isTaskId(taskId)) return { success: false, error: 'Not a task id' };
   const url = taskUrl(getSetting('apiBaseUrl'), taskId);
-  const open = () => { void shell.openExternal(url); };
+  const open = () => { shell.openExternal(url).catch(err => console.error("Failed to open task link:", err)); };
   if (action === 'copy') clipboard.writeText(taskId);
   else if (action === 'copy-link') clipboard.writeText(url);
   else if (action === 'open') open();
