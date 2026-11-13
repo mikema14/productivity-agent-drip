@@ -13,6 +13,9 @@ Nothing goes to Easy8 — Marek sends it from Drip -> Review -> "Log N to Easy8"
   drip_log.py plan  --task 645001 --minutes 180 [--date 2026-11-13]
   drip_log.py apply --task 645001 --minutes 180 [--date ...] --billable 1 --comment "..." --comment "..."
 
+  drip_log.py entries --task 645001 [--date ...]          # what is already on the task that day
+  drip_log.py amend --id <entry id> --minutes 90 [--comment "..."]   # fix one unsent entry; 0 = remove
+
 `plan` prints JSON with one chunk per entry; `apply` needs exactly one --comment per chunk.
 """
 import argparse
@@ -141,7 +144,7 @@ def apply_plan(conn: sqlite3.Connection, plan: dict, comments: list[str], billab
                         (s["id"],),
                     )
                 before = " + ".join(f"{s['minutes']}m" for s in chunk["merges_sessions"])
-                out.append(f"session {keep['id'][:8]}: {before} '{keep['comment'] or ''}' → "
+                out.append(f"session {keep['id']}: {before} '{keep['comment'] or ''}' → "
                            f"{size}m '{comment}' (billable {billable})"
                            + (f", merged {len(merged)} session(s)" if merged else ""))
             else:
@@ -153,24 +156,84 @@ def apply_plan(conn: sqlite3.Connection, plan: dict, comments: list[str], billab
                     (new_id, plan["date"], size, title, plan["task"], comment, billable, iso(cursor)),
                 )
                 cursor += timedelta(minutes=size)
-                out.append(f"new entry {new_id[:8]}: none → {size}m '{comment}' (billable {billable})")
+                out.append(f"new entry {new_id}: none → {size}m '{comment}' (billable {billable})")
     return out
+
+
+def day_entries(conn: sqlite3.Connection, task: str, day: str) -> list[dict]:
+    """Everything on the task that day, oldest first — named, unnamed and sent."""
+    rows = conn.execute(
+        """SELECT 'session' AS kind, id, start_at AS start, duration_minutes AS minutes, comment,
+                  COALESCE(logged, 0) AS logged FROM pomodoro_sessions
+           WHERE date(start_at) = date(?) AND task_id = ? AND source = 'pomodoro'
+           UNION ALL
+           SELECT 'entry', id, start_time, duration_minutes, comment, COALESCE(logged, 0)
+           FROM adhoc_entries WHERE date = ? AND task_id = ? AND COALESCE(is_todo, 0) = 0
+           ORDER BY start""",
+        (day, task, day, task),
+    ).fetchall()
+    return [dict(r) | {"unnamed": is_unnamed(r["comment"])} for r in rows]
+
+
+def amend(conn: sqlite3.Connection, entry_id: str, minutes: int, comment: str | None) -> str:
+    """Change one not-yet-sent entry's length (0 = remove it) and optionally its comment."""
+    if not 0 <= minutes <= MAX_ENTRY_MIN:
+        raise ValueError(f"--minutes must be 0–{MAX_ENTRY_MIN} for one entry")
+    for table, start_col in (("pomodoro_sessions", "start_at"), ("adhoc_entries", "start_time")):
+        row = conn.execute(f"SELECT id, {start_col} AS start, duration_minutes, comment, "
+                           f"COALESCE(logged, 0) AS logged FROM {table} WHERE id = ?",
+                           (entry_id,)).fetchone()
+        if not row:
+            continue
+        if row["logged"]:
+            raise ValueError("entry already sent to Easy8 — change it in Easy8, not here")
+        new_comment = comment if comment and comment.strip() else row["comment"]
+        before = f"{row['duration_minutes']}m '{row['comment'] or ''}'"
+        with conn:
+            if minutes == 0:
+                conn.execute(f"DELETE FROM {table} WHERE id = ? AND COALESCE(logged, 0) = 0", (entry_id,))
+                return f"{entry_id}: {before} → removed"
+            if table == "pomodoro_sessions":
+                end = iso(parse_iso(row["start"]) + timedelta(minutes=minutes))
+                conn.execute("UPDATE pomodoro_sessions SET duration_minutes = ?, end_at = ?, comment = ? "
+                             "WHERE id = ? AND COALESCE(logged, 0) = 0",
+                             (minutes, end, new_comment, entry_id))
+            else:
+                conn.execute("UPDATE adhoc_entries SET duration_minutes = ?, comment = ? "
+                             "WHERE id = ? AND COALESCE(logged, 0) = 0", (minutes, new_comment, entry_id))
+        return f"{entry_id}: {before} → {minutes}m '{new_comment}'"
+    raise ValueError(f"no entry with id {entry_id}")
 
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("action", choices=["plan", "apply"])
-    p.add_argument("--task", required=True)
-    p.add_argument("--minutes", type=int, required=True)
+    p.add_argument("action", choices=["plan", "apply", "entries", "amend"])
+    p.add_argument("--task")
+    p.add_argument("--id", help="amend: entry id from apply / entries output")
+    p.add_argument("--minutes", type=int)
     p.add_argument("--date", default=date.today().isoformat(), help="local day, YYYY-MM-DD (default today)")
     p.add_argument("--billable", type=int, choices=[0, 1])
     p.add_argument("--comment", action="append", default=[])
     p.add_argument("--db", type=Path, default=DB_PATH)
     a = p.parse_args(argv)
-    if not a.task.isdigit():
+    if a.action == "amend":
+        if not a.id or a.minutes is None:
+            print("ERROR: amend needs --id and --minutes", file=sys.stderr)
+            return 2
+        try:
+            conn = connect(a.db, write=True)
+            print(amend(conn, a.id, a.minutes, a.comment[0] if a.comment else None))
+            conn.close()
+            return 0
+        except ValueError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 2
+    if not a.task or not a.task.isdigit():
         print("ERROR: --task must be an Easy8 task number", file=sys.stderr)
         return 2
-    if not 1 <= a.minutes <= 1440:
+    if a.action == "entries":
+        a.minutes = 1
+    if a.minutes is None or not 1 <= a.minutes <= 1440:
         print("ERROR: --minutes must be 1–1440", file=sys.stderr)
         return 2
     try:
@@ -179,6 +242,10 @@ def main(argv: list[str] | None = None) -> int:
         print("ERROR: --date must be YYYY-MM-DD", file=sys.stderr)
         return 2
     try:
+        if a.action == "entries":
+            with connect(a.db, write=False) as conn:
+                print(json.dumps(day_entries(conn, a.task, a.date), indent=2))
+            return 0
         if a.action == "plan":
             with connect(a.db, write=False) as conn:
                 print(json.dumps(build_plan(conn, a.task, a.minutes, a.date), indent=2))

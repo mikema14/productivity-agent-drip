@@ -140,6 +140,40 @@ class DripLogTest(unittest.TestCase):
         local = datetime.fromisoformat(st.replace("Z", "+00:00")).astimezone()
         self.assertEqual((local.date().isoformat(), local.hour), ("2026-11-12", 16))
 
+    def test_second_log_adds_and_keeps_first(self):
+        self.session("s0", "09:00", 25)
+        self.run_log(120, ["Fixed VAT field"])
+        self.session("s1", "12:00", 25)
+        self.run_log(60, ["Tested export with client data"])
+        self.assertEqual(self.total(), 180)
+        rows = drip_log.day_entries(self.conn, TASK, DAY)
+        self.assertEqual([(r["minutes"], r["comment"]) for r in rows],
+                         [(120, "Fixed VAT field"), (60, "Tested export with client data")])
+
+    def test_amend_changes_length_and_comment_then_removes(self):
+        self.run_log(120, ["Fixed VAT field"])
+        eid = self.conn.execute("SELECT id FROM adhoc_entries").fetchone()[0]
+        drip_log.amend(self.conn, eid, 90, None)
+        self.assertEqual(tuple(self.conn.execute("SELECT duration_minutes, comment FROM adhoc_entries").fetchone()),
+                         (90, "Fixed VAT field"))
+        drip_log.amend(self.conn, eid, 90, "Fixed VAT field in export")
+        self.assertEqual(self.conn.execute("SELECT comment FROM adhoc_entries").fetchone()[0], "Fixed VAT field in export")
+        drip_log.amend(self.conn, eid, 0, None)
+        self.assertEqual(self.total(), 0)
+
+    def test_amend_session_moves_end_and_refuses_sent_or_over_2h(self):
+        self.session("s0", "09:00", 25)
+        drip_log.amend(self.conn, "s0", 45, "Built mapping")
+        self.assertEqual(self.conn.execute("SELECT end_at FROM pomodoro_sessions WHERE id='s0'").fetchone()[0],
+                         f"{DAY}T09:45:00.000Z")
+        self.session("sent", "10:00", 25, logged=1)
+        with self.assertRaises(ValueError):
+            drip_log.amend(self.conn, "sent", 30, None)
+        with self.assertRaises(ValueError):
+            drip_log.amend(self.conn, "s0", 150, None)
+        with self.assertRaises(ValueError):
+            drip_log.amend(self.conn, "nope", 30, None)
+
     def test_other_day_ignored(self):
         self.conn.execute("INSERT INTO pomodoro_sessions (id, start_at, duration_minutes, task_id, comment)"
                           " VALUES ('y', '2026-11-12T09:00:00.000Z', 25, ?, NULL)", (TASK,))
