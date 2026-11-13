@@ -876,6 +876,16 @@ export function checkTimerHydration() {
   }
 }
 
+/**
+ * `duration` on drip://start-focus: whole minutes 1–180, else undefined
+ * (the focus then runs Now's current length).
+ */
+export function parseDeeplinkDuration(raw: string | undefined): number | undefined {
+  if (!raw || !/^\d+$/.test(raw.trim())) return undefined;
+  const minutes = Number(raw.trim());
+  return minutes >= 1 && minutes <= 180 ? minutes : undefined;
+}
+
 // Track if listeners are already set up to prevent duplicates
 let listenersSetup = false;
 
@@ -946,6 +956,10 @@ export function setupMainTimerListeners() {
     if (state.status === 'idle') {
       if (data.intention) {
         state.setIntention(data.intention);
+      }
+      const minutes = parseDeeplinkDuration(data.duration);
+      if (minutes !== undefined) {
+        state.setDurationMinutes(minutes);
       }
       state.startFocus(data.taskId);
     }

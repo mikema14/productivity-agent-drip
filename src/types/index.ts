@@ -327,7 +327,7 @@ export interface TimerAPI {
   onTimerTick: (callback: (remainingSeconds: number) => void) => void;
   onTimerComplete: (callback: (timerType: 'focus' | 'break') => void) => void;
   onTimerExtended: (callback: (newRemaining: number) => void) => void;
-  onUrlStartFocus: (callback: (data: { taskId?: string; intention?: string }) => void) => void;
+  onUrlStartFocus: (callback: (data: { taskId?: string; intention?: string; duration?: string }) => void) => void;
   onUrlTimerAction: (callback: (action: 'pause' | 'resume' | 'stop' | 'finish-early' | 'start-break' | 'skip-break', data?: any) => void) => void;
   toggleTray: (show: boolean) => Promise<void>;
   // Session-end overlay

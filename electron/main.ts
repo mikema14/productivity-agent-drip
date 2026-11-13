@@ -172,9 +172,11 @@ function handleDripUrl(url: string) {
       case 'start-focus': {
         const taskId = params.get('taskId') || undefined;
         const intention = params.get('intention') || '';
+        // Optional whole minutes; the renderer validates it (1–180) and ignores anything else.
+        const duration = params.get('duration') || undefined;
         // Send to renderer to start focus via the store (handles session count, break logic, etc.)
         if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('url-start-focus', { taskId, intention });
+          mainWindow.webContents.send('url-start-focus', { taskId, intention, duration });
           revealWindow(mainWindow);
         }
         break;

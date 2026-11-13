@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { setupMainTimerListeners, useTimerStore } from './timerStore';
+import { parseDeeplinkDuration, setupMainTimerListeners, useTimerStore } from './timerStore';
 import { resetTimer, setTimer } from '../test/timerState';
 import type { IdleCommand, PomodoroSession } from '../types';
 
@@ -14,13 +14,16 @@ const today = new Date().toISOString().split('T')[0];
 // the first time and reuse them (they read window.timerAPI lazily).
 let idleCommand: ((command: IdleCommand) => void) | null = null;
 let extended: ((remaining: number) => void) | null = null;
+type UrlStartFocus = (data: { taskId?: string; intention?: string; duration?: string }) => void;
+let urlStartFocus: UrlStartFocus | null = null;
 function listeners() {
   if (!idleCommand) {
     setupMainTimerListeners();
     idleCommand = vi.mocked(window.timerAPI.onIdleCommand).mock.calls[0][0];
     extended = vi.mocked(window.timerAPI.onTimerExtended).mock.calls[0][0];
+    urlStartFocus = vi.mocked(window.timerAPI.onUrlStartFocus).mock.calls[0][0];
   }
-  return { idleCommand: idleCommand!, extended: extended! };
+  return { idleCommand: idleCommand!, extended: extended!, urlStartFocus: urlStartFocus! };
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -204,5 +207,44 @@ describe('timerStore — pending break', () => {
     expect(useTimerStore.getState().pendingBreakMinutes).toBe(10);
     await useTimerStore.getState().reset();
     expect(useTimerStore.getState().pendingBreakMinutes).toBeNull();
+  });
+});
+
+describe('timerStore — drip://start-focus duration', () => {
+  beforeEach(() => {
+    resetTimer();
+    setTimer({ durationMinutes: 25, sessionCount: 0 });
+    window.timerAPI.startMainTimer = vi.fn(async () => ({ raycastFocus: false }));
+  });
+  afterEach(() => resetTimer());
+
+  it('a valid duration starts a focus of that many minutes', async () => {
+    listeners().urlStartFocus({ taskId: '645001', intention: '', duration: '30' });
+    await flush();
+    expect(window.timerAPI.startMainTimer).toHaveBeenCalledWith(1800, 'focus', 6, '645001', undefined);
+    const s = useTimerStore.getState();
+    expect(s.status).toBe('focus');
+    expect(s.totalDuration).toBe(1800);
+    expect(s.durationMinutes).toBe(30);
+  });
+
+  it('without duration the focus runs Now\'s current length', async () => {
+    listeners().urlStartFocus({ taskId: '645001', intention: '' });
+    await flush();
+    expect(window.timerAPI.startMainTimer).toHaveBeenCalledWith(1500, 'focus', 5, '645001', undefined);
+    expect(useTimerStore.getState().durationMinutes).toBe(25);
+  });
+
+  it.each(['0', '181', '2.5', '-5', 'abc', '30m', ''])('duration %j is ignored', async (duration) => {
+    listeners().urlStartFocus({ taskId: '645001', intention: '', duration });
+    await flush();
+    expect(window.timerAPI.startMainTimer).toHaveBeenCalledWith(1500, 'focus', 5, '645001', undefined);
+    expect(useTimerStore.getState().durationMinutes).toBe(25);
+  });
+
+  it('accepts the 1 and 180 bounds', () => {
+    expect(parseDeeplinkDuration('1')).toBe(1);
+    expect(parseDeeplinkDuration('180')).toBe(180);
+    expect(parseDeeplinkDuration(undefined)).toBeUndefined();
   });
 });

@@ -167,7 +167,7 @@ const timerAPI: TimerAPI = {
     ipcRenderer.on('timer-extended', (_event, newRemaining) => callback(newRemaining));
   },
 
-  onUrlStartFocus: (callback: (data: { taskId?: string; intention?: string }) => void) => {
+  onUrlStartFocus: (callback: (data: { taskId?: string; intention?: string; duration?: string }) => void) => {
     ipcRenderer.on('url-start-focus', (_event, data) => callback(data));
   },
 
