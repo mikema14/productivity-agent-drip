@@ -125,7 +125,7 @@ export default function TemplateManagerModal({ isOpen, onClose, onTemplatesChang
                       {template.name}
                     </div>
                     <div className="text-sm text-txt-muted">
-                      Task {template.task_id} · {template.default_duration || 15}m ·{' '}
+                      Task <span data-task-id={template.task_id} className="font-mono">{template.task_id}</span> · {template.default_duration || 15}m ·{' '}
                       {template.billable ? 'Billable' : 'Non-billable'}
                       {template.comment && (
                         <span className="block mt-0.5 italic">"{template.comment}"</span>

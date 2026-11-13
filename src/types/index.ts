@@ -312,6 +312,8 @@ export interface TimerAPI {
   onCalendarFeedUpdated?: (callback: () => void) => () => void;
   getDaysSinceLastLog?: () => Promise<number | null>;
   openExternal?: (url: string) => Promise<void>;
+  /** Copy a task id / its Easy8 link, open it in the browser, or show the right-click menu (main process). */
+  taskIdAction?: (action: 'copy' | 'copy-link' | 'open' | 'menu', taskId: string) => Promise<void>;
   // Main process timer control
   /** Resolves with whether main asked Raycast Focus to start alongside the timer. */
   startMainTimer: (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string, kickoffRolloverSeconds?: number) => Promise<{ raycastFocus: boolean }>;

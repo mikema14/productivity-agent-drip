@@ -38,7 +38,7 @@ export default function UpNext({ rows, trackedMinutes, onSwitch, onOpenPlan }: P
               className="flex items-center gap-3.5 h-[42px] px-3.5 border border-drip-elevated rounded-[2px] text-left transition-colors hover:border-drip-border hover:bg-focus/5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-drip-elevated"
             >
               <span className="font-mono text-[10.5px] text-txt-muted">{row.index.toString().padStart(2, '0')}</span>
-              {row.taskId && <span className="font-mono text-[12px] text-focus">{row.taskId}</span>}
+              {row.taskId && <span data-task-id={row.taskId} className="font-mono text-[12px] text-focus">{row.taskId}</span>}
               <span className="flex-1 min-w-0 font-display text-[14px] text-txt-primary truncate">{row.title}</span>
               {minutes > 0 && <span className="font-mono text-[11.5px] text-txt-secondary">{formatMinutesPadded(minutes)}</span>}
             </button>

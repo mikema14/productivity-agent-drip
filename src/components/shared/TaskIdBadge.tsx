@@ -31,7 +31,7 @@ export default function TaskIdBadge({ taskId, taskName, className = '', plain = 
       onMouseEnter={showTooltip}
       onMouseLeave={hideTooltip}
     >
-      <span className="font-mono">{plain ? taskId : `#${taskId}`}</span>
+      <span data-task-id={taskId} className="font-mono">{plain ? taskId : `#${taskId}`}</span>
       {tooltipPos && taskName && (
         <span
           className="fixed px-2.5 py-1.5 text-xs text-txt-primary bg-drip-elevated border border-focus/30 rounded-lg shadow-lg z-[9999] pointer-events-none animate-fade-in max-w-[280px] break-words"

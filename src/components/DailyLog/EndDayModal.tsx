@@ -208,7 +208,7 @@ export default function EndDayModal({ date, onClose, onSuccess, initialReflectio
                   <div className="text-sm text-txt-muted mb-1">Tasks Worked On:</div>
                   <div className="flex flex-wrap gap-2">
                     {tasksWorked.map(taskId => (
-                      <span key={taskId} className="px-2 py-1 bg-focus/5 border border-focus/20 text-txt-secondary rounded-full text-sm font-mono">
+                      <span key={taskId} data-task-id={taskId} className="px-2 py-1 bg-focus/5 border border-focus/20 text-txt-secondary rounded-full text-sm font-mono">
                         {taskId}
                       </span>
                     ))}

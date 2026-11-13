@@ -110,7 +110,7 @@ export default function TaskPickerPopover({ onPick, onClose }: Props) {
             onMouseEnter={() => setHighlighted(i)}
             className={`w-full h-8 px-3 flex items-center gap-3 text-left transition-colors ${i === highlighted ? 'bg-focus/10' : ''}`}
           >
-            <span className="shrink-0 font-mono text-[12px] text-focus">{task.task_id}</span>
+            <span data-task-id={task.task_id} className="shrink-0 font-mono text-[12px] text-focus">{task.task_id}</span>
             <span className="min-w-0 truncate font-display text-[13px] text-txt-secondary">{task.title}</span>
           </button>
         ))}

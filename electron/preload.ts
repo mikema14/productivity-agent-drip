@@ -105,6 +105,10 @@ const timerAPI: TimerAPI = {
     await ipcRenderer.invoke('open-external', url);
   },
 
+  taskIdAction: async (action: 'copy' | 'copy-link' | 'open' | 'menu', taskId: string): Promise<void> => {
+    await ipcRenderer.invoke('task-id:action', action, taskId);
+  },
+
   // Main process timer control
   startMainTimer: async (duration: number, timerType: 'focus' | 'break', nextBreakDuration?: 5 | 10, taskId?: string, kickoffRolloverSeconds?: number): Promise<{ raycastFocus: boolean }> => {
     const result = await ipcRenderer.invoke('start-main-timer', duration, timerType, nextBreakDuration, taskId, kickoffRolloverSeconds);

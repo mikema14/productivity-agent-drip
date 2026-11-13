@@ -117,7 +117,7 @@ export default function KickoffTakeover() {
         <div className="flex items-center gap-2.5 text-[18px] text-txt-secondary min-w-0 max-w-full px-4">
           {currentTaskId ? (
             <>
-              <span data-testid="kickoff-task-id" className="font-mono text-[15px] text-focus bg-focus/10 rounded-[2px] px-2 py-0.5 shrink-0">
+              <span data-testid="kickoff-task-id" data-task-id={currentTaskId} className="font-mono text-[15px] text-focus bg-focus/10 rounded-[2px] px-2 py-0.5 shrink-0">
                 {currentTaskId}
               </span>
               <span className="truncate">{taskName || intention}</span>

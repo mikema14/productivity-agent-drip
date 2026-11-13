@@ -46,7 +46,7 @@ export default function TodaysThree() {
           <div key={item.id} data-testid="today-item" className="flex flex-col gap-1.5 px-3 py-2.5 border border-drip-border rounded-[2px]">
             <span className="flex items-baseline gap-2 min-w-0 font-display text-[13px] text-txt-primary">
               {taskId
-                ? <span className="shrink-0 font-mono text-[11px] text-focus">{taskId}</span>
+                ? <span data-task-id={taskId} className="shrink-0 font-mono text-[11px] text-focus">{taskId}</span>
                 : <span className="shrink-0 font-display text-[11px] text-txt-dim">No task ID</span>}
               <span title={item.title} className="min-w-0 truncate">{item.title}</span>
             </span>
@@ -72,7 +72,7 @@ export default function TodaysThree() {
             <svg aria-hidden width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-break">
               <path d="M2.5 6.2l2.3 2.3 4.7-5" />
             </svg>
-            {taskId && <span className="shrink-0 font-mono text-[11px]">{taskId}</span>}
+            {taskId && <span data-task-id={taskId} className="shrink-0 font-mono text-[11px]">{taskId}</span>}
             <span title={item.title} className="flex-1 min-w-0 truncate">{item.title}</span>
             <button
               type="button"

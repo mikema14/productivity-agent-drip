@@ -95,7 +95,7 @@ export default function TaskCardWithPicker({
         className="shrink-0 flex flex-col gap-1 cursor-pointer group"
       >
         <span className="now-label text-txt-muted flex items-center gap-2">
-          <span className="text-focus normal-case tracking-normal font-mono text-[12px]">{task.task_id}</span>
+          <span data-task-id={task.task_id} className="text-focus normal-case tracking-normal font-mono text-[12px]">{task.task_id}</span>
           {task.project_name && <span className="truncate">— {task.project_name}</span>}
           <span
             className="ml-auto text-txt-muted group-hover:text-txt-primary transition-transform"
