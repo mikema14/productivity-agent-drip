@@ -17,6 +17,7 @@ Nothing goes to Easy8 — Marek sends it from Drip -> Review -> "Log N to Easy8"
 """
 import argparse
 import json
+import re
 import sqlite3
 import sys
 import uuid
@@ -26,7 +27,14 @@ from pathlib import Path
 DB_PATH = Path.home() / "Library/Application Support/drip/productivity.db"
 MAX_ENTRY_MIN = 120
 UNNAMED = ("", "focus session", "kickoff")
+# Drip's Finish early default comment, timerStore: `Finished early (${elapsedMinutes}m)`.
+FINISHED_EARLY = re.compile(r"^finished early \(\d+m\)$")
 BUSY_TIMEOUT_S = 5.0
+
+
+def is_unnamed(comment: str | None) -> bool:
+    text = (comment or "").strip().lower()
+    return text in UNNAMED or bool(FINISHED_EARLY.match(text))
 
 
 def connect(db_path: Path, write: bool) -> sqlite3.Connection:
@@ -53,7 +61,7 @@ def unnamed_sessions(conn: sqlite3.Connection, task: str, day: str) -> list[sqli
              AND COALESCE(logged, 0) = 0 ORDER BY start_at""",
         (day, task),
     ).fetchall()
-    return [r for r in rows if (r["comment"] or "").strip().lower() in UNNAMED]
+    return [r for r in rows if is_unnamed(r["comment"])]
 
 
 def build_plan(conn: sqlite3.Connection, task: str, minutes: int, day: str) -> dict:
@@ -107,6 +115,9 @@ def apply_plan(conn: sqlite3.Connection, plan: dict, comments: list[str], billab
     if any(not c.strip() for c in comments):
         raise ValueError("comments must not be empty")
     now = now or datetime.now(timezone.utc)
+    if plan["date"] != now.astimezone().date().isoformat():
+        # Another day: new entries end at 17:00 local that day instead of today's clock.
+        now = datetime.fromisoformat(f"{plan['date']}T17:00:00").astimezone()
     title = plan["title"] or f"Task {plan['task']}"
     out: list[str] = []
     # New entries with no session to anchor them sit back-to-back, ending now.

@@ -124,6 +124,22 @@ class DripLogTest(unittest.TestCase):
         self.assertEqual(tuple(get("other")), (25, "Focus session"))
         self.assertEqual(tuple(get("kick")), (60, "Afternoon work"))
 
+    def test_finished_early_counts_as_unnamed(self):
+        self.session("fe", "09:00", 12, comment="Finished early (12m)")
+        self.session("own", "10:00", 12, comment="Finished early: VAT fix")
+        self.run_log(30, ["Fixed VAT field"])
+        get = lambda i: tuple(self.conn.execute("SELECT duration_minutes, comment FROM pomodoro_sessions WHERE id=?", (i,)).fetchone())
+        self.assertEqual(get("fe"), (30, "Fixed VAT field"))
+        self.assertEqual(get("own"), (12, "Finished early: VAT fix"))
+
+    def test_past_day_new_entries_sit_on_that_day(self):
+        self.conn.execute("DELETE FROM adhoc_entries")
+        plan = drip_log.build_plan(self.conn, TASK, 60, "2026-11-12")
+        drip_log.apply_plan(self.conn, plan, ["Yesterday work"], 1, now=NOW)
+        st = self.conn.execute("SELECT start_time FROM adhoc_entries").fetchone()[0]
+        local = datetime.fromisoformat(st.replace("Z", "+00:00")).astimezone()
+        self.assertEqual((local.date().isoformat(), local.hour), ("2026-11-12", 16))
+
     def test_other_day_ignored(self):
         self.conn.execute("INSERT INTO pomodoro_sessions (id, start_at, duration_minutes, task_id, comment)"
                           " VALUES ('y', '2026-11-12T09:00:00.000Z', 25, ?, NULL)", (TASK,))
